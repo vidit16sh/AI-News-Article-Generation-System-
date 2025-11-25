@@ -1,0 +1,45 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  news  CleanedNews[]
+}
+
+model RawNews {
+  id        String   @id @default(uuid())
+  sourceUrl String   @unique
+  title     String
+  rawBody   String?
+  fetchedAt DateTime @default(now())
+  processed Boolean  @default(false)
+}
+
+model CleanedNews {
+  id           String   @id @default(uuid())
+  title        String
+  summary      String
+  content      String
+  sourceUrl    String
+  publishedAt  DateTime
+  categoryId   Int
+  category     Category @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model ProcessingLog {
+  id        Int      @id @default(autoincrement())
+  newsId    String?
+  status    String   
+  message   String
+  timestamp DateTime @default(now())
+}
