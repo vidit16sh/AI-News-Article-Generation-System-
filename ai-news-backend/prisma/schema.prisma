@@ -49,14 +49,31 @@ model ProcessingLog {
 
 model GeneratedArticle {
   id              String   @id @default(uuid())
+  originalNewsId  String   @unique
+  originalNews    CleanedNews @relation(fields: [originalNewsId], references: [id])
+
+  // Core Content
   headline        String
   slug            String   @unique
   metaDescription String
+  articleHtml     String   // The full HTML body
+  // Metadata & SEO
   tags            String[] // Stores tags as a list
-  content         String   // The HTML body
-  createdAt       DateTime @default(now())
+  keywords        String[] // Main keywords
   
-  // Link back to the source signal
-  originalNewsId  String   @unique
-  originalNews    CleanedNews @relation(fields: [originalNewsId], references: [id])
+  imageUrl        String? 
+  
+  rssEntry        String?  @db.Text // Store the <item> XML
+  sitemapEntry    String?  @db.Text // Store the <url> XML
+  
+  // Advanced Fields (Requested in your prompt)
+  newsJsonLd      Json?    // Stores the Schema.org JSON-LD object
+  originalityScore Float   @default(0.0)
+  confidenceScore  Float   @default(0.0)
+  
+  // Publishing Status
+  status          String   @default("DRAFT") // DRAFT, PUBLISHED, REVIEW
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

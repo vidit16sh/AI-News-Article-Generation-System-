@@ -1,9 +1,9 @@
 require('dotenv').config();
-const Bottleneck = require('bottleneck'); // <--- IMPORT THIS
-const { connectRabbit } = require('./config/rabbit');
-const prisma = require('./config/db');
-const { cleanText } = require('./services/cleaner.service');
-const { classifyNews, getOrCreateCategory } = require('./services/classifier.service');
+const Bottleneck = require('bottleneck'); 
+const { connectRabbit } = require('../config/rabbit');
+const prisma = require('../config/db');
+const { cleanText } = require('../services/cleaner.service');
+const { classifyNews, getOrCreateCategory } = require('../services/classifier.service');
 
 // 🛑 RATE LIMITER CONFIGURATION
 // safe limit: 1 request every 4000ms (4 seconds) = 15 per minute
@@ -16,7 +16,7 @@ const processJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
     const { rawNewsId } = content;
 
-    console.log(`\n⚙️  [Worker] Picked up: ${rawNewsId}`);
+    console.log(`\n⚙️  [Ingest-Worker] Picked up: ${rawNewsId}`);
 
     try {
         const rawNews = await prisma.rawNews.findUnique({ where: { id: rawNewsId } });
@@ -37,7 +37,8 @@ const processJob = async (msg, channel) => {
 
         const category = await getOrCreateCategory(categoryName);
 
-await prisma.cleanedNews.create({
+        // 1. Save Cleaned Data
+        const finalNews = await prisma.cleanedNews.create({
             data: {
                 title: rawNews.title,
                 summary: cleanedBody.substring(0, 150) + "...",
@@ -51,12 +52,20 @@ await prisma.cleanedNews.create({
             }
         });
 
+        // 2. Mark Raw as Processed
         await prisma.rawNews.update({
             where: { id: rawNewsId },
             data: { processed: true }
         });
 
         console.log(`   ✅ Done! Classified as: ${categoryName}`);
+
+        // 3. TRIGGER MODEL 2 (The AI Writer)
+        // This sends the ID to the Generation Worker
+        const payload = { newsId: finalNews.id };
+        channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
+        console.log(`   ➡️  Triggered Model 2 (Sent to generation_queue)`);
+
         channel.ack(msg);
 
     } catch (err) {
@@ -74,10 +83,13 @@ await prisma.cleanedNews.create({
 const startWorker = async () => {
     const channel = await connectRabbit();
     
+    // Ensure the generation queue exists so we don't crash when sending to it
+    await channel.assertQueue('generation_queue', { durable: true });
+
     // ⚠️ CRITICAL: Only take 1 job at a time
     channel.prefetch(1); 
     
-    console.log("👀 Worker waiting... (Rate Limit: 1 req/4s)");
+    console.log("👀 Ingest Worker waiting... (Rate Limit: 1 req/4s)");
 
     channel.consume('ingest_queue', (msg) => {
         if (msg) processJob(msg, channel);
