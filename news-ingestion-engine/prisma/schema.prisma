@@ -19,7 +19,8 @@ model RawNews {
   id        String   @id @default(uuid())
   sourceUrl String   @unique
   title     String
-  rawBody   String?
+  rawBody   String? 
+  publishedAt DateTime @default(now())
   fetchedAt DateTime @default(now())
   processed Boolean  @default(false)
 }
@@ -33,7 +34,9 @@ model CleanedNews {
   publishedAt  DateTime
   categoryId   Int
   category     Category @relation(fields: [categoryId], references: [id])
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) 
+  
+  generatedArticle GeneratedArticle?
 }
 
 model ProcessingLog {
@@ -42,4 +45,18 @@ model ProcessingLog {
   status    String   
   message   String
   timestamp DateTime @default(now())
+} 
+
+model GeneratedArticle {
+  id              String   @id @default(uuid())
+  headline        String
+  slug            String   @unique
+  metaDescription String
+  tags            String[] // Stores tags as a list
+  content         String   // The HTML body
+  createdAt       DateTime @default(now())
+  
+  // Link back to the source signal
+  originalNewsId  String   @unique
+  originalNews    CleanedNews @relation(fields: [originalNewsId], references: [id])
 }

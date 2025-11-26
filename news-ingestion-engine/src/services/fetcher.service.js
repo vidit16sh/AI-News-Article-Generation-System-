@@ -1,47 +1,74 @@
 const Parser = require('rss-parser');
 const redis = require('../config/redis');
 const prisma = require('../config/db');
+const { connectRabbit } = require('../config/rabbit');
+const { scrapeArticle } = require('./scraper.service'); 
 
-const parser = new Parser();
+// Configure parser to look for full content tags
+const parser = new Parser({
+    customFields: {
+        item: [
+            ['content:encoded', 'fullContent'], 
+            ['content', 'normalContent']
+        ],
+    }
+});
 
 const fetchRSS = async (url) => {
     console.log(`\n🔍 Fetching RSS: ${url}`);
+    const channel = await connectRabbit();
     
     try {
         const feed = await parser.parseURL(url);
-        console.log(`Found ${feed.items.length} items.`);
-
         let newCount = 0;
 
         for (const item of feed.items) {
             const link = item.link;
 
-            // 1. DEDUPLICATION: Check Redis
-            // If we have seen this link in the last 24 hours, skip it.
+            // 1. Deduplication (Redis)
             const isCached = await redis.get(`news:${link}`);
             if (isCached) {
-                process.stdout.write("."); // Visual feedback for skipped items
+                process.stdout.write(".");
                 continue;
             }
 
-            // 2. SAVE: Insert into Postgres (RawNews table)
-            await prisma.rawNews.create({
-                data: {
+            // 2. INTELLIGENT PARSING
+            // Try to find the longest content available
+            let bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
+            
+            if (bestContent.length < 200) {
+                const scrapedText = await scrapeArticle(link);
+                if (scrapedText) {
+                    bestContent = scrapedText;
+                    console.log(`   📝 Scraped ${bestContent.length} chars of real content.`);
+                }
+            }
+            // Fix Date: Use the real pubDate, fallback to now only if missing
+            const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
+
+            // 3. Save Raw to DB
+            const raw = await prisma.rawNews.create({
+                 // ... same as before
+                 data: {
                     sourceUrl: link,
                     title: item.title,
-                    rawBody: item.content || item.contentSnippet || "",
+                    rawBody: bestContent, // <--- NOW THIS HAS REAL TEXT
+                    publishedAt: pubDate,
                     processed: false 
                 }
             });
 
-            // 3. CACHE: Mark as seen in Redis
-            // 'EX', 86400 means expire in 24 hours (86400 seconds)
+            // 4. Cache & Queue
             await redis.set(`news:${link}`, '1', 'EX', 86400);
+
+            const payload = { rawNewsId: raw.id };
+            channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(payload)));
+            console.log(`   ➡️  Queued: ${raw.title.substring(0, 30)}...`);
             
             newCount++;
         }
 
-        console.log(`\n✅ Saved ${newCount} NEW articles.`);
+        console.log(`\n✅ Saved & Queued ${newCount} NEW articles.`);
         return newCount;
 
     } catch (err) {
