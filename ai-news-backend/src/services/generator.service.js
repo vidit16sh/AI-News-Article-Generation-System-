@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -44,7 +44,7 @@ Return exactly one JSON object with these keys:
 - Headline length: 55–70 chars. No clickbait.
 `;
 
-const generateArticle = async (cleanedNewsData) => {
+export const generateArticle = async (cleanedNewsData) => {
     try {
         // Construct the User Prompt dynamically
         const userPrompt = `
@@ -76,5 +76,3 @@ const generateArticle = async (cleanedNewsData) => {
         throw error;
     }
 };
-
-module.exports = { generateArticle };

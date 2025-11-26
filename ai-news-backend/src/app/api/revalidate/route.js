@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
+    // Check API Key to prevent strangers from clearing your cache
     const authHeader = request.headers.get('x-admin-key');
     
-    // Basic Security Check
     if (authHeader !== process.env.API_SECRET_KEY) {
         return NextResponse.json({ message: 'Invalid Token' }, { status: 401 });
     }
@@ -13,10 +13,10 @@ export async function POST(request) {
     const { tag } = await request.json();
 
     if (!tag) {
-      return NextResponse.json({ message: 'Missing tag' }, { status: 400 });
+      return NextResponse.json({ message: 'Missing tag parameter' }, { status: 400 });
     }
 
-    // Trigger Revalidation
+    // Clear Next.js Cache
     revalidateTag(tag);
 
     return NextResponse.json({ revalidated: true, now: Date.now() });

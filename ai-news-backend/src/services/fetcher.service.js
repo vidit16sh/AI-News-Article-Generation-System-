@@ -1,8 +1,8 @@
-const Parser = require('rss-parser');
-const redis = require('../config/redis');
-const prisma = require('../config/db');
-const { connectRabbit } = require('../config/rabbit');
-const { scrapeArticle } = require('./scraper.service'); 
+import Parser from 'rss-parser';
+import redis from '../config/redis.js'; // .js extension!
+import prisma from '../config/db.js';   // .js extension!
+import { connectRabbit } from '../config/rabbit.js'; // .js extension!
+import { scrapeArticle } from './scraper.service.js';
 
 // Configure parser to look for full content tags
 const parser = new Parser({
@@ -14,7 +14,7 @@ const parser = new Parser({
     }
 });
 
-const fetchRSS = async (url) => {
+export const fetchRSS = async (url) => {
     console.log(`\n🔍 Fetching RSS: ${url}`);
     const channel = await connectRabbit();
     
@@ -76,5 +76,3 @@ const fetchRSS = async (url) => {
         return 0;
     }
 };
-
-module.exports = { fetchRSS };

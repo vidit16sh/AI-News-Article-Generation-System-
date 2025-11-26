@@ -1,8 +1,8 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-const UserAgent = require('user-agents');
+import axios from 'axios';
+import * as cheerio from 'cheerio'; // Cheerio works best with 'import * as'
+import UserAgent from 'user-agents';
 
-const scrapeArticle = async (url) => {
+export const scrapeArticle = async (url) => {
     try {
         console.log(`   🕷️  Scraping full text: ${url}`);
         
@@ -45,5 +45,3 @@ const scrapeArticle = async (url) => {
         return null;
     }
 };
-
-module.exports = { scrapeArticle };

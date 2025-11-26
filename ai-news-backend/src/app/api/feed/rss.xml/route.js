@@ -1,10 +1,9 @@
-import prisma from '@/lib/prisma';
+import prisma from '../../../../lib/prisma';
 
 export const revalidate = 3600; // Cache for 1 hour
 
-// Helper to escape XML characters
 const escapeXml = (unsafe) => {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
+  return unsafe ? unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {
       case '<': return '&lt;';
       case '>': return '&gt;';
@@ -12,7 +11,7 @@ const escapeXml = (unsafe) => {
       case '\'': return '&apos;';
       case '"': return '&quot;';
     }
-  });
+  }) : '';
 };
 
 export async function GET() {
@@ -21,6 +20,7 @@ export async function GET() {
   try {
     const articles = await prisma.generatedArticle.findMany({
       take: 50,
+      where: { status: 'PUBLISHED' },
       orderBy: { createdAt: 'desc' },
       select: {
         headline: true,
@@ -31,7 +31,6 @@ export async function GET() {
       }
     });
 
-    // Build XML String
     const items = articles.map((article) => `
       <item>
         <title>${escapeXml(article.headline)}</title>
@@ -43,11 +42,11 @@ export async function GET() {
     `).join('');
 
     const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
-      <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+      <rss version="2.0">
         <channel>
-          <title>AI News Feed</title>
+          <title>AI News Backend</title>
           <link>${baseUrl}</link>
-          <description>Latest breaking news in Crypto, Tech, and Finance.</description>
+          <description>Real-time AI generated news for Crypto and Tech.</description>
           <language>en-us</language>
           <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
           ${items}

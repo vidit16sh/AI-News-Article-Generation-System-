@@ -1,9 +1,9 @@
-require('dotenv').config();
-const Bottleneck = require('bottleneck'); 
-const { connectRabbit } = require('../config/rabbit');
-const prisma = require('../config/db');
-const { cleanText } = require('../services/cleaner.service');
-const { classifyNews, getOrCreateCategory } = require('../services/classifier.service');
+import 'dotenv/config'; 
+import Bottleneck from 'bottleneck';
+import { connectRabbit } from '../config/rabbit.js'; // Note the .js extension
+import prisma from '../config/db.js';
+import { cleanText } from '../services/cleaner.service.js';
+import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 
 // 🛑 RATE LIMITER CONFIGURATION
 // safe limit: 1 request every 4000ms (4 seconds) = 15 per minute

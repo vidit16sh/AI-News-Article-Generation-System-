@@ -1,6 +1,6 @@
-const sanitizeHtml = require('sanitize-html');
+import sanitizeHtml from 'sanitize-html';
 
-const cleanText = (text) => {
+export const cleanText = (text) => {
     if (!text) return "";
     
     // 1. Remove HTML tags (allow nothing)
@@ -18,4 +18,3 @@ const cleanText = (text) => {
     return clean;
 };
 
-module.exports = { cleanText };

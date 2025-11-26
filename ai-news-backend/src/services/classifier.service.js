@@ -1,5 +1,5 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const prisma = require('../config/db');
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import prisma from '../config/db.js';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -13,7 +13,7 @@ const RULES = {
     'Stocks': ['nasdaq', 'sp500', 'dow jones', 'shares', 'stock market']
 };
 
-const classifyNews = async (text, title) => {
+export const classifyNews = async (text, title) => {
     const combinedText = (title + " " + text).toLowerCase();
 
     // 1. TRY RULES FIRST
@@ -44,12 +44,10 @@ const classifyNews = async (text, title) => {
 };
 
 // Helper to ensure category exists in DB before saving
-const getOrCreateCategory = async (name) => {
+export const getOrCreateCategory = async (name) => {
     let cat = await prisma.category.findUnique({ where: { name } });
     if (!cat) {
         cat = await prisma.category.create({ data: { name } });
     }
     return cat;
 };
-
-module.exports = { classifyNews, getOrCreateCategory };

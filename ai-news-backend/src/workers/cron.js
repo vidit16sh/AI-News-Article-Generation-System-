@@ -1,6 +1,6 @@
-require('dotenv').config();
-const cron = require('node-cron');
-const { fetchRSS } = require('../services/fetcher.service');
+import 'dotenv/config';
+import cron from 'node-cron';
+import { fetchRSS } from '../services/fetcher.service.js';
 
 // Define your sources here
 const SOURCES = [

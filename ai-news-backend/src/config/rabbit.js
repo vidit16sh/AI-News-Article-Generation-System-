@@ -1,17 +1,18 @@
-const amqp = require('amqplib');
+import amqp from 'amqplib';
 
 let channel = null;
 
-const connectRabbit = async () => {
-    if (channel) return channel; // Return existing connection if open
-
+export const connectRabbit = async () => {
+    if (channel) return channel;
+    
     try {
         console.log("🐰 Connecting to RabbitMQ...");
-        const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://user:password@localhost:5672');
+        const connection = await amqp.connect(process.env.RABBITMQ_URL);
         channel = await connection.createChannel();
         
-        // Create the queue if it doesn't exist
+        // Assert queues
         await channel.assertQueue('ingest_queue', { durable: true });
+        await channel.assertQueue('generation_queue', { durable: true });
         
         console.log("✅ RabbitMQ Connected");
         return channel;
@@ -20,5 +21,3 @@ const connectRabbit = async () => {
         throw err;
     }
 };
-
-module.exports = { connectRabbit };

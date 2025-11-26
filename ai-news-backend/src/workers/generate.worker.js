@@ -1,9 +1,9 @@
-require('dotenv').config();
-const Bottleneck = require('bottleneck');
-const stringSimilarity = require('string-similarity'); // <--- NEW: For Originality Score
-const { connectRabbit } = require('../config/rabbit');
-const prisma = require('../config/db');
-const { generateArticle } = require('../services/generator.service');
+import 'dotenv/config';
+import Bottleneck from 'bottleneck';
+import stringSimilarity from 'string-similarity';
+import { connectRabbit } from '../config/rabbit.js';
+import prisma from '../config/db.js';
+import { generateArticle } from '../services/generator.service.js';
 
 // Rate Limiter (Adjust based on your plan)
 const limiter = new Bottleneck({
