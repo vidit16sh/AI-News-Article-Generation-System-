@@ -1,7 +1,7 @@
-require('dotenv').config(); // Load environment variables
-const { fetchRSS } = require('./src/services/fetcher.service');
-const prisma = require('./src/config/db');
-const redis = require('./src/config/redis');
+import 'dotenv/config';
+import { fetchRSS } from './src/services/fetcher.service.js';
+import prisma from './src/config/db.js';
+import redis from './src/config/redis.js';
 
 async function test() {
     console.log("🚀 Starting Ingestion Test...");

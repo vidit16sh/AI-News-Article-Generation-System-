@@ -1,10 +1,9 @@
 import Parser from 'rss-parser';
-import redis from '../config/redis.js'; // .js extension!
-import prisma from '../config/db.js';   // .js extension!
-import { connectRabbit } from '../config/rabbit.js'; // .js extension!
+import redis from '../config/redis.js';
+import prisma from '../config/db.js';
+import { connectRabbit } from '../config/rabbit.js';
 import { scrapeArticle } from './scraper.service.js';
 
-// Configure parser to look for full content tags
 const parser = new Parser({
     customFields: {
         item: [
@@ -25,40 +24,38 @@ export const fetchRSS = async (url) => {
         for (const item of feed.items) {
             const link = item.link;
 
-            // 1. Deduplication (Redis)
             const isCached = await redis.get(`news:${link}`);
             if (isCached) {
                 process.stdout.write(".");
                 continue;
             }
 
-            // 2. INTELLIGENT PARSING
-            // Try to find the longest content available
+            // Intelligent Parsing
             let bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
             
+            // Trigger Scraper if thin
             if (bestContent.length < 200) {
                 const scrapedText = await scrapeArticle(link);
                 if (scrapedText) {
                     bestContent = scrapedText;
-                    console.log(`   📝 Scraped ${bestContent.length} chars of real content.`);
+                    console.log(`   📝 Scraped ${bestContent.length} chars.`);
                 }
             }
-            // Fix Date: Use the real pubDate, fallback to now only if missing
+
+            // Fix Date
             const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
 
-            // 3. Save Raw to DB
+            // Save Raw
             const raw = await prisma.rawNews.create({
-                 // ... same as before
-                 data: {
+                data: {
                     sourceUrl: link,
                     title: item.title,
-                    rawBody: bestContent, // <--- NOW THIS HAS REAL TEXT
-                    publishedAt: pubDate,
+                    rawBody: bestContent, 
+                    publishedAt: pubDate,   
                     processed: false 
                 }
             });
 
-            // 4. Cache & Queue
             await redis.set(`news:${link}`, '1', 'EX', 86400);
 
             const payload = { rawNewsId: raw.id };
@@ -67,8 +64,7 @@ export const fetchRSS = async (url) => {
             
             newCount++;
         }
-
-        console.log(`\n✅ Saved & Queued ${newCount} NEW articles.`);
+        console.log(`\n✅ Saved ${newCount} NEW articles.`);
         return newCount;
 
     } catch (err) {

@@ -1,4 +1,4 @@
-import prisma from '../../../../lib/prisma';
+import prisma from '@/lib/prisma'; 
 import { NextResponse } from 'next/server';
 
 // Force dynamic (no static caching) so we always get the newest data on refresh
