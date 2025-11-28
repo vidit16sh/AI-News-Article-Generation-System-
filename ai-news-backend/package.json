@@ -45,9 +45,10 @@
     "user-agents": "^1.1.669"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "concurrently": "^9.2.1",
-    "eslint": "^9.39.1",
-    "eslint-config-next": "^16.0.4",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.5.0",
     "nodemon": "^3.1.11",
     "prisma": "^5.10.2"
   }
