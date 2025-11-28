@@ -1,27 +1,23 @@
 import 'dotenv/config';
 import cron from 'node-cron';
-import { fetchRSS } from '../services/fetcher.service.js';
+import { fetchRSS, fetchCoinNess } from '../services/fetcher.service.js';
 
-// Define your sources here
 const SOURCES = [
-    "https://www.coindesk.com/arc/outboundfeeds/rss/", // CoinDesk
-    "https://watcher.guru/news/feed",                  // Watcher Guru
-    "https://decrypt.co/feed", 
-    
+    "https://watcher.guru/news/feed",
+    "https://decrypt.co/feed",
+    "https://www.coindesk.com/arc/outboundfeeds/rss/"
 ];
 
 console.log("⏰ Cron Scheduler Started...");
 
-// Schedule: Run every minute (* * * * *)
-// Check https://crontab.guru to customize
 cron.schedule('* * * * *', async () => {
     console.log(`\n⏰ [${new Date().toISOString()}] Cron Triggered`);
     
+    // 1. Fetch CoinNess (Fastest)
+    await fetchCoinNess();
+
+    // 2. Fetch Standard RSS
     for (const url of SOURCES) {
-        try {
-            await fetchRSS(url);
-        } catch (err) {
-            console.error(`   ❌ Failed to fetch ${url}`);
-        }
+        await fetchRSS(url);
     }
 });
