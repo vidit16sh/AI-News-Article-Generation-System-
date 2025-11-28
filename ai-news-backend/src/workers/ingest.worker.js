@@ -1,7 +1,7 @@
 import 'dotenv/config'; 
 import Bottleneck from 'bottleneck';
 import { connectRabbit } from '../config/rabbit.js'; // Note the .js extension
-import prisma from '../config/db.js';
+import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
 import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 

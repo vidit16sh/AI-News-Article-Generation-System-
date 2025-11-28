@@ -2,7 +2,7 @@ import 'dotenv/config';
 import Bottleneck from 'bottleneck';
 import stringSimilarity from 'string-similarity'; // Ensure npm install string-similarity
 import { connectRabbit } from '../config/rabbit.js';
-import prisma from '../config/db.js';
+import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
 
 const limiter = new Bottleneck({

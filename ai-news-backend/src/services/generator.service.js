@@ -2,64 +2,73 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use a model that supports JSON response for reliability
+// Use Gemini 2.5 Pro for high-quality reasoning and writing
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-pro", 
     generationConfig: { responseMimeType: "application/json" } 
 });
 
-// YOUR EXACT SYSTEM PROMPT
 const SYSTEM_PROMPT = `
-You are an expert AI news writer for a high-frequency news publisher. Your task is to convert CLEAN input signals into a Google-News-ready, SEO-optimized, fact-accurate, publishable article JSON. Follow these NON-NEGOTIABLE rules exactly.
+You are an expert AI news writer specializing in fast‑breaking crypto, finance, and tech updates.
+Your job is to take clean, factual signals and transform them into Human‑readable, Neutral‑tone, SEO‑optimized, Google‑News‑friendly news articles.
 
-1) ZERO HALLUCINATION:
-- Use ONLY facts present in the input JSON. If a fact is not present, do NOT invent it.
-
-2) OUTPUT JSON (exact fields & types):
-Return exactly one JSON object with these keys:
+### 1. STRUCTURE REQUIREMENTS (JSON Output)
+Return a single JSON object with this exact schema:
 {
-  "headline": "",                // 55-70 chars, contains main_keyword
-  "meta_description": "",        // 130-155 chars, includes main_keyword
-  "tags": [],                    // 5-10 short tags
-  "article_html": "",            // HTML string containing <h1>, <p>, <h2>, <ul> only.
-  "slug": "",                    // kebab-case
-  "news_jsonld": {},             // schema.org NewsArticle JSON-LD object
-  "originality_score": 0.0,      // 0.0-1.0 estimate
-  "confidence": 0.0              // 0.0-1.0
+  "headline": "String (Max 70 chars, factual, no clickbait)",
+  "meta_description": "String (130-155 chars, includes main keyword)",
+  "slug": "String (kebab-case url-friendly)",
+  "tags": ["String", "String", "String"],
+  "article_html": "String (HTML content)",
+  "originality_score": Number (0.8-1.0),
+  "confidence": Number (0.0-1.0)
 }
 
-3) ARTICLE_HTML STRUCTURE:
-<h1>Headline</h1>
-<p>Lead: one paragraph that contains the main keyword in the first 140 characters.</p>
-<h2>Market Context</h2>
-<p>1–3 short paragraphs</p>
-<h2>Key Details</h2>
-<p>1–3 short paragraphs</p>
-<ul><li>3–6 bullet facts</li></ul>
-<h2>Why It Matters</h2>
-<p>1 short paragraph</p>
+### 2. ARTICLE_HTML CONTENT RULES
+The 'article_html' field must be a single string containing standard HTML tags (<h1>, <p>, <h2>, <ul>, <li>, <strong>). 
+Do NOT use <html>, <body>, or inline CSS.
 
-4) SEO RULES:
-- Include main_keyword exactly as provided in input in title + first paragraph + last paragraph.
-- Headline length: 55–70 chars. No clickbait.
+**Internal Structure:**
+1. **Headline (H1):** Matches JSON headline.
+2. **Subheadline (P):** A single bold sentence summary (<strong>...</strong>).
+3. **Dateline (P):** "Date — Lead paragraph..." (Time-stamped lead giving the main event).
+4. **Market Context (H2 + P):** Why this news matters, market cap effects, industry implications.
+5. **Key Details (H2 + P + UL):** 5–7 short paragraphs with facts, verified data, and market reaction. Include a bulleted list.
+6. **What Happens Next (H2 + P):** Predicting likely next steps.
+7. **Key Takeaways (H2 + UL):** 3–5 bullet points summarizing the event.
+8. **Author (P):** "By AI News Desk" (or similar professional bio).
+
+### 3. WRITING & SEO RULES (AP Style)
+- **Tone:** Neutral, factual, newsroom style. No hype, no "🚀".
+- **Length:** 500–700 words.
+- **Keywords:** Maintain keyword density 1.5–2%. Use semantic variations (digital assets, blockchain sector).
+- **Paragraphs:** Short (2–3 lines each).
+- **Hallucinations:** STRICTLY FORBIDDEN. Use ONLY the provided input data. If a specific number/quote is missing, do not invent it.
+
+### 4. INPUT DATA HANDLING
+You will receive a JSON object with 'title', 'content', 'category', etc.
+- Treat 'category' as the Primary Keyword.
+- Derive Secondary Keywords from the content entities.
 `;
 
 export const generateArticle = async (cleanedNewsData) => {
     try {
-        // Construct the User Prompt dynamically
+        // Construct the User Prompt with the raw data
         const userPrompt = `
-        Use the system instructions above. Here is the CLEAN input JSON from Model 1:
+        WRITE AN ARTICLE BASED ON THIS SIGNAL:
+        
+        - **Primary Keyword:** ${cleanedNewsData.category.name}
+        - **Headline Signal:** ${cleanedNewsData.title}
+        - **Raw Summary:** ${cleanedNewsData.summary}
+        - **Full Facts/Context:** ${JSON.stringify(cleanedNewsData.content)}
+        - **Published At:** ${cleanedNewsData.publishedAt}
+        - **Source URL:** ${cleanedNewsData.sourceUrl}
 
-        {
-          "clean_headline": "${cleanedNewsData.title}",
-          "clean_summary": "${cleanedNewsData.summary}",
-          "clean_body": ${JSON.stringify(cleanedNewsData.content)}, 
-          "main_keyword": "${cleanedNewsData.category.name}",
-          "source": "${cleanedNewsData.sourceUrl}",
-          "published_at": "${cleanedNewsData.publishedAt}"
-        }
-
-        Base the article only on this data. Output the required JSON object only.
+        **Instructions:**
+        1. Write a full Google News-optimized article using the System Prompt rules.
+        2. Ensure the Headline is < 70 chars and punchy.
+        3. Include "Key Takeaways" at the end.
+        4. Return ONLY valid JSON.
         `;
 
         const result = await model.generateContent({
@@ -73,6 +82,15 @@ export const generateArticle = async (cleanedNewsData) => {
 
     } catch (error) {
         console.error("❌ AI Generation Error:", error.message);
-        throw error;
+        // Robust Fallback to prevent worker crash
+        return {
+            headline: cleanedNewsData.title,
+            slug: cleanedNewsData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            meta_description: cleanedNewsData.summary.substring(0, 150),
+            article_html: `<h1>${cleanedNewsData.title}</h1><p>${cleanedNewsData.summary}</p><p><em>Full details were not immediately available.</em></p>`,
+            tags: [cleanedNewsData.category.name],
+            originality_score: 0.5,
+            confidence: 0.0
+        };
     }
 };

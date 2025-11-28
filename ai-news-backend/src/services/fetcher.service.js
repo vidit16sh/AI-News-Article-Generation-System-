@@ -1,7 +1,7 @@
 import Parser from 'rss-parser';
 import axios from 'axios';
 import redis from '../config/redis.js';
-import prisma from '../config/db.js';
+import prisma from '../lib/prisma.js';
 import { connectRabbit } from '../config/rabbit.js';
 import { scrapeArticle } from './scraper.service.js';
 

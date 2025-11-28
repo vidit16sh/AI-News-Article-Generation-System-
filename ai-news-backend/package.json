@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "type": "module",
-  "scripts": {
-    "dev": "concurrently \"npm run dev:next\" \"npm run worker:ingest\" \"npm run worker:gen\" \"npm run cron\"",
+"scripts": {
+    "dev": "concurrently --kill-others \"npm run dev:next\" \"npm run worker:ingest\" \"npm run worker:gen\" \"npm run cron\" --names \"NEXT,INGEST,GEN,CRON\" --prefix-colors \"bgBlue.bold,bgMagenta.bold,bgGreen.bold,bgYellow.bold\"",
     "dev:next": "next dev --webpack",
     "build": "next build",
     "start": "next start",
