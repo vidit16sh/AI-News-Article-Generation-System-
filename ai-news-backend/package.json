@@ -2,7 +2,7 @@
   "name": "ai-news-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js", 
+  "main": "index.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:next\" \"npm run worker:ingest\" \"npm run worker:gen\" \"npm run cron\"",
@@ -20,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fal-ai/client": "^1.7.2",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.10.2",
     "amqplib": "^0.10.9",
