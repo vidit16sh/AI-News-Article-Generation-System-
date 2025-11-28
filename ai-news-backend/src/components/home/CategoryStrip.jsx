@@ -1,0 +1,82 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+
+const CATEGORIES = [
+  { slug: "all", label: "All" },
+  { slug: "crypto", label: "Crypto" },
+  { slug: "bitcoin", label: "Bitcoin" },
+  { slug: "ai-news", label: "AI News" },
+  { slug: "world-news", label: "World" },
+  { slug: "technology", label: "Technology" },
+];
+
+export default function CategoryStrip() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeFromQuery = searchParams.get("category") || "all";
+
+  const isHome = pathname === "/";
+
+  return (
+    <section className="mb-5 mt-1">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Browse by category
+        </h2>
+        <span className="hidden text-[0.7rem] text-slate-400 sm:inline">
+          Tap a tag to filter articles
+        </span>
+      </div>
+
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 pt-1 text-sm thin-scrollbar">
+        {CATEGORIES.map((cat) => {
+          const isActive =
+            isHome && cat.slug === activeFromQuery
+              ? true
+              : isHome && cat.slug === "all" && !searchParams.get("category");
+
+          const href =
+            cat.slug === "all" ? "/" : `/?category=${encodeURIComponent(cat.slug)}`;
+
+          return (
+            <Link
+              key={cat.slug}
+              href={href}
+              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 transition ${
+                isActive
+                  ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span className="text-xs">
+                {iconForCategory(cat.slug)}
+              </span>
+              <span className="text-xs sm:text-[0.8rem] font-medium">
+                {cat.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function iconForCategory(slug) {
+  switch (slug) {
+    case "crypto":
+      return "🪙";
+    case "bitcoin":
+      return "₿";
+    case "ai-news":
+      return "🤖";
+    case "world-news":
+      return "🌍";
+    case "technology":
+      return "💻";
+    default:
+      return "✨";
+  }
+}
