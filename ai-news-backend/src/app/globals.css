@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* ---- Basic globals without @apply ---- */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc; /* slate-50-ish */
+  color: #020617; /* slate-950-ish */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+::selection {
+  background: #3b82f6; /* blue-500 */
+  color: #ffffff;
+}
+
+/* Optional “thin scrollbar” utility we used in layout.js */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: #e5e7eb; /* slate-200 */
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #9ca3af; /* slate-400 */
+  border-radius: 999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* slate-500 */
+}
