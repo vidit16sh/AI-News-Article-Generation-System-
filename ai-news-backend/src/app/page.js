@@ -1,6 +1,8 @@
-import HeroSection from "../components/home/HeroSection.jsx";
-import CategoryStrip from "../components/home/CategoryStrip.jsx";
-import ArticleGrid from "../components/home/ArticleGrid.jsx";
+import HeroSection from "../components/home/HeroSection";
+import LatestNewsSection from "../components/home/LatestNewsSection";
+import TopStoriesSection from "../components/home/TopStoriesSection";
+import SidebarFinanceSection from "../components/home/SidebarFinanceSection";
+import PoliticsStripSection from "../components/home/PoliticsStripSection";
 
 async function fetchLatestArticles() {
   const baseUrl =
@@ -8,7 +10,6 @@ async function fetchLatestArticles() {
 
   try {
     const res = await fetch(`${baseUrl}/api/articles/latest`, {
-      // Revalidate every 60s so homepage stays fresh
       next: { revalidate: 60 },
     });
 
@@ -25,12 +26,18 @@ async function fetchLatestArticles() {
   }
 }
 
-export default async function HomePage({ searchParams }) {
+export default async function HomePage(props) {
   const allArticles = await fetchLatestArticles();
 
-  const categorySlug = searchParams?.category || "all";
+  const searchParams = props?.searchParams || {};
+  const rawCategory = searchParams.category;
+
+  const categorySlug = Array.isArray(rawCategory)
+    ? rawCategory[0]
+    : rawCategory || "all";
 
   let filteredArticles = allArticles;
+
   if (categorySlug && categorySlug !== "all") {
     const slugLower = categorySlug.toLowerCase();
     filteredArticles = allArticles.filter((article) => {
@@ -45,11 +52,52 @@ export default async function HomePage({ searchParams }) {
 
   const [featured, ...rest] = filteredArticles;
 
+  const latestNews = rest.slice(0, 3);
+  const topStoriesMain = rest[3] || featured || rest[0];
+  const topStoriesList = rest.slice(4, 8);
+  const politicsArticles = rest.slice(8, 12);
+  const financeArticles = rest.slice(3, 10).length
+    ? rest.slice(3, 10)
+    : rest.slice(0, 7);
+
+  const politicsSource = politicsArticles.length ? politicsArticles : rest;
+  const politicsForStrip = politicsSource.slice(0, 4);
+
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <HeroSection featured={featured} />
-      <CategoryStrip />
-      <ArticleGrid articles={rest} />
+    <div className="space-y-10">
+      {/* TOP: hero + latest + top stories + finance sidebar with divider */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,2.4fr)_1px_minmax(0,1fr)] lg:gap-0">
+        {/* LEFT SIDE */}
+        <div className="space-y-6 lg:pr-8">
+          <HeroSection featured={featured || rest[0]} />
+
+          <LatestNewsSection
+            articles={latestNews.length ? latestNews : rest.slice(0, 3)}
+          />
+
+          <TopStoriesSection
+            mainArticle={topStoriesMain}
+            listArticles={
+              topStoriesList.length ? topStoriesList : rest.slice(0, 4)
+            }
+          />
+        </div>
+
+        {/* VERTICAL DIVIDER – height = whole grid row */}
+        <div className="hidden lg:block bg-slate-200" />
+
+        {/* RIGHT SIDE */}
+        <aside className="mt-8 space-y-6 lg:mt-0 lg:pl-8">
+          <SidebarFinanceSection
+            articles={
+              financeArticles.length ? financeArticles : rest.slice(0, 7)
+            }
+          />
+        </aside>
+      </div>
+
+      {/* FULL-WIDTH POLITICS STRIP (separate from grid so divider stops above it) */}
+      <PoliticsStripSection articles={politicsForStrip} />
     </div>
   );
 }

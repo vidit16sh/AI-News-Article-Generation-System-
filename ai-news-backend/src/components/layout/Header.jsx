@@ -3,6 +3,29 @@
 import { useState } from "react";
 import Link from "next/link";
 
+const PRIMARY_LINKS = [
+  { label: "Latest News", href: "/" },
+  { label: "Business", href: "/category/business" },
+  { label: "Finance", href: "/category/finance" },
+  { label: "Health", href: "/category/health" },
+  { label: "Politics", href: "/category/politics" },
+  { label: "Fashion", href: "/category/fashion" },
+  { label: "Real Estate", href: "/category/real-estate" },
+  { label: "Travel", href: "/category/travel" },
+  { label: "Entertainment", href: "/category/entertainment" },
+  { label: "Sports", href: "/category/sports" },
+  { label: "Tech", href: "/category/tech" },
+  { label: "Podcast", href: "/podcast" },
+];
+
+const SECONDARY_LINKS = [
+  { label: "About", href: "/about" },
+  { label: "Careers", href: "/careers" },
+  { label: "Authors", href: "/authors" },
+  { label: "Advertise", href: "/advertise" },
+  { label: "Contact", href: "/contact" },
+];
+
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -10,120 +33,180 @@ export default function Header() {
   const closeMenu = () => setIsMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-      {/* Header content: 90% of viewport, capped at 1440px */}
-      <div className="mx-auto flex h-14 w-[90vw] max-w-[1440px] items-center justify-between gap-3 px-2 sm:h-16 sm:px-4">
-        {/* Logo */}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2"
-          onClick={closeMenu}
-        >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-red-500 shadow-sm" />
-          <span className="flex flex-col leading-none">
-            <span className="text-sm font-semibold tracking-[0.12em] uppercase text-slate-900">
-              VrajNews
-            </span>
-            <span className="text-[0.65rem] uppercase tracking-[0.18em] text-slate-400">
-              AI Edition
-            </span>
-          </span>
-        </Link>
+    <header className="sticky top-0 z-50 bg-white ">
+      {/* DESKTOP HEADER (date + logo + location in one line) */}
+      <div className="hidden flex-col md:flex">
+        {/* Top row */}
+        <div className="flex h-16 items-center border-b border-slate-200 px-6 ">
+          <div className="flex-1 text-[11px] font-normal text-slate-500">
+            December 01 - 03:51 AM
+          </div>
 
-        {/* Desktop nav */}
-        <nav
-          className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex"
-          aria-label="Main navigation"
-        >
-          <NavLink href="/">Home</NavLink>
-          <NavLink href="/category/crypto">Crypto</NavLink>
-          <NavLink href="/category/ai-news">AI News</NavLink>
-          <NavLink href="/category/world-news">World</NavLink>
-          <NavLink href="/search">Search</NavLink>
-        </nav>
+          <div className="flex flex-none justify-center">
+            <LogoDesktop />
+          </div>
 
-        {/* Right section: search + hamburger */}
-        <div className="flex items-center gap-2">
+          <div className="flex-1 text-right text-[11px] font-normal text-slate-500">
+            New York, US: 3.3°C
+          </div>
+        </div>
+
+        {/* Red nav bar under logo */}
+        <div className="flex h-11 items-center justify-center border-b border-red-700 bg-[#d00000] text-[13px] font-medium tracking-[0.06em] text-white">
+          <div className="flex w-full max-w-5xl items-center justify-between px-4">
+            {/* Nav links */}
+            <nav className="flex flex-1 items-center justify-center gap-6">
+              {PRIMARY_LINKS.map((item, index) => (
+                <div key={item.href} className="flex items-center">
+                  <NavLink href={item.href}>{item.label}</NavLink>
+
+                  {/* Thin divider after "Latest News" */}
+                  {index === 0 && (
+                    <span className="ml-4 h-4 border-l border-white/60" />
+                  )}
+                </div>
+              ))}
+            </nav>
+
+            {/* Search circle on right */}
+            <button
+              type="button"
+              aria-label="Search"
+              className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-transparent text-white/90 transition hover:bg-white hover:text-[#d00000]"
+            >
+              <SearchIcon />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE HEADER (red bar) */}
+      <div className="flex items-center justify-between bg-[#d00000] px-4 py-3 text-white md:hidden">
+        <LogoMobile />
+
+        <div className="flex items-center gap-3">
+          {/* Search circle */}
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
-            aria-label="Search articles"
+            aria-label="Search"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-transparent text-white/95"
           >
             <SearchIcon />
           </button>
 
-          {/* Hamburger (mobile only) */}
+          {/* Hamburger / menu icon */}
           <button
             type="button"
-            className="inline-flex flex-col items-center justify-center gap-[4px] rounded-full p-1.5 text-slate-800 transition hover:bg-slate-100 md:hidden"
-            aria-label="Toggle navigation menu"
+            aria-label="Toggle menu"
             aria-expanded={isMenuOpen}
             onClick={toggleMenu}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#d00000] shadow-sm"
           >
-            <span
-              className={`h-[2px] w-5 rounded-full bg-slate-900 transition-transform duration-200 ${
-                isMenuOpen ? "translate-y-[6px] rotate-45" : ""
-              }`}
-            />
-            <span
-              className={`h-[2px] w-5 rounded-full bg-slate-900 transition-opacity duration-150 ${
-                isMenuOpen ? "opacity-0" : "opacity-100"
-              }`}
-            />
-            <span
-              className={`h-[2px] w-5 rounded-full bg-slate-900 transition-transform duration-200 ${
-                isMenuOpen ? "-translate-y-[6px] -rotate-45" : ""
-              }`}
-            />
+            {/* Equal / close icon */}
+            <div className="relative h-3 w-4">
+              <span
+                className={`absolute left-0 right-0 h-[2px] rounded-full bg-current transition-transform duration-200 ${
+                  isMenuOpen ? "translate-y-[5px] rotate-45" : "translate-y-0"
+                }`}
+              />
+              <span
+                className={`absolute left-0 right-0 h-[2px] rounded-full bg-current transition-opacity duration-150 ${
+                  isMenuOpen ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <span
+                className={`absolute left-0 right-0 h-[2px] rounded-full bg-current transition-transform duration-200 ${
+                  isMenuOpen ? "-translate-y-[5px] -rotate-45" : "translate-y-[10px]"
+                }`}
+              />
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Mobile menu overlay (spans full width, but aligned with header height) */}
+      {/* MOBILE FULLSCREEN MENU OVERLAY */}
       <div
-        className={`fixed inset-x-0 top-[3.5rem] origin-top transform bg-slate-900/85 text-slate-50 backdrop-blur-xl transition-all duration-200 md:hidden ${
-          isMenuOpen
-            ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none -translate-y-3 opacity-0"
+        className={`fixed inset-0 z-40 transform bg-white transition-transform duration-300 ease-out md:hidden ${
+          isMenuOpen ? "translate-y-0" : "-translate-y-full pointer-events-none"
         }`}
       >
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 pb-6 pt-4 thin-scrollbar">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-900/70 px-3 py-1 text-[0.75rem]">
-            <span>⚡</span>
-            <span className="text-slate-200">
-              AI-generated crypto &amp; tech stories
-            </span>
-          </div>
+        {/* top strip so it sits below browser status bar */}
+        <div className="pt-3" />
 
-          <div className="flex items-center gap-2 rounded-full border border-slate-600 bg-slate-900 px-3 py-2">
-            <SearchIcon size={16} className="text-slate-300" />
-            <input
-              type="text"
-              placeholder="Search articles…"
-              aria-label="Search articles"
-              className="w-full border-none bg-transparent text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none"
-            />
-          </div>
+        {/* Top row with logo, search and close buttons */}
+        <div className="flex items-center justify-between px-4 pb-3">
+          <LogoMobile color="black" />
 
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Search"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600"
+            >
+              <SearchIcon />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={closeMenu}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#d00000] text-white shadow-sm"
+            >
+              <span className="relative block h-3 w-3">
+                <span className="absolute inset-0 h-[2px] w-full rotate-45 rounded-full bg-current" />
+                <span className="absolute inset-0 h-[2px] w-full -rotate-45 rounded-full bg-current" />
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Menu items with slide/fade animation */}
+        <div className="px-4 pb-10 pt-4">
+          <nav aria-label="Mobile primary navigation">
+            <ul className="space-y-3 text-[15px] font-medium text-slate-900">
+              {PRIMARY_LINKS.map((item, index) => (
+                <li
+                  key={item.href}
+                  className={`transform transition-all duration-300 ${
+                    isMenuOpen
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-4 opacity-0"
+                  } ${index === 0 ? "delay-75" : `delay-${75 + index * 25}`}`}
+                >
+                  <Link
+                    href={item.href}
+                    onClick={closeMenu}
+                    className="block"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Divider */}
+          <div className="mt-6 border-t border-slate-200" />
+
+          {/* Secondary links at bottom section */}
           <nav
-            className="flex flex-col gap-2 pt-1 text-sm font-medium"
-            aria-label="Mobile navigation"
+            aria-label="Mobile secondary navigation"
+            className="mt-4 space-y-3 text-[14px] text-slate-700"
           >
-            <MobileNavLink href="/" onClick={closeMenu}>
-              Home
-            </MobileNavLink>
-            <MobileNavLink href="/category/crypto" onClick={closeMenu}>
-              Crypto
-            </MobileNavLink>
-            <MobileNavLink href="/category/ai-news" onClick={closeMenu}>
-              AI News
-            </MobileNavLink>
-            <MobileNavLink href="/category/world-news" onClick={closeMenu}>
-              World News
-            </MobileNavLink>
-            <MobileNavLink href="/category/technology" onClick={closeMenu}>
-              Technology
-            </MobileNavLink>
+            {SECONDARY_LINKS.map((item, index) => (
+              <div
+                key={item.href}
+                className={`transform transition-all duration-300 ${
+                  isMenuOpen
+                    ? "translate-y-0 opacity-100"
+                    : "translate-y-4 opacity-0"
+                } ${`delay-${200 + index * 25}`}`}
+              >
+                <Link href={item.href} onClick={closeMenu} className="block">
+                  {item.label}
+                </Link>
+              </div>
+            ))}
           </nav>
         </div>
       </div>
@@ -131,30 +214,51 @@ export default function Header() {
   );
 }
 
-function NavLink({ href, children }) {
+/* --------- SMALL COMPONENTS ---------- */
+
+function LogoDesktop() {
   return (
-    <Link
-      href={href}
-      className="relative text-slate-600 transition hover:text-slate-900"
-    >
-      <span>{children}</span>
+    <Link href="/" className="flex items-baseline gap-1">
+      <span className="text-3xl font-semibold tracking-tight text-black">
+        CoinMarket
+      </span>
+      <span className="text-3xl font-semibold tracking-tight text-[#e00000]">
+        Buzz
+      </span>
     </Link>
   );
 }
 
-function MobileNavLink({ href, children, onClick }) {
+function LogoMobile({ color = "white" }) {
+  const textColorMain =
+    color === "white" ? "text-white/80" : "text-slate-900";
+  const textColorFlash =
+    color === "white" ? "text-white" : "text-[#e00000]";
+
+  return (
+    <Link href="/" className="flex items-baseline gap-1">
+      <span className={`text-2xl font-semibold tracking-tight ${textColorMain}`}>
+        news
+      </span>
+      <span className={`text-2xl font-semibold tracking-tight ${textColorFlash}`}>
+        flash
+      </span>
+    </Link>
+  );
+}
+
+function NavLink({ href, children }) {
   return (
     <Link
       href={href}
-      onClick={onClick}
-      className="rounded-lg px-2 py-2 text-slate-50 transition hover:bg-slate-800/80"
+      className="relative text-[13px] font-medium tracking-[0.03em] text-white/90 transition hover:text-white"
     >
       {children}
     </Link>
   );
 }
 
-function SearchIcon({ size = 18, className = "" }) {
+function SearchIcon({ size = 16, className = "" }) {
   const s = size;
   return (
     <svg
