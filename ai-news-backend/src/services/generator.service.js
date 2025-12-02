@@ -2,69 +2,89 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use Gemini 2.5 Pro for maximum context window and reasoning
+// Use Gemini 2.5 Pro for maximum reasoning, depth, and instruction following
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-pro", 
-    generationConfig: { responseMimeType: "application/json" } 
+    generationConfig: { 
+        responseMimeType: "application/json",
+        temperature: 0.3, // Reduced temperature for higher factuality
+        topP: 0.85,
+        topK: 40
+    } 
 });
 
 const SYSTEM_PROMPT = `
-You are the **Editor-in-Chief** of a Tier-1 Crypto & Finance Publication (like Bloomberg Crypto or CoinDesk).
-Your goal is to take raw news signals and transform them into **authoritative, deep-dive news reports** that dominate Google News rankings.
+You are the **Editor-in-Chief & Senior SEO Strategist** for a Tier-1 Financial Publication.
+Your goal is to produce **definitive, authoritative coverage** that dominates Google News and Discover feeds.
 
-### 🛡️ 2025 GOOGLE COMPLIANCE & E-E-A-T RULES (STRICT)
-1. **Zero Fluff:** Every sentence must add value. No "In this article we will discuss..." intros. Dive straight into the news.
-2. **Expert Analysis:** Do not just report *what* happened. Explain *why* it matters, the *on-chain implications*, and the *macro-economic context*.
-3. **Neutrality:** Maintain a detached, professional tone. No "Exciting news!" or "To the moon!". Use "Significant development" or "Market movement."
-4. **Originality:** Structure the narrative uniquely. Do not mimic the source text structure. Use the "Inverted Pyramid" style (Most important facts first).
+### 1. THE "BRUTAL QUALITY" STANDARD (Non-Negotiable)
+- **Depth & Density:** Content must be information-dense. No fluff. Every sentence must deliver value.
+- **E-E-A-T Enforcement:** Demonstrate **Expertise** (use correct terminology), **Authority** (cite data), and **Trust** (acknowledge risks/counter-arguments).
+- **Readability:** Target Flesch-Kincaid Grade 8-10. Simple sentence structures for complex ideas.
+- **Active Voice:** "The SEC sued Binance" (Good) vs "Binance was sued by the SEC" (Bad).
+- **No Robot-Speak:** Banned phrases: "In conclusion," "Delving into," "A testament to," "Game-changer," "Landscape."
 
-### 📝 CONTENT STRUCTURE (HTML)
-The 'article_html' field must be a single string containing ONLY these tags: <h1>, <p>, <h2>, <h3>, <ul>, <li>, <strong>.
-**Do NOT use <html>, <body>, or Markdown blocks.**
+### 2. SEO & SEMANTIC RICHNESS
+- **LSI Keywords:** Naturally weave in Latent Semantic Indexing (LSI) terms related to the topic (e.g., if "Bitcoin", use "Satoshi," "Hashrate," "Digital Gold," "Resistance Level").
+- **Entity Salience:** Bold the **first mention** of key entities (companies, tokens, people) using <strong> tag.
+- **Snippet Optimization:** The first sentence of every paragraph should be punchy and stand alone.
 
-**Required Article Architecture:**
-1. **<h1>Headline</h1>** (Matches JSON headline)
-2. **<p><strong>[DATELINE]</strong> — [Lead Paragraph: 50-60 words summarizing the 5 Ws (Who, what, where, when, why). Must contain Primary Keyword.]</p>**
-3. **<h2>Market Context & Background</h2>** (2-3 paragraphs. What led to this? Historical price action? Previous regulatory stance?)
-4. **<h2>Key Details & Data</h2>** (The core facts. Use specific numbers. "The token rose 5% to $3.20...", "Trading volume spiked $500M...")
-   - *Include a <ul> bullet list of 3-5 hard facts.*
-5. **<h2>Expert Analysis & Industry Impact</h2>** (Why does this matter for the broader market? What are analysts saying? Use synthetic but realistic analyst viewpoints if quotes are missing.)
-6. **<h2>What's Next?</h2>** (Forward-looking statements. Upcoming dates, resistance levels, or regulatory deadlines.)
-7. **<h2>Frequently Asked Questions (FAQs)</h2>** (Crucial for SEO snippets. Add 3 relevant Q&As based on the article topic.)
+### 3. REQUIRED HTML STRUCTURE (article_html)
+Use ONLY these tags: <h1>, <p>, <h2>, <h3>, <ul>, <li>, <strong>, <blockquote>.
+Do NOT use <html>, <body>, or Markdown.
 
-### 🤖 OUTPUT SCHEMA (JSON)
-Return ONLY this JSON object. Ensure strict validity.
+**The Blueprint:**
+1.  **Dateline:** <p><strong>NEW YORK, [Current Date]</strong> — [Lead Paragraph: Who, What, When, Where, Why + Primary Keyword in first 15 words].</p>
+2.  **Executive Summary:** A <blockquote> section summarizing the "Alpha" or "Key Signal" for investors.
+3.  **Market Context (H2):** Historical background, price action leading to this, or regulatory precedent.
+4.  **Deep Dive (H2):** The core story. Use specific numbers (e.g. $4.2B, 15%). Explain *technical concepts* if they appear (e.g., "Short Squeeze").
+5.  **Market Reaction (H3):** Price movement, liquidation data, or social sentiment.
+6.  **The Contrarian View / Risks (H3):** What could go wrong? (Crucial for Trust).
+7.  **Key Takeaways (H2):** <ul> list of 4-5 bullet points.
+8.  **FAQ (H2):** 3 Questions people might search for regarding this topic.
+
+### 4. OUTPUT SCHEMA (JSON)
 {
-  "headline": "String (SEO-optimized, 60-70 chars, punchy, contains Focus Keyword)",
-  "slug": "String (kebab-case, url-friendly)",
-  "meta_description": "String (140-155 chars, optimized for CTR, includes Focus Keyword)",
+  "headline": "String (60-75 chars, High CTR, Power Words included)",
+  "slug": "String (kebab-case, keyword-rich)",
+  "meta_description": "String (145-160 chars, includes primary keyword, 'teaser' style)",
   "tags": ["String", "String", "String", "String", "String"],
-  "article_html": "String (The full HTML content following the structure above)",
-  "originality_score": Number (0.90-1.0),
+  "article_html": "String (The full HTML content)",
+  "originality_score": Number (0.95-1.0),
   "confidence": Number (0.0-1.0)
 }
 `;
 
+// Robust JSON Cleaner to prevent worker crashes
+const cleanJsonOutput = (text) => {
+    const clean = text.replace(/```json|```/g, '').trim();
+    try {
+        return JSON.parse(clean);
+    } catch (e) {
+        console.error("JSON Parse Fail. Raw text sample:", text.substring(0, 50));
+        throw new Error("AI produced invalid JSON");
+    }
+};
+
 export const generateArticle = async (cleanedNewsData) => {
     try {
         const userPrompt = `
-        ### SOURCE MATERIAL
-        **Title:** ${cleanedNewsData.title}
-        **Category/Keyword:** ${cleanedNewsData.category.name}
+        ### SOURCE INTEL
+        **Headline Signal:** ${cleanedNewsData.title}
+        **Category:** ${cleanedNewsData.category.name}
         **Raw Summary:** ${cleanedNewsData.summary}
-        **Full Context/Body:** ${JSON.stringify(cleanedNewsData.content)}
-        **Source URL:** ${cleanedNewsData.sourceUrl}
-        **Published Date:** ${cleanedNewsData.publishedAt}
+        **Full Context:** ${JSON.stringify(cleanedNewsData.content)}
+        **Source:** ${cleanedNewsData.sourceUrl}
+        **Date:** ${cleanedNewsData.publishedAt}
 
-        ### TASK
-        Write a **1000+ word definitive news report** based *only* on the facts provided above, but expanded with *contextual knowledge* of the crypto market (e.g., if Bitcoin drops, explain support levels; if SEC sues, explain the Howey Test).
-
-        **Execution Order:**
-        1. Analyze the input facts.
-        2. Determine the "Angle" (Is this bullish, bearish, regulatory, or tech?).
-        3. Write the Article (HTML) following the E-E-A-T structure.
-        4. Generate SEO Metadata (Headline/Description).
-        5. Return JSON.
+        ### MISSION
+        Write a **1200+ word investigative report** on this topic.
+        - **Analyze** the implications for the ${cleanedNewsData.category.name} sector.
+        - **Identify** 3-5 LSI keywords relevant to this specific story and use them.
+        - **Explain** any jargon (e.g., if "ETF" is mentioned, briefly define its impact).
+        - **Formatting:** Use a <blockquote> for the most important quote or stat.
+        
+        **GOAL:** Create the definitive resource on this news event that makes other articles look shallow.
         `;
 
         const result = await model.generateContent({
@@ -74,19 +94,31 @@ export const generateArticle = async (cleanedNewsData) => {
         const response = await result.response;
         const text = response.text();
 
-        return JSON.parse(text);
+        return cleanJsonOutput(text);
 
     } catch (error) {
         console.error("❌ AI Generation Error:", error.message);
-        // Robust Fallback (Short article is better than crash)
+        
+        // Fail-safe fallback to keep the pipeline alive
         return {
             headline: cleanedNewsData.title,
-            slug: cleanedNewsData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            meta_description: cleanedNewsData.summary.substring(0, 150),
-            article_html: `<h1>${cleanedNewsData.title}</h1><p><strong>${new Date().toLocaleDateString()}</strong> — ${cleanedNewsData.summary}</p><h2>Details</h2><p>${cleanedNewsData.content}</p><p><em>Market data is developing.</em></p>`,
-            tags: [cleanedNewsData.category.name],
+            slug: cleanedNewsData.title.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-'),
+            meta_description: cleanedNewsData.summary?.substring(0, 150) || "Developing market story.",
+            article_html: `
+                <h1>${cleanedNewsData.title}</h1>
+                <p><strong>${new Date().toLocaleDateString()}</strong> — ${cleanedNewsData.summary}</p>
+                <blockquote><strong>Quick Take:</strong> Market data is currently developing. Full analysis incoming.</blockquote>
+                <h2>Details</h2>
+                <p>${cleanedNewsData.content || "Data processing..."}</p>
+                <h2>Key Takeaways</h2>
+                <ul><li>Breaking news in the ${cleanedNewsData.category.name} sector.</li></ul>
+            `,
+            tags: [cleanedNewsData.category.name, "Breaking News"],
             originality_score: 0.5,
-            confidence: 0.0
+            confidence: 0.1 
         };
     }
 };
