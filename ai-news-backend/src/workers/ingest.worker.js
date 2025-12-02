@@ -28,13 +28,16 @@ const processJob = async (msg, channel) => {
         }
 
         const cleanedBody = cleanText(rawNews.rawBody);
-
+        const classification = await limiter.schedule(() => 
+            classifyNews(cleanedBody, rawNews.title)
+        ); 
         // ⏳ WRAP THE AI CALL IN THE LIMITER
         // This line will PAUSE execution automatically if we are going too fast
-        const categoryName = await limiter.schedule(() => 
-            classifyNews(cleanedBody, rawNews.title)
-        );
+        const categoryName = classification.category || "General";
+        const priorityScore = classification.priority_score || 50; 
 
+        console.log(`   🧠 Classified: ${categoryName} (Score: ${priorityScore})`);
+        
         const category = await getOrCreateCategory(categoryName);
 
         // 1. Save Cleaned Data
@@ -44,10 +47,7 @@ const processJob = async (msg, channel) => {
                 summary: cleanedBody.substring(0, 150) + "...",
                 content: cleanedBody,
                 sourceUrl: rawNews.sourceUrl,
-                
-                // ✅ BUG FIX: Use the original date from RawNews
                 publishedAt: rawNews.publishedAt, 
-                
                 categoryId: category.id
             }
         });
@@ -62,7 +62,10 @@ const processJob = async (msg, channel) => {
 
         // 3. TRIGGER MODEL 2 (The AI Writer)
         // This sends the ID to the Generation Worker
-        const payload = { newsId: finalNews.id };
+        const payload = { 
+            newsId: finalNews.id,
+            priorityScore: priorityScore // <--- Passing score to next worker
+        };
         channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
         console.log(`   ➡️  Triggered Model 2 (Sent to generation_queue)`);
 

@@ -3,47 +3,30 @@ import CategoryStrip from "../components/home/CategoryStrip.jsx";
 import ArticleGrid from "../components/home/ArticleGrid.jsx";
 
 async function fetchLatestArticles() {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
-    const res = await fetch(`${baseUrl}/api/articles/latest`, {
-      // Revalidate every 60s so homepage stays fresh
+    // ✅ Call the new Super API (limit 20 for homepage)
+    const res = await fetch(`${baseUrl}/api/articles?limit=20`, {
       next: { revalidate: 60 },
     });
 
-    if (!res.ok) {
-      console.error("Failed to fetch latest articles:", res.status);
-      return [];
-    }
-
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    if (!res.ok) return [];
+    
+    const json = await res.json();
+    // ✅ Handle the new response structure ({ data: [...] })
+    return json.data || []; 
   } catch (err) {
-    console.error("Error fetching latest articles:", err);
+    console.error("Error fetching articles:", err);
     return [];
   }
 }
 
-export default async function HomePage({ searchParams }) {
-  const allArticles = await fetchLatestArticles();
+export default async function HomePage() {
+  const articles = await fetchLatestArticles();
 
-  const categorySlug = searchParams?.category || "all";
-
-  let filteredArticles = allArticles;
-  if (categorySlug && categorySlug !== "all") {
-    const slugLower = categorySlug.toLowerCase();
-    filteredArticles = allArticles.filter((article) => {
-      const category =
-        article.category ||
-        article.primaryCategory ||
-        article.tags?.[0] ||
-        "";
-      return category.toLowerCase().includes(slugLower);
-    });
-  }
-
-  const [featured, ...rest] = filteredArticles;
+  // Separate the "Featured" (first one) from the rest
+  const [featured, ...rest] = articles;
 
   return (
     <div className="space-y-6 sm:space-y-8">
