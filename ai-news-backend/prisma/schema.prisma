@@ -70,10 +70,11 @@ model GeneratedArticle {
   newsJsonLd      Json?    // Stores the Schema.org JSON-LD object
   originalityScore Float   @default(0.0)
   confidenceScore  Float   @default(0.0)
-  
+  priorityScore   Int      @default(0)  // 0 to 100
+  publishAt       DateTime @default(now()) // When it should go live
   // Publishing Status
-  status          String   @default("DRAFT") // DRAFT, PUBLISHED, REVIEW
-  
+  status          String   @default("DRAFT") // DRAFT, QUEUED, PUBLISHED
+   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

@@ -26,11 +26,21 @@ export const classifyNews = async (text, title) => {
     // 2. IF NO RULES MATCH, ASK AI
     try {
         const prompt = `
-            Classify this news article into exactly one of these categories: 
-            [Crypto, Finance, Stocks, Tech, Global, Sports, Politics].
-            Return ONLY the category name.
-            Title: ${title}
-            Content: ${text.substring(0, 300)}...
+          Analyze this news item. Return a JSON object:
+          {
+            "category": "Crypto" | "Tech" | "Finance",
+            "priority_score": Number (0-100),
+            "reasoning": "String (short explanation)"
+          }
+            
+          Scoring Rules:
+          - 90-100: "Breaking" (Major hacks, SEC lawsuits, BTC/ETH price moves >5%).
+          - 70-89:  "Important" (Partnerships, new product launches, listings).
+          - 40-69:  "Standard" (Daily analysis, minor updates, opinion pieces).
+          - 0-39:   "Noise" (Airdrop spam, minor NFT mints, press releases).
+            
+          Title: ${title}
+          Content: ${text.substring(0, 500)}...
         `;
         
         const result = await model.generateContent(prompt);

@@ -1,34 +1,42 @@
 import Link from "next/link";
 
-/* ---------- Data fetching ---------- */
+/* ---------- Data fetching (UPDATED for new API) ---------- */
 
-async function fetchLatestArticles() {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+async function fetchCategoryArticles(slug, page = 1) {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
-    const res = await fetch(`${baseUrl}/api/articles/latest`, {
-      next: { revalidate: 60 },
-    });
+    // ✅ Call Super API with category & page
+    const res = await fetch(
+      `${baseUrl}/api/articles?category=${encodeURIComponent(slug)}&page=${page}&limit=12`,
+      {
+        next: { revalidate: 60 },
+      }
+    );
 
     if (!res.ok) {
-      console.error("Failed to fetch latest articles:", res.status);
-      return [];
+      console.error("Failed to fetch category articles:", res.status);
+      return { data: [], meta: { totalPages: 1, current: 1 } };
     }
 
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const json = await res.json();
+    // Handle new response format: { data: [], meta: {} }
+    return {
+      data: Array.isArray(json.data) ? json.data : [],
+      meta: json.meta || { totalPages: 1, current: 1 }
+    };
   } catch (err) {
-    console.error("Error fetching latest articles:", err);
-    return [];
+    console.error("Error fetching category articles:", err);
+    return { data: [], meta: { totalPages: 1, current: 1 } };
   }
 }
 
 /* ---------- Metadata ---------- */
 
 export async function generateMetadata({ params }) {
-  const slug = params?.slug ?? "news";
-  const meta = getCategoryMeta(slug);
+  const { slug } = await params;
+  const safeSlug = slug ?? "news";
+  const meta = getCategoryMeta(safeSlug);
 
   return {
     title: `${meta.label} News | VrajNews`,
@@ -41,26 +49,17 @@ export async function generateMetadata({ params }) {
 /* ---------- Page ---------- */
 
 export default async function CategoryPage({ params, searchParams }) {
-  const slug = params?.slug ?? "news"; // e.g. "crypto", "ai-news"
-  const pageParam = parseInt(searchParams?.page || "1", 10);
-  const currentPage =
-    Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const { slug } = await params;
+  const sp = await searchParams;
+  
+  const safeSlug = slug ?? "news";
+  const pageParam = parseInt(sp?.page || "1", 10);
+  const currentPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
 
-  const allArticles = await fetchLatestArticles();
-  const meta = getCategoryMeta(slug);
-
-  // ✅ Filter articles by tags (this is what /api/articles/latest returns)
-  const filteredArticles = filterByCategorySlug(allArticles, slug);
-
-  const PAGE_SIZE = 12;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredArticles.length / PAGE_SIZE),
-  );
-  const clampedPage = Math.min(currentPage, totalPages);
-
-  const start = (clampedPage - 1) * PAGE_SIZE;
-  const pageArticles = filteredArticles.slice(start, start + PAGE_SIZE);
+  // ✅ Fetch Data from Server API
+  const { data: pageArticles, meta } = await fetchCategoryArticles(safeSlug, currentPage);
+  
+  const categoryMeta = getCategoryMeta(safeSlug);
   const hasArticles = pageArticles.length > 0;
 
   return (
@@ -70,14 +69,14 @@ export default async function CategoryPage({ params, searchParams }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500">
-              <span className="text-base">{meta.icon}</span>
+              <span className="text-base">{categoryMeta.icon}</span>
               <span className="uppercase tracking-[0.18em]">Category</span>
             </div>
             <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-              {meta.label} News
+              {categoryMeta.label} News
             </h1>
             <p className="max-w-2xl text-sm text-slate-500">
-              {meta.description}
+              {categoryMeta.description}
             </p>
           </div>
 
@@ -103,30 +102,30 @@ export default async function CategoryPage({ params, searchParams }) {
               ))}
             </div>
 
-            {totalPages > 1 && (
+            {meta.totalPages > 1 && (
               <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 sm:px-4">
                 <div>
                   Page{" "}
                   <span className="font-semibold text-slate-800">
-                    {clampedPage}
+                    {meta.current}
                   </span>{" "}
                   of{" "}
                   <span className="font-semibold text-slate-800">
-                    {totalPages}
+                    {meta.totalPages}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {clampedPage > 1 && (
+                  {meta.current > 1 && (
                     <PageLink
-                      slug={slug}
-                      page={clampedPage - 1}
+                      slug={safeSlug}
+                      page={meta.current - 1}
                       direction="prev"
                     />
                   )}
-                  {clampedPage < totalPages && (
+                  {meta.current < meta.totalPages && (
                     <PageLink
-                      slug={slug}
-                      page={clampedPage + 1}
+                      slug={safeSlug}
+                      page={meta.current + 1}
                       direction="next"
                     />
                   )}
@@ -137,7 +136,7 @@ export default async function CategoryPage({ params, searchParams }) {
         ) : (
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
             No articles in{" "}
-            <span className="font-semibold">{meta.label}</span> yet. Background
+            <span className="font-semibold">{categoryMeta.label}</span> yet. Background
             workers may not have generated stories for this category, or content
             is still being ingested.
           </div>
@@ -198,34 +197,6 @@ function getCategoryMeta(slug) {
   }
 }
 
-/**
- * Filter articles by category slug using tags.
- * Example:
- *  - slug "crypto"  → matches tags ["Crypto", "Crypto News"]
- *  - slug "ai-news" → matches tags ["AI News", "AI"]
- */
-function filterByCategorySlug(articles, slug) {
-  if (!Array.isArray(articles) || !slug) return [];
-
-  const slugLower = slug.toLowerCase();
-
-  return articles.filter((article) => {
-    const tags = Array.isArray(article.tags) ? article.tags : [];
-    if (tags.length === 0) return false;
-
-    return tags.some((tag) => {
-      const t = tag.toLowerCase();
-      const tSlug = t.replace(/\s+/g, "-"); // "AI News" → "ai-news"
-      return (
-        t === slugLower ||
-        tSlug === slugLower ||
-        t.includes(slugLower) ||
-        tSlug.includes(slugLower)
-      );
-    });
-  });
-}
-
 /* ---------- UI helpers ---------- */
 
 function ArticleCard({ article }) {
@@ -234,10 +205,13 @@ function ArticleCard({ article }) {
   const excerpt =
     article.metaDescription ||
     "AI-generated article without a summary yet.";
+  
+  // Safe check for tags array
   const firstTag = Array.isArray(article.tags) && article.tags.length > 0
     ? article.tags[0]
     : "News";
-  const author = "AI Writer"; // no author field in API, so we label it
+    
+  const author = "AI Writer"; 
   const timeAgo = timeAgoFromDate(article.createdAt);
   const thumbnail = article.imageUrl || "";
 
@@ -269,9 +243,9 @@ function ArticleCard({ article }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3.5">
-        <h2 className="line-clamp-2 text-sm font-semibold text-slate-900 group-hover:text-slate-950 sm:text-[0.95rem]">
+        <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 group-hover:text-slate-950 sm:text-[0.95rem]">
           {title}
-        </h2>
+        </h3>
         <p className="line-clamp-3 text-xs text-slate-500 sm:text-[0.8rem]">
           {excerpt}
         </p>

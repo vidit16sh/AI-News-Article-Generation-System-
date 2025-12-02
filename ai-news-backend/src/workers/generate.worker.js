@@ -4,21 +4,12 @@ import stringSimilarity from 'string-similarity'; // Ensure npm install string-s
 import { connectRabbit } from '../config/rabbit.js';
 import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
-
+import { generateImage } from '../services/image.service.js'; 
 const limiter = new Bottleneck({
     minTime: 30000, // 10s for safety (Free tier)
     maxConcurrent: 1 
 });
 
-// Helper: Generate Image
-const generateImage = async (headline) => {
-    try {
-        const prompt = encodeURIComponent(headline.replace(/[^a-zA-Z0-9 ]/g, ""));
-        return `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=576&nologo=true`;
-    } catch (e) {
-        return null;
-    }
-};
 
 // Helper: Check Originality
 const calculateOriginality = (aiText, sourceText) => {
@@ -47,7 +38,7 @@ const triggerRevalidation = async (tag) => {
 
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
-    const { newsId } = content;
+    const { newsId, priorityScore } = content;
 
     console.log(`\n📝 [Gen-Worker] Processing Job: ${newsId}`);
 
@@ -83,8 +74,23 @@ const processGenerationJob = async (msg, channel) => {
 
         // 4. Determine Status
         let status = "DRAFT";
-        if (aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20) {
+        let publishAt = new Date();
+        const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20; 
+        
+        if (isHighQuality) {
+        if (priorityScore >= 90) {
+            // 🚨 BREAKING NEWS: Publish Immediately
             status = "PUBLISHED";
+            console.log(`   🚨 BREAKING NEWS DETECTED (Score: ${priorityScore}) - Publishing NOW.`);
+        } else if (priorityScore >= 50) {
+            // 🕒 STANDARD NEWS: Queue it
+            status = "QUEUED";
+            console.log(`   🕒 Standard News (Score: ${priorityScore}) - Queued for Drip Feed.`);
+        } else {
+            // 🗑️ LOW VALUE: Keep as Draft
+            status = "DRAFT";
+            console.log(`   🗑️ Low Value (Score: ${priorityScore}) - Saved as Draft.`);
+            }
         }
 
         // 5. Save
@@ -100,18 +106,19 @@ const processGenerationJob = async (msg, channel) => {
                 sitemapEntry: aiOutput.sitemap_entry,
                 newsJsonLd: aiOutput.news_jsonld,
                 originalityScore: realOriginalityScore,
-                confidenceScore: aiOutput.confidence || 0,
+                confidenceScore: aiOutput.confidence || 0, 
+                priorityScore: priorityScore,
                 status: status,
+                publishAt: publishAt,
                 originalNewsId: cleanNews.id
             }
         });
 
         console.log(`   ✨ Finished: ${aiOutput.slug} [${status}]`);
 
-        if (status === 'PUBLISHED') {
-            await triggerRevalidation('articles');
-        }
-
+    if (status === 'PUBLISHED') {
+        await triggerRevalidation('articles');
+    }
         channel.ack(msg);
 
     } catch (err) {

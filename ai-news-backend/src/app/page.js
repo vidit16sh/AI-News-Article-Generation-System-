@@ -5,52 +5,30 @@ import SidebarFinanceSection from "../components/home/SidebarFinanceSection";
 import PoliticsStripSection from "../components/home/PoliticsStripSection";
 
 async function fetchLatestArticles() {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
-    const res = await fetch(`${baseUrl}/api/articles/latest`, {
+    // ✅ Call the new Super API (limit 20 for homepage)
+    const res = await fetch(`${baseUrl}/api/articles?limit=20`, {
       next: { revalidate: 60 },
     });
 
-    if (!res.ok) {
-      console.error("Failed to fetch latest articles:", res.status);
-      return [];
-    }
-
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    if (!res.ok) return [];
+    
+    const json = await res.json();
+    // ✅ Handle the new response structure ({ data: [...] })
+    return json.data || []; 
   } catch (err) {
-    console.error("Error fetching latest articles:", err);
+    console.error("Error fetching articles:", err);
     return [];
   }
 }
 
-export default async function HomePage(props) {
-  const allArticles = await fetchLatestArticles();
+export default async function HomePage() {
+  const articles = await fetchLatestArticles();
 
-  const searchParams = props?.searchParams || {};
-  const rawCategory = searchParams.category;
-
-  const categorySlug = Array.isArray(rawCategory)
-    ? rawCategory[0]
-    : rawCategory || "all";
-
-  let filteredArticles = allArticles;
-
-  if (categorySlug && categorySlug !== "all") {
-    const slugLower = categorySlug.toLowerCase();
-    filteredArticles = allArticles.filter((article) => {
-      const category =
-        article.category ||
-        article.primaryCategory ||
-        article.tags?.[0] ||
-        "";
-      return category.toLowerCase().includes(slugLower);
-    });
-  }
-
-  const [featured, ...rest] = filteredArticles;
+  // Separate the "Featured" (first one) from the rest
+  const [featured, ...rest] = articles;
 
   const latestNews = rest.slice(0, 3);
   const topStoriesMain = rest[3] || featured || rest[0];
