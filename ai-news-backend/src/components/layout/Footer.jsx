@@ -12,13 +12,13 @@ export default function Footer() {
             <div className="mb-4 flex items-center gap-2">
               <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
               <h2 className="text-[1rem] sm:text-[1.1rem] font-light">
-                Subscribe to NewsFlash
+                Subscribe to Coin Market Buzz
               </h2>
             </div>
 
             <p className="max-w-md text-[0.9rem] leading-relaxed text-slate-300">
-              Stay updated on the latest happenings in the U.S. Whether it&apos;s
-              business, politics, fashion, tech or finance, we deliver it in a
+              Stay updated on the latest happenings in the Crypto Market Whether it&apos;s
+              business, politics, tech or finance, we deliver it in a
               flash—straight to your inbox.
             </p>
 

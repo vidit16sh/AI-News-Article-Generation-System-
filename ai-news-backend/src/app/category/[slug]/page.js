@@ -1,33 +1,26 @@
+// app/category/[slug]/page.js
 import Link from "next/link";
 
-/* ---------- Data fetching (UPDATED for new API) ---------- */
+/* ---------- TEMP DATA FETCH: get all articles, ignore category ---------- */
 
-async function fetchCategoryArticles(slug, page = 1) {
+async function fetchAllArticles() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
-    // ✅ Call Super API with category & page
-    const res = await fetch(
-      `${baseUrl}/api/articles?category=${encodeURIComponent(slug)}&page=${page}&limit=12`,
-      {
-        next: { revalidate: 60 },
-      }
-    );
+    const res = await fetch(`${baseUrl}/api/articles?limit=30`, {
+      next: { revalidate: 60 },
+    });
 
     if (!res.ok) {
-      console.error("Failed to fetch category articles:", res.status);
-      return { data: [], meta: { totalPages: 1, current: 1 } };
+      console.error("Failed to fetch articles for category page:", res.status);
+      return [];
     }
 
     const json = await res.json();
-    // Handle new response format: { data: [], meta: {} }
-    return {
-      data: Array.isArray(json.data) ? json.data : [],
-      meta: json.meta || { totalPages: 1, current: 1 }
-    };
+    return Array.isArray(json.data) ? json.data : [];
   } catch (err) {
-    console.error("Error fetching category articles:", err);
-    return { data: [], meta: { totalPages: 1, current: 1 } };
+    console.error("Error fetching articles for category page:", err);
+    return [];
   }
 }
 
@@ -48,270 +41,278 @@ export async function generateMetadata({ params }) {
 
 /* ---------- Page ---------- */
 
-export default async function CategoryPage({ params, searchParams }) {
+export default async function CategoryPage({ params }) {
   const { slug } = await params;
-  const sp = await searchParams;
-  
   const safeSlug = slug ?? "news";
-  const pageParam = parseInt(sp?.page || "1", 10);
-  const currentPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
 
-  // ✅ Fetch Data from Server API
-  const { data: pageArticles, meta } = await fetchCategoryArticles(safeSlug, currentPage);
-  
+  const articles = await fetchAllArticles();
   const categoryMeta = getCategoryMeta(safeSlug);
-  const hasArticles = pageArticles.length > 0;
+
+  if (!articles.length) {
+    return (
+      <div className="space-y-6 sm:space-y-8">
+        <CategoryBanner label={categoryMeta.label} />
+        <section>
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+            No articles available yet.
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  const [heroArticle, ...rest] = articles;
+  const gridArticles = rest.slice(0, 3);
+  const sidebarArticles = rest.slice(3, 9).length ? rest.slice(3, 9) : rest;
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Top heading for that category */}
-      <section className="mt-1 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 sm:py-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500">
-              <span className="text-base">{categoryMeta.icon}</span>
-              <span className="uppercase tracking-[0.18em]">Category</span>
-            </div>
-            <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-              {categoryMeta.label} News
-            </h1>
-            <p className="max-w-2xl text-sm text-slate-500">
-              {categoryMeta.description}
-            </p>
-          </div>
+      {/* Banner: "Latest in Politics / Business / ..." */}
+      <CategoryBanner label={categoryMeta.label} />
 
-          <Link
-            href="/"
-            className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
-          >
-            ← Back to homepage
-          </Link>
+      {/* Layout: left (hero + grid) + divider + right sidebar */}
+      <div className="lg:flex lg:gap-0">
+        {/* LEFT SIDE */}
+        <div className="flex-1 space-y-6 lg:pr-8">
+          <CategoryHero article={heroArticle} />
+          <CategoryGrid articles={gridArticles} />
         </div>
-      </section>
 
-      {/* Articles list for that category */}
-      <section className="space-y-4">
-        {hasArticles ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {pageArticles.map((article) => (
-                <ArticleCard
-                  key={article.slug || article.id}
-                  article={article}
-                />
-              ))}
-            </div>
+        {/* VERTICAL DIVIDER */}
+        <div className="hidden w-px bg-slate-200 mx-6 lg:block" />
 
-            {meta.totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 sm:px-4">
-                <div>
-                  Page{" "}
-                  <span className="font-semibold text-slate-800">
-                    {meta.current}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-slate-800">
-                    {meta.totalPages}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {meta.current > 1 && (
-                    <PageLink
-                      slug={safeSlug}
-                      page={meta.current - 1}
-                      direction="prev"
-                    />
-                  )}
-                  {meta.current < meta.totalPages && (
-                    <PageLink
-                      slug={safeSlug}
-                      page={meta.current + 1}
-                      direction="next"
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-            No articles in{" "}
-            <span className="font-semibold">{categoryMeta.label}</span> yet. Background
-            workers may not have generated stories for this category, or content
-            is still being ingested.
-          </div>
-        )}
-      </section>
+        {/* RIGHT SIDE – Featured list */}
+        <aside className="mt-6 w-[280px] space-y-6 lg:mt-0 lg:w-[320px] lg:pl-0">
+          <CategoryFeaturedSidebar
+            label="Featured"
+            articles={sidebarArticles}
+          />
+        </aside>
+      </div>
     </div>
   );
 }
 
-/* ---------- Category helpers ---------- */
+/* ---------- Category banner (updated to match design) ---------- */
+
+function CategoryBanner({ label }) {
+  return (
+    <section className="mt-1 mb-3">
+      <div className="flex items-center gap-3">
+        {/* Thin vertical red line like the design */}
+        <span className="h-4 w-[2px] bg-red-500" />
+        <p className="text-sm font-light text-slate-900">
+          Latest in {label}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Hero section (big article row) ---------- */
+
+function CategoryHero({ article }) {
+  if (!article) return null;
+  const a = normalizeArticle(article);
+
+  return (
+    <section className="mt-2">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.7fr)] md:items-stretch">
+        {/* Left: text */}
+        <div className="flex flex-col justify-start gap-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs sm:text-[0.8rem]">
+              <span className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-[0.8rem] font-normal text-red-600">
+                {a.category}
+              </span>
+              {a.date && (
+                <span className="text-[0.8rem] font-light text-slate-500">
+                  {a.date}
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-2xl font-light leading-snug sm:text-3xl lg:text-[2.1rem]">
+              <Link
+                href={`/news/${a.slug}`}
+                className="hover:underline underline-offset-[3px] decoration-red-500"
+              >
+                {a.title}
+              </Link>
+            </h1>
+
+            {a.excerpt && (
+              <p className="max-w-xl text-[0.9rem] leading-relaxed text-slate-600">
+                {a.excerpt}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: image */}
+        <div className="relative h-52 w-full overflow-hidden rounded-md bg-slate-100 sm:h-64 md:h-72">
+          {a.imageUrl ? (
+            <img
+              src={a.imageUrl}
+              alt={a.title}
+              className="h-full w-full object-cover object-center"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <span className="text-6xl">📰</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Grid of 3 cards under hero ---------- */
+
+function CategoryGrid({ articles }) {
+  const list = Array.isArray(articles) ? articles : [];
+  if (!list.length) return null;
+
+  return (
+    <section className="mt-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {list.map((article) => {
+          const a = normalizeArticle(article);
+          return (
+            <Link
+              key={a.slug}
+              href={`/news/${a.slug}`}
+              className="group flex h-full flex-col gap-2"
+            >
+              {/* Image */}
+              <div className="h-48 w-full overflow-hidden rounded-md bg-slate-100">
+                {a.imageUrl ? (
+                  <img
+                    src={a.imageUrl}
+                    alt={a.title}
+                    className="h-full w-full object-cover object-center transition-opacity duration-200 group-hover:opacity-80"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-slate-300">
+                    <span className="text-3xl">📰</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Meta + title */}
+              <div className="flex flex-1 flex-col gap-1">
+                <div className="text-[0.75rem] font-light text-slate-500">
+                  {a.date && `${a.category} • ${a.date}`}
+                </div>
+                <h3 className="line-clamp-2 text-[1rem] font-light text-slate-900 group-hover:underline underline-offset-[3px]">
+                  {a.title}
+                </h3>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Right-side featured list ---------- */
+
+function CategoryFeaturedSidebar({ label, articles }) {
+  const list = Array.isArray(articles) ? articles.slice(0, 5) : [];
+  if (!list.length) return null;
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
+        <h2 className="text-sm font-light text-slate-900">{label}</h2>
+      </div>
+
+      <div className="space-y-4">
+        {list.map((article) => {
+          const a = normalizeArticle(article);
+          return (
+            <Link
+              key={a.slug}
+              href={`/news/${a.slug}`}
+              className="group flex gap-3"
+            >
+              <div className="h-16 w-24 flex-shrink-0 overflow-hidden rounded-md bg-slate-100">
+                {a.imageUrl ? (
+                  <img
+                    src={a.imageUrl}
+                    alt={a.title}
+                    className="h-full w-full object-cover object-center group-hover:opacity-90"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-slate-300">
+                    <span className="text-2xl">📰</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="text-[0.7rem] text-slate-500">
+                  {a.category} {a.date && <>• {a.date}</>}
+                </div>
+                <div className="line-clamp-2 text-[0.85rem] font-light text-slate-900 group-hover:underline underline-offset-[3px]">
+                  {a.title}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Helpers ---------- */
 
 function getCategoryMeta(slug) {
   const key = (slug || "news").toLowerCase();
 
   switch (key) {
     case "crypto":
-      return {
-        label: "Crypto",
-        icon: "🪙",
-        description:
-          "Market-moving headlines, liquidity rotations, and on-chain narratives across the crypto ecosystem.",
-      };
+      return { label: "Crypto" };
     case "bitcoin":
-      return {
-        label: "Bitcoin",
-        icon: "₿",
-        description:
-          "Macro trends, ETF flows, miner economics, and narratives centered around Bitcoin as an asset and protocol.",
-      };
+      return { label: "Bitcoin" };
     case "ai-news":
-      return {
-        label: "AI News",
-        icon: "🤖",
-        description:
-          "How AI is reshaping markets, trading, infrastructure, and the broader tech landscape.",
-      };
+      return { label: "AI" };
     case "world-news":
-      return {
-        label: "World News",
-        icon: "🌍",
-        description:
-          "Macro events, regulation, and global news that influence risk sentiment and capital flows.",
-      };
+      return { label: "World" };
     case "technology":
-      return {
-        label: "Technology",
-        icon: "💻",
-        description:
-          "Infrastructure, software, and hardware trends that underpin crypto, AI, and modern finance.",
-      };
+      return { label: "Technology" };
+    case "business":
+      return { label: "Business" };
+    case "politics":
+      return { label: "Politics" };
     default:
-      return {
-        label: "News",
-        icon: "✨",
-        description:
-          "AI-generated coverage across crypto, AI, macro, and technology, curated from multiple sources.",
-      };
+      return { label: "News" };
   }
 }
 
-/* ---------- UI helpers ---------- */
-
-function ArticleCard({ article }) {
+function normalizeArticle(article) {
   const slug = article.slug || article.id || "#";
-  const title = article.headline || "Untitled article";
+  const title = article.headline || article.title || "Untitled article";
   const excerpt =
-    article.metaDescription ||
-    "AI-generated article without a summary yet.";
-  
-  // Safe check for tags array
-  const firstTag = Array.isArray(article.tags) && article.tags.length > 0
-    ? article.tags[0]
-    : "News";
-    
-  const author = "AI Writer"; 
-  const timeAgo = timeAgoFromDate(article.createdAt);
-  const thumbnail = article.imageUrl || "";
+    article.metaDescription || article.summary || article.excerpt || "";
+  const category =
+    article.category ||
+    article.primaryCategory ||
+    (Array.isArray(article.tags) && article.tags[0]) ||
+    "Business";
+  const imageUrl =
+    article.imageUrl || article.heroImageUrl || article.thumbnail || "";
 
-  return (
-    <Link
-      href={slug === "#" ? "#" : `/news/${slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-[2px] hover:border-slate-300 hover:shadow-md"
-    >
-      <div className="relative h-40 w-full overflow-hidden bg-slate-100">
-        {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-slate-300">
-            <span className="text-3xl">{iconForCategory(firstTag)}</span>
-          </div>
-        )}
+  const date = article.createdAt
+    ? new Date(article.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      })
+    : "";
 
-        <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-2 py-1 text-[0.7rem] font-medium text-slate-50 backdrop-blur">
-          <span className="opacity-80">{iconForCategory(firstTag)}</span>
-          <span>{firstTag}</span>
-        </div>
-        <div className="absolute right-2 bottom-2 rounded-full bg-slate-900/80 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.12em] text-emerald-300">
-          AI-generated
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 p-3.5">
-        <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 group-hover:text-slate-950 sm:text-[0.95rem]">
-          {title}
-        </h3>
-        <p className="line-clamp-3 text-xs text-slate-500 sm:text-[0.8rem]">
-          {excerpt}
-        </p>
-
-        <div className="mt-auto flex items-center justify-between pt-2 text-[0.7rem] text-slate-400">
-          <span>By {author}</span>
-          <span>{timeAgo}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function PageLink({ slug, page, direction }) {
-  const href =
-    page === 1
-      ? `/category/${slug}`
-      : `/category/${slug}?page=${encodeURIComponent(page)}`;
-
-  const label =
-    direction === "prev"
-      ? "Previous"
-      : direction === "next"
-      ? "Next"
-      : `Page ${page}`;
-
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800"
-    >
-      {direction === "prev" && <span>←</span>}
-      <span>{label}</span>
-      {direction === "next" && <span>→</span>}
-    </Link>
-  );
-}
-
-function iconForCategory(tagOrCategory) {
-  const key = (tagOrCategory || "").toLowerCase();
-  if (key.includes("bitcoin")) return "₿";
-  if (key.includes("crypto")) return "🪙";
-  if (key.includes("eth") || key.includes("ethereum")) return "Ξ";
-  if (key.includes("ai")) return "🤖";
-  if (key.includes("world")) return "🌍";
-  if (key.includes("tech")) return "💻";
-  return "✨";
-}
-
-function timeAgoFromDate(dateString) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-  if (diffMinutes < 1) return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes} min ago`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-
-  return date.toLocaleDateString();
+  return { slug, title, excerpt, category, imageUrl, date };
 }
