@@ -1,39 +1,36 @@
-import Image from 'next/image';
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import CryptoSidebar from './CryptoSidebar';
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import FeaturedSidebar from "./FeaturedSidebar";
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
-  // Use local API during dev, or full URL in prod
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
     const res = await fetch(`${baseUrl}/api/articles/${slug}`, {
-      // Revalidate every 60s: good for Google News + freshness
       next: { revalidate: 60 },
     });
 
     if (!res.ok) return null;
     return await res.json(); // expected: { article, relatedArticles }
   } catch (error) {
-    console.error('Error fetching article:', error);
+    console.error("Error fetching article:", error);
     return null;
   }
 }
 
 // 2. SEO Metadata
 export async function generateMetadata({ params }) {
-  // match your original pattern – await params in Next 15+/16
   const { slug } = await params;
   const data = await getArticle(slug);
 
   if (!data?.article) {
-    return { title: 'Article Not Found' };
+    return { title: "Article Not Found" };
   }
 
   const { article } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   const url = `${baseUrl}/news/${article.slug}`;
   const image = article.imageUrl || `${baseUrl}/default-og-image.png`;
@@ -48,12 +45,12 @@ export async function generateMetadata({ params }) {
       title: article.headline,
       description: article.metaDescription || article.excerpt || article.headline,
       url,
-      type: 'article',
+      type: "article",
       images: [image],
-      siteName: 'Crypto AI News',
+      siteName: "Crypto AI News",
     },
     twitter: {
-      card: 'summary_large_image',
+      card: "summary_large_image",
       title: article.headline,
       description: article.metaDescription || article.excerpt || article.headline,
       images: [image],
@@ -61,7 +58,7 @@ export async function generateMetadata({ params }) {
   };
 }
 
-// 3. The Page Component
+// 3. Page Component
 export default async function ArticlePage({ params }) {
   const { slug } = await params;
   const data = await getArticle(slug);
@@ -71,17 +68,31 @@ export default async function ArticlePage({ params }) {
   }
 
   const { article, relatedArticles } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const articleUrl = `${baseUrl}/news/${article.slug}`;
 
-  const date = new Date(article.createdAt).toLocaleDateString('en-US', {
-    dateStyle: 'long',
-  });
+  const category =
+    article.category ||
+    article.primaryCategory ||
+    article.tags?.[0] ||
+    "News";
+
+  const publishedDate = article.createdAt
+    ? new Date(article.createdAt).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const authorName = article.authorName || article.sourceName || "AI Writer";
+  const readingTime = article.readingTime || "3";
 
   // JSON-LD for Google News / rich results
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'NewsArticle',
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
     headline: article.headline,
     description: article.metaDescription || article.excerpt || article.headline,
     image: article.imageUrl ? [article.imageUrl] : [],
@@ -89,34 +100,37 @@ export default async function ArticlePage({ params }) {
     dateModified: article.updatedAt || article.createdAt,
     author: [
       {
-        '@type': 'Organization',
-        name: 'AI News Desk',
+        "@type": "Organization",
+        name: authorName,
       },
     ],
     publisher: {
-      '@type': 'Organization',
-      name: 'Crypto AI News',
+      "@type": "Organization",
+      name: "Crypto AI News",
       logo: {
-        '@type': 'ImageObject',
+        "@type": "ImageObject",
         url: `${baseUrl}/logo.png`,
       },
     },
     mainEntityOfPage: {
-      '@type': 'WebPage',
-      '@id': articleUrl,
+      "@type": "WebPage",
+      "@id": articleUrl,
     },
   };
 
+  const sidebarArticles = Array.isArray(relatedArticles) ? relatedArticles : [];
+  const relatedForMain = sidebarArticles.slice(0, 6); // up to 6 related cards
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6 xl:px-0">
-      {/* JSON-LD for Google / Google News */}
+    <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-0">
+      {/* JSON-LD */}
       <script
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Breadcrumbs for UX + SEO */}
+      {/* Breadcrumbs */}
       <nav
         aria-label="Breadcrumb"
         className="mb-4 text-xs font-medium text-slate-500"
@@ -143,146 +157,225 @@ export default async function ArticlePage({ params }) {
         </ol>
       </nav>
 
-      <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
-        {/* Main Article Column */}
+      {/* Desktop: left / divider / right. Mobile: stacked (unchanged) */}
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3.2fr)_1px_minmax(260px,1fr)] lg:items-start lg:gap-8">
+        {/* MAIN ARTICLE COLUMN */}
         <main
-          className="flex-1"
+          className="lg:pr-8"
           itemScope
           itemType="https://schema.org/NewsArticle"
         >
-          {/* Top meta area – NO card container, more “editorial” look */}
+          {/* Top meta section */}
           <header className="mb-6 border-b border-slate-200 pb-5">
-            {/* Category / Tags row */}
-            <div className="mb-3 flex flex-wrap gap-2">
-              {article.tags &&
-                article.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-blue-700"
-                  >
-                    {tag}
-                  </span>
-                ))}
+            <div className="mb-3">
+              <span className="inline-flex items-center rounded-md border border-red-100 bg-red-50 px-3 py-1 text-[0.7rem] font-medium tracking-wide text-red-600">
+                {category}
+              </span>
             </div>
 
-            {/* Headline */}
             <h1
               itemProp="headline"
-              className="mb-3 text-3xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl"
+              className="mb-4 text-3xl font-light leading-tight text-slate-900 sm:text-[2.2rem]"
             >
               {article.headline}
             </h1>
 
-            {/* Dek / short summary */}
-            {article.excerpt && (
-              <p className="mb-4 max-w-3xl text-sm text-slate-600 sm:text-base">
-                {article.excerpt}
-              </p>
-            )}
+            {/* Author row */}
+            <div className="flex flex-wrap items-center gap-3 text-[0.8rem] text-slate-500">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[0.75rem] font-medium text-slate-700">
+                  {authorName.charAt(0)}
+                </div>
+                <span className="text-slate-700">{authorName}</span>
+              </div>
 
-            {/* Author + date + meta */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 sm:text-sm">
-              <span
-                itemProp="author"
-                itemScope
-                itemType="https://schema.org/Organization"
-              >
-                By{' '}
-                <span itemProp="name" className="font-medium text-slate-800">
-                  AI News Desk
-                </span>
-              </span>
-              <span aria-hidden="true">•</span>
-              <time
-                itemProp="datePublished"
-                dateTime={article.createdAt}
-                className="font-medium text-slate-700"
-              >
-                {date}
-              </time>
-              {article.readingTime && (
-                <>
-                  <span aria-hidden="true">•</span>
-                  <span>{article.readingTime} min read</span>
-                </>
-              )}
+              <span className="hidden text-slate-400 sm:inline">•</span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {publishedDate && (
+                  <time
+                    itemProp="datePublished"
+                    dateTime={article.createdAt}
+                    className="text-slate-500"
+                  >
+                    {publishedDate}
+                  </time>
+                )}
+                <span className="text-slate-400">•</span>
+                <span>{readingTime} min read</span>
+              </div>
             </div>
           </header>
 
-          {/* Hero image full-width, separated from meta */}
+          {/* Hero image */}
           {article.imageUrl && (
-            <figure className="mb-8 overflow-hidden rounded-3xl bg-slate-100">
-              <div className="relative h-56 w-full sm:h-80 lg:h-[420px]">
+            <figure className="mb-8 overflow-hidden rounded-md bg-slate-100">
+              <div className="relative h-64 w-full sm:h-80 lg:h-[420px]">
                 <Image
                   src={article.imageUrl}
                   alt={article.headline}
                   fill
                   priority
                   className="object-cover"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 720px"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 800px"
                 />
               </div>
-              {/* Optional caption if you ever add it on article */}
               {article.imageCaption && (
-                <figcaption className="px-3 py-3 text-xs text-slate-500 sm:px-0">
+                <figcaption className="px-2 py-2 text-[0.7rem] text-slate-500 sm:px-0">
                   {article.imageCaption}
                 </figcaption>
               )}
             </figure>
           )}
 
-          {/* Article body – tuned for spacing & readability */}
-          <section
-            itemProp="articleBody"
-            className="
-              prose prose-slate max-w-none
-              prose-headings:scroll-mt-24 prose-headings:font-semibold
-              prose-a:font-semibold prose-a:text-blue-600 hover:prose-a:text-blue-700
-              prose-img:rounded-2xl prose-img:shadow-sm
-              prose-p:my-5 prose-li:my-1.5
-              leading-relaxed
-            "
-            dangerouslySetInnerHTML={{ __html: article.articleHtml }}
-          />
+          {/* Body + share bar (desktop) */}
+          <div className="lg:flex lg:items-start lg:gap-6">
+            {/* Share column – desktop only */}
+            <div className="hidden text-slate-400 lg:flex lg:flex-col lg:items-center lg:gap-4 lg:pt-1">
+              <span className="text-[0.65rem] uppercase tracking-[0.18em] text-slate-400">
+                Share
+              </span>
+              <ShareIcon label="Facebook" abbr="f" />
+              <ShareIcon label="Twitter" abbr="t" />
+              <ShareIcon label="LinkedIn" abbr="in" />
+              <ShareIcon label="Email" abbr="@" />
+            </div>
 
-          {/* Related stories at the bottom */}
-          {relatedArticles && relatedArticles.length > 0 && (
-            <section className="mt-10 border-t border-slate-200 pt-6">
-              <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                Related stories
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {relatedArticles.map((related) => (
-                  <Link
-                    key={related.id}
-                    href={`/news/${related.slug}`}
-                    className="group block rounded-2xl border border-slate-200 bg-white/80 p-4 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60"
-                  >
-                    <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 group-hover:text-blue-800">
-                      {related.headline}
-                    </h3>
-                    {related.createdAt && (
-                      <p className="mt-2 text-xs text-slate-500">
-                        {new Date(related.createdAt).toLocaleDateString(
-                          'en-US',
-                          { dateStyle: 'medium' }
-                        )}
-                      </p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </section>
+            {/* Article body – spacing tuned for readability */}
+            <section
+              itemProp="articleBody"
+              className="
+                prose prose-slate max-w-none
+                prose-p:my-5
+                prose-p:text-[0.97rem]
+                prose-li:my-2
+                prose-headings:mt-8 prose-headings:mb-3
+                prose-headings:font-semibold
+                prose-a:text-blue-600 hover:prose-a:text-blue-700
+                leading-relaxed
+              "
+              dangerouslySetInnerHTML={{ __html: article.articleHtml }}
+            />
+          </div>
+
+          {/* RELATED ARTICLES SECTION */}
+          {relatedForMain.length > 0 && (
+            <RelatedArticlesSection articles={relatedForMain} />
           )}
         </main>
 
-        {/* Right Sidebar: visually lighter, mobile-first (stacks below on small screens) */}
-        <aside className="w-full shrink-0 lg:w-80 lg:sticky lg:top-20 lg:self-start">
-          <div className="mt-8 border-t border-slate-200 pt-6 lg:mt-0 lg:border-none lg:pt-0">
-            <CryptoSidebar />
-          </div>
+        {/* VERTICAL DIVIDER – very thin line, desktop only */}
+        <div className="hidden h-full bg-slate-200 lg:block" />
+
+        {/* RIGHT SIDEBAR – sticky on desktop */}
+        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-full lg:self-start lg:pl-4">
+          <FeaturedSidebar articles={sidebarArticles} />
         </aside>
       </div>
     </div>
   );
+}
+
+/* --------- Small share icon component --------- */
+
+function ShareIcon({ label, abbr }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Share on ${label}`}
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-[0.7rem] font-semibold uppercase text-slate-500 hover:border-red-500 hover:text-red-600"
+    >
+      {abbr}
+    </button>
+  );
+}
+
+/* --------- Related Articles Section --------- */
+
+function RelatedArticlesSection({ articles }) {
+  const normalized = articles.map((a) => normalizeRelated(a));
+
+  return (
+    <section className="mt-10">
+      {/* Heading row with red bar + title */}
+      <div className="mb-4 flex items-center gap-2">
+        <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
+        <h2 className="text-[1rem] sm:text-[1.1rem] font-light text-slate-900">
+          Related Articles
+        </h2>
+      </div>
+
+      {/* Cards grid */}
+      <div className="grid gap-6 md:grid-cols-3 sm:grid-cols-2">
+        {normalized.map((a) => (
+          <Link
+            key={a.slug}
+            href={`/news/${a.slug}`}
+            className="group block"
+          >
+            {/* Image */}
+            <div className="relative mb-3 h-44 w-full overflow-hidden rounded-md bg-slate-100 sm:h-48">
+              {a.imageUrl ? (
+                <Image
+                  src={a.imageUrl}
+                  alt={a.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 360px"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-slate-300">
+                  <span className="text-4xl">📰</span>
+                </div>
+              )}
+            </div>
+
+            {/* Meta row */}
+            <div className="mb-1 text-[0.8rem] font-light text-slate-500">
+              {a.category && (
+                <>
+                  {a.category}
+                  {a.date && " • "}
+                </>
+              )}
+              {a.date}
+            </div>
+
+            {/* Title */}
+            <h3 className="line-clamp-3 text-[0.98rem] font-light leading-snug text-slate-900 group-hover:underline underline-offset-[3px]">
+              {a.title}
+            </h3>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function normalizeRelated(article) {
+  const slug = article.slug || article.id || "#";
+  const title = article.headline || article.title || "Untitled article";
+  const category =
+    article.category ||
+    article.primaryCategory ||
+    article.tags?.[0] ||
+    "Business";
+  const imageUrl =
+    article.imageUrl || article.heroImageUrl || article.thumbnail || "";
+
+  const date = article.createdAt
+    ? new Date(article.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      })
+    : "";
+
+  return {
+    slug,
+    title,
+    category,
+    imageUrl,
+    date,
+  };
 }
