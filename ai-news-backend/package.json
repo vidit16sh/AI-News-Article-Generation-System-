@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "type": "module",
-"scripts": {
+  "scripts": {
     "dev": "concurrently --kill-others \"npm run dev:next\" \"npm run worker:ingest\" \"npm run publisher\" \"npm run worker:gen\" \"npm run cron\" --names \"NEXT,INGEST,GEN,CRON\" --prefix-colors \"bgBlue.bold,bgMagenta.bold,bgGreen.bold,bgYellow.bold\"",
     "dev:next": "next dev --webpack",
     "build": "next build",
@@ -12,7 +12,7 @@
     "lint": "next lint",
     "worker:ingest": "node src/workers/ingest.worker.js",
     "worker:gen": "node src/workers/generate.worker.js",
-    "cron": "node src/workers/cron.js", 
+    "cron": "node src/workers/cron.js",
     "publisher": "node src/workers/publisher.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"
@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "baseline-browser-mapping": "^2.9.0",
     "concurrently": "^9.2.1",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.5.0",

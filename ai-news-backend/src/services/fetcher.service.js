@@ -7,77 +7,81 @@ import { scrapeArticle } from './scraper.service.js';
 
 const parser = new Parser({
     customFields: {
-        item: [
-            ['content:encoded', 'fullContent'], 
-            ['content', 'normalContent']
-        ],
+        item: [['content:encoded', 'fullContent'], ['content', 'normalContent']],
     }
 });
 
-// 1. COINNESS FETCHER
-export const fetchCoinNess = async () => {
-    const apiUrl = process.env.COINNESS_API_URL;
-    if (!apiUrl) return;
+// Helper: Random sleep to prevent 429 Blocking
+const randomSleep = () => {
+    const ms = Math.floor(Math.random() * 4000) + 3000; 
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
 
+// 1. COINNESS FETCHER (Restored)
+export const fetchCoinNess = async () => {
+    const apiUrl = process.env.COINNESS_API_URL || "https://api.coinness.com/feed/v1/breaking-news?languageCode=en";
+    
     console.log(`\n🔍 Fetching CoinNess...`);
     const channel = await connectRabbit();
 
     try {
-        const response = await axios.get(apiUrl);
-        // API structure might vary, usually response.data.list or response.data
-        const items = response.data.list || response.data || [];
+        const config = {};
+        if (process.env.COINNESS_API_KEY) {
+            config.headers = { 'Authorization': `Bearer ${process.env.COINNESS_API_KEY}` };
+        }
+
+        const response = await axios.get(apiUrl, config);
+        const items = response.data.list || response.data || []; 
 
         let newCount = 0;
+
         for (const item of items) {
             const uniqueId = `coinness:${item.id}`;
+            
+            // 1. Redis Check
             const isCached = await redis.get(uniqueId);
             if (isCached) continue;
 
-            // CoinNess content is usually short but fast
-            const content = item.content || item.title; 
-            
-            // Check DB for duplicates
-            const existingRaw = await prisma.rawNews.findFirst({
-                where: { title: item.title } // CoinNess might not have unique URLs
+            // 2. Database Check (CRITICAL FIX)
+            const sourceUrl = item.shareUrl || `https://coinness.com/news/${item.id}`;
+            const existing = await prisma.rawNews.findUnique({
+                where: { sourceUrl: sourceUrl }
             });
-            
-            if (existingRaw) {
-                 await redis.set(uniqueId, '1', 'EX', 86400);
-                 continue;
+
+            if (existing) {
+                await redis.set(uniqueId, '1', 'EX', 86400);
+                continue;
             }
 
+            // 3. Save
+            const content = item.content || item.title; 
             const raw = await prisma.rawNews.create({
                 data: {
-                    sourceUrl: item.shareUrl || `coinness-${item.id}`,
-                    title: item.title,
+                    sourceUrl: sourceUrl,
+                    title: item.title || content.substring(0, 50),
                     rawBody: content,
-                    publishedAt: new Date(), 
+                    publishedAt: new Date(),
                     processed: false
                 }
             });
 
             await redis.set(uniqueId, '1', 'EX', 86400);
-            
+
             const payload = { rawNewsId: raw.id };
             channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(payload)));
             console.log(`   ⚡ CoinNess: ${item.title.substring(0, 30)}...`);
             
             newCount++;
         }
-        if (newCount > 0) console.log(`✅ CoinNess: ${newCount} new items.`);
+        
+        if(newCount > 0) console.log(`   ✅ CoinNess: ${newCount} new items.`);
 
     } catch (err) {
-        console.error(`❌ CoinNess Error: ${err.message}`);
+        console.error(`   ❌ CoinNess Error: ${err.message}`);
     }
 };
 
-// Helper: Sleep to prevent 429 Rate Limits
-const randomSleep = () => {
-    const ms = Math.floor(Math.random() * 4000) + 3000; // 3000ms + (0-4000ms)
-    return new Promise(resolve => setTimeout(resolve, ms));
-}; 
-
-// 2. RSS FETCHER (With Throttling)
+// 2. RSS FETCHER (Fixed)
 export const fetchRSS = async (url) => {
     console.log(`\n🔍 Fetching RSS: ${url}`);
     const channel = await connectRabbit();
@@ -96,23 +100,24 @@ export const fetchRSS = async (url) => {
                 continue;
             }
 
-            // 2. DB Check
+            // 2. Database Check (CRITICAL FIX FOR CRASH)
             const existingRaw = await prisma.rawNews.findUnique({
                 where: { sourceUrl: link }
             });
 
             if (existingRaw) {
+                // It exists in DB but not Redis. Update Redis and skip.
                 await redis.set(`news:${link}`, '1', 'EX', 86400);
+                process.stdout.write("s"); // 's' for skipped
                 continue;
             }
 
             // 3. Intelligent Parsing
             let bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
             
-            // 🛑 STEALTH SCRAPING
+            // Scraper Trigger (With Delay)
             if (bestContent.length < 200) {
-                await randomSleep(); // <--- Wait random time
-                
+                await randomSleep(); 
                 const scrapedText = await scrapeArticle(link);
                 if (scrapedText) {
                     bestContent = scrapedText;
@@ -142,12 +147,12 @@ export const fetchRSS = async (url) => {
             
             newCount++;
         }
-
-        console.log(`\n✅ Saved & Queued ${newCount} NEW articles.`);
+        
+        console.log(`\n✅ Saved ${newCount} NEW articles.`);
         return newCount;
 
     } catch (err) {
-        console.error(`❌ Error fetching RSS: ${err.message}`);
+        console.error(`   ❌ Error fetching RSS: ${err.message}`);
         return 0;
     }
 };

@@ -1,22 +1,21 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic'; // Ensure fresh data
+export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
   const category = searchParams.get('category') || 'all';
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = 12; // 12 items per page
+  const limit = parseInt(searchParams.get('limit') || '12');
 
   try {
-    // Build the filter dynamically
     const where = {
       status: 'PUBLISHED',
     };
 
-    // 1. Search Filter (Headline or Description)
+    // 1. Search Filter
     if (query) {
       where.OR = [
         { headline: { contains: query, mode: 'insensitive' } },
@@ -24,15 +23,14 @@ export async function GET(request) {
       ];
     }
 
-    // 2. Category Filter (Tag Matching)
+    // 2. Category Filter
     if (category && category !== 'all') {
-      // Matches if the tags array contains the category (case insensitive logic handled by frontend passing correct slug)
       where.tags = {
-        has: category 
+        has: category // Tags are stored as Case Sensitive in DB, usually Title Case
       };
     }
 
-    // 3. Execute Query with Pagination
+    // 3. Execute Query
     const [articles, total] = await prisma.$transaction([
       prisma.generatedArticle.findMany({
         where,
@@ -48,7 +46,14 @@ export async function GET(request) {
           createdAt: true,
           tags: true,
           priorityScore: true,
-          confidenceScore: true
+          confidenceScore: true,
+          // NEW: Include source data to populate "Author/Source" in UI
+          originalNews: {
+            select: {
+              sourceUrl: true,
+              title: true
+            }
+          }
         }
       }),
       prisma.generatedArticle.count({ where })

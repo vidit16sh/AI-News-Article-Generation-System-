@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+import Image from "next/image";
 export default function ArticleGrid({ articles }) {
   const hasArticles = Array.isArray(articles) && articles.length > 0;
 
@@ -65,10 +65,12 @@ function ArticleCard({ article }) {
     >
       <div className="relative h-40 w-full overflow-hidden bg-slate-100">
         {thumbnail ? (
-          <img
+          <Image
             src={thumbnail}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            fill
+            className="object-cover transition duration-300 group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-slate-300">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+import Image from "next/image";
 export default function HeroSection({ featured }) {
   const fallback = {
     slug: "getting-started-with-vrajnews",
@@ -24,11 +24,14 @@ export default function HeroSection({ featured }) {
         <div className="order-1 md:order-2 rounded-md overflow-hidden bg-slate-100">
           <div className="w-full h-[220px] sm:h-[260px] md:h-[280px] lg:h-[320px]">
             {article.imageUrl ? (
-              <img
-                src={article.imageUrl}
-                alt={article.title}
-                className="h-full w-full object-fill object-center"
-              />
+            <Image
+              src={article.imageUrl}
+              alt={article.title}
+              fill
+              priority // Loads immediately (Critical for speed score)
+              className="object-cover object-center"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-300">
                 <span className="text-6xl">📰</span>
