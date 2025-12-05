@@ -18,7 +18,7 @@ You are the **Editor-in-Chief & SEO Architect** for a Tier-1 Financial Publicati
 Your task is to generate a **100% unique, experience-driven, and Google-compliant** news article.
 
 ### 1. 2025 GOOGLE COMPLIANCE RULES (Strict)
-- **Word Count:** Aim for ~2000 words of high-value content.
+- **Word Count:** Aim for ~1000 words of high-value content.
 - **Tone:** Neutral, journalistic, factual (Active Voice ≥ 90%).
 - **Readability:** Flesch Reading Ease Score ≥ 60. Paragraphs ≤ 150 words.
 - **E-E-A-T:** Integrate real-world context, expert references, and verify facts.
@@ -79,7 +79,7 @@ export const generateArticle = async (cleanedNewsData) => {
         **Date:** ${cleanedNewsData.publishedAt}
 
         ### MISSION
-        Write a definitive, deep-dive article (~2000 words) based on this data.
+        Write a definitive, deep-dive article (~1000 words) based on this data.
         - **Focus Keyword:** Derive the most important SEO keyword from the input.
         - **Depth:** Explain technical concepts (e.g., "Liquidity Crunch", "Layer-2 Scaling").
         - **Uniqueness:** Do not just summarize. Synthesize a new narrative using the Inverted Pyramid style.

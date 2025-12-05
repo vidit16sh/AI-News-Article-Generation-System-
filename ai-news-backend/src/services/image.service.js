@@ -15,44 +15,52 @@ composition: Central subject, clean background, no text, no watermarks.
 `;
 
 const generateImage = async (headline) => {
+  // 🔍 DEBUGGING
+  if (!process.env.FAL_KEY) {
+      console.error("❌ FATAL: FAL_KEY is missing in .env!");
+      return null;
+  }
+
   try {
     console.log(`   🎨 Generating Professional Image for: "${headline.substring(0, 20)}..."`);
 
-    // 1. Clean the headline to remove "noise" (dates, tickers) for better visual concepts
     const cleanSubject = headline
-        .replace(/(\$\d+[\d,.]*)|(\d+%)/g, "") // Remove specific prices/percentages ($50k, 5%)
-        .replace(/[:\-]/g, " ") // Remove colons/dashes
+        .replace(/(\$\d+[\d,.]*)|(\d+%)/g, "") 
+        .replace(/[:\-]/g, " ") 
         .trim();
 
-    // 2. Construct the Professional Prompt
     const fullPrompt = `
     ${THEME_PROMPT}
-    
     Subject: A conceptual representation of: "${cleanSubject}".
     Context: Cryptocurrency, Blockchain technology, Global Finance.
-    
     Details: 8k resolution, unreal engine 5 render, hyper-detailed, trending on artstation.
     `;
 
     const result = await fal.subscribe("fal-ai/flux/schnell", {
       input: {
         prompt: fullPrompt,
-        image_size: "landscape_16_9", // Perfect for Article Headers
-        num_inference_steps: 6,       // Increased slightly for better detail (4 -> 6)
+        image_size: "landscape_16_9",
+        num_inference_steps: 4,
         seed: Math.floor(Math.random() * 1000000),
         enable_safety_checker: true,
-        guidance_scale: 7.5           // Forces model to follow the "Theme" strictly
+        guidance_scale: 7.5
       },
-      logs: false,
+      logs: true, 
     });
 
-    if (result.images && result.images.length > 0) {
-      return result.images[0].url;
+    // ✅ FIX: Check BOTH possible locations for images
+    // Some models return { images: [] }, others return { data: { images: [] } }
+    const images = result.images || (result.data && result.data.images);
+
+    if (images && images.length > 0) {
+      return images[0].url;
     }
+    
+    console.error("❌ Fal.ai returned no images. Raw Response:", JSON.stringify(result));
     return null;
 
   } catch (error) {
-    console.error("❌ Fal.ai Error:", error.message);
+    console.error("❌ Fal.ai Exception:", error.message);
     return null; 
   }
 };
