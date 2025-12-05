@@ -6,7 +6,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-pro", 
     generationConfig: { 
-        responseMimeType: "application/json",
+        responseMimeType: "application/json", 
+        maxOutputTokens: 8192,
         temperature: 0.25, // Low temp for factual accuracy
         topP: 0.9,
         topK: 40
