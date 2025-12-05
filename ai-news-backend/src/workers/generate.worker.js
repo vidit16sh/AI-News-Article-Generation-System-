@@ -38,7 +38,7 @@ const triggerRevalidation = async (tag) => {
 
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
-    const { newsId, priorityScore } = content;
+    const { newsId, priorityScore = 50 } = content;
 
     console.log(`\n📝 [Gen-Worker] Processing Job: ${newsId}`);
 

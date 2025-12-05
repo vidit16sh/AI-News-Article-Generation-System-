@@ -1,22 +1,21 @@
 import 'dotenv/config'; 
 import Bottleneck from 'bottleneck';
-import { connectRabbit } from '../config/rabbit.js'; // Note the .js extension
+import { connectRabbit } from '../config/rabbit.js'; 
 import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
 import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 
-// 🛑 RATE LIMITER CONFIGURATION
-// safe limit: 1 request every 4000ms (4 seconds) = 15 per minute
+// 🛑 RATE LIMITER: 1 req every 5 seconds (Slower = Safer)
 const limiter = new Bottleneck({
-    minTime: 4000, 
+    minTime: 5000, 
     maxConcurrent: 1 
 });
 
 const processJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
-    const { rawNewsId } = content;
+    const { rawNewsId, retryCount = 0 } = content; // Track retries
 
-    console.log(`\n⚙️  [Ingest-Worker] Picked up: ${rawNewsId}`);
+    console.log(`\n⚙️  [Ingest-Worker] Picked up: ${rawNewsId} (Retry: ${retryCount})`);
 
     try {
         const rawNews = await prisma.rawNews.findUnique({ where: { id: rawNewsId } });
@@ -28,11 +27,12 @@ const processJob = async (msg, channel) => {
         }
 
         const cleanedBody = cleanText(rawNews.rawBody);
+
+        // ⏳ AI Call
         const classification = await limiter.schedule(() => 
             classifyNews(cleanedBody, rawNews.title)
         ); 
-        // ⏳ WRAP THE AI CALL IN THE LIMITER
-        // This line will PAUSE execution automatically if we are going too fast
+
         const categoryName = classification.category || "General";
         const priorityScore = classification.priority_score || 50; 
 
@@ -60,39 +60,45 @@ const processJob = async (msg, channel) => {
 
         console.log(`   ✅ Done! Classified as: ${categoryName}`);
 
-        // 3. TRIGGER MODEL 2 (The AI Writer)
-        // This sends the ID to the Generation Worker
+        // 3. TRIGGER MODEL 2
         const payload = { 
             newsId: finalNews.id,
-            priorityScore: priorityScore // <--- Passing score to next worker
+            priorityScore: priorityScore
         };
         channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
-        console.log(`   ➡️  Triggered Model 2 (Sent to generation_queue)`);
+        console.log(`   ➡️  Triggered Model 2`);
 
         channel.ack(msg);
 
     } catch (err) {
         console.error(`   ❌ Error: ${err.message}`);
-        // If it's a 429 (Rate Limit) error from Google, we put it back in the queue
-        if (err.message.includes('429')) {
-             console.log("   ⏳ Rate Limit Hit - Requeuing...");
-             channel.nack(msg); // Put back to retry later
+        
+        // 🚨 SMART RETRY LOGIC for 429s
+        if (err.message && err.message.includes('429')) {
+             // Exponential Backoff: 10s, 20s, 40s...
+             const delay = Math.min(10000 * Math.pow(2, retryCount), 60000); // Max 1 min
+             
+             console.log(`   ⏳ Rate Limit Hit - Requeuing in ${delay/1000}s...`);
+             
+             setTimeout(() => {
+                 // Re-queue with incremented retry count
+                 const newContent = { ...content, retryCount: retryCount + 1 };
+                 channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
+                 channel.ack(msg); // Ack original to remove it
+             }, delay);
+
         } else {
-             channel.ack(msg); // Ack other errors to avoid infinite loops
+             channel.ack(msg); // Ack permanent errors
         }
     }
 };
 
 const startWorker = async () => {
     const channel = await connectRabbit();
-    
-    // Ensure the generation queue exists so we don't crash when sending to it
     await channel.assertQueue('generation_queue', { durable: true });
-
-    // ⚠️ CRITICAL: Only take 1 job at a time
     channel.prefetch(1); 
     
-    console.log("👀 Ingest Worker waiting... (Rate Limit: 1 req/4s)");
+    console.log("👀 Ingest Worker waiting... (Rate Limit: 1 req/5s)");
 
     channel.consume('ingest_queue', (msg) => {
         if (msg) processJob(msg, channel);
