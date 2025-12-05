@@ -34,7 +34,54 @@ const triggerRevalidation = async (tag) => {
     } catch (error) {
         // Ignore
     }
-};
+}; 
+
+const createJsonLd = (article, url) => ({
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": url
+    },
+    "headline": article.headline,
+    "description": article.meta_description || article.headline, // Critical for SEO
+    "image": article.imageUrl ? [article.imageUrl] : [], // Safety check
+    "datePublished": new Date().toISOString(),
+    "dateModified": new Date().toISOString(), // Google prefers seeing this
+    "author": { 
+        "@type": "Organization", 
+        "name": "AI News Desk" 
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "AI News Platform", // Replace with your actual Site Name
+        "logo": {
+            "@type": "ImageObject",
+            "url": "http://localhost:3000/logo.png" // Replace with your actual logo URL
+        }
+    }
+});
+
+
+const createRssEntry = (article, url) => `
+<item>
+  <title><![CDATA[${article.headline}]]></title>
+  <link>${url}</link>
+  <guid isPermaLink="true">${url}</guid>
+  <pubDate>${new Date().toUTCString()}</pubDate>
+  <description><![CDATA[${article.meta_description}]]></description>
+  ${article.imageUrl ? `<enclosure url="${article.imageUrl}" length="0" type="image/jpeg" />` : ''}
+  <category><![CDATA[${article.tags?.[0] || 'News'}]]></category>
+  <dc:creator>AI News Desk</dc:creator>
+</item>`; 
+
+const createSitemapEntry = (url) => `
+<url>
+  <loc>${url}</loc>
+  <lastmod>${new Date().toISOString()}</lastmod>
+  <changefreq>daily</changefreq>
+  <priority>0.7</priority>
+</url>`;
 
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
@@ -67,10 +114,19 @@ const processGenerationJob = async (msg, channel) => {
         const aiOutput = await limiter.schedule(() => generateArticle(cleanNews));
 
         // 2. Generate Image
+        console.log(`   🎨 Generating Image (Fal.ai)...`);
         const imageUrl = await generateImage(aiOutput.headline);
+        
+        if (!imageUrl) console.warn("   ⚠️ Image generation failed (Key issue?)."); 
 
         // 3. Score Originality
         const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const fullUrl = `${baseUrl}/news/${aiOutput.slug}`; 
+        
+        const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl);
+        const rssEntry = createRssEntry(aiOutput, fullUrl);
+        const sitemapEntry = createSitemapEntry(fullUrl);
 
         // 4. Determine Status
         let status = "DRAFT";
@@ -100,16 +156,24 @@ const processGenerationJob = async (msg, channel) => {
                 slug: aiOutput.slug,
                 metaDescription: aiOutput.meta_description,
                 articleHtml: aiOutput.article_html,
-                tags: aiOutput.tags || [],
+                
+                tags: aiOutput.tags || [], 
+                keywords: aiOutput.keywords || [],
+                
                 imageUrl: imageUrl,
-                rssEntry: aiOutput.rss_entry,
-                sitemapEntry: aiOutput.sitemap_entry,
-                newsJsonLd: aiOutput.news_jsonld,
+                
+                rssEntry: rssEntry,         // ✅ Populated
+                sitemapEntry: sitemapEntry, // ✅ Populated
+                newsJsonLd: newsJsonLd,
+                
                 originalityScore: realOriginalityScore,
                 confidenceScore: aiOutput.confidence || 0, 
                 priorityScore: priorityScore,
+                
                 status: status,
+                
                 publishAt: publishAt,
+                
                 originalNewsId: cleanNews.id
             }
         });

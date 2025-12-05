@@ -2,60 +2,61 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use Gemini 2.5 Pro for maximum reasoning, depth, and instruction following
+// Use Gemini 2.5 Pro for maximum reasoning depth
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-pro", 
     generationConfig: { 
         responseMimeType: "application/json",
-        temperature: 0.3, // Reduced temperature for higher factuality
-        topP: 0.85,
+        temperature: 0.25, // Low temp for factual accuracy
+        topP: 0.9,
         topK: 40
     } 
 });
 
 const SYSTEM_PROMPT = `
-You are the **Editor-in-Chief & Senior SEO Strategist** for a Tier-1 Financial Publication.
-Your goal is to produce **definitive, authoritative coverage** that dominates Google News and Discover feeds.
+You are the **Editor-in-Chief & SEO Architect** for a Tier-1 Financial Publication.
+Your task is to generate a **100% unique, experience-driven, and Google-compliant** news article.
 
-### 1. THE "BRUTAL QUALITY" STANDARD (Non-Negotiable)
-- **Depth & Density:** Content must be information-dense. No fluff. Every sentence must deliver value.
-- **E-E-A-T Enforcement:** Demonstrate **Expertise** (use correct terminology), **Authority** (cite data), and **Trust** (acknowledge risks/counter-arguments).
-- **Readability:** Target Flesch-Kincaid Grade 8-10. Simple sentence structures for complex ideas.
-- **Active Voice:** "The SEC sued Binance" (Good) vs "Binance was sued by the SEC" (Bad).
-- **No Robot-Speak:** Banned phrases: "In conclusion," "Delving into," "A testament to," "Game-changer," "Landscape."
+### 1. 2025 GOOGLE COMPLIANCE RULES (Strict)
+- **Word Count:** Aim for ~2000 words of high-value content.
+- **Tone:** Neutral, journalistic, factual (Active Voice ≥ 90%).
+- **Readability:** Flesch Reading Ease Score ≥ 60. Paragraphs ≤ 150 words.
+- **E-E-A-T:** Integrate real-world context, expert references, and verify facts.
+- **Structure:** Use transition words in ≥ 30% of sentences. Subheadings every 300 words.
 
-### 2. SEO & SEMANTIC RICHNESS
-- **LSI Keywords:** Naturally weave in Latent Semantic Indexing (LSI) terms related to the topic (e.g., if "Bitcoin", use "Satoshi," "Hashrate," "Digital Gold," "Resistance Level").
-- **Entity Salience:** Bold the **first mention** of key entities (companies, tokens, people) using <strong> tag.
-- **Snippet Optimization:** The first sentence of every paragraph should be punchy and stand alone.
+### 2. SEO REQUIREMENTS
+- **Focus Keyword:** Must appear in Title, First 100 words, Subheadings, and Conclusion.
+- **LSI Keywords:** Use synonyms and related terms to prevent keyword stuffing.
+- **Power Words:** Include at least one emotional/psychological trigger word in the headline.
 
-### 3. REQUIRED HTML STRUCTURE (article_html)
-Use ONLY these tags: <h1>, <p>, <h2>, <h3>, <ul>, <li>, <strong>, <blockquote>.
-Do NOT use <html>, <body>, or Markdown.
-
-**The Blueprint:**
-1.  **Dateline:** <p><strong>NEW YORK, [Current Date]</strong> — [Lead Paragraph: Who, What, When, Where, Why + Primary Keyword in first 15 words].</p>
-2.  **Executive Summary:** A <blockquote> section summarizing the "Alpha" or "Key Signal" for investors.
-3.  **Market Context (H2):** Historical background, price action leading to this, or regulatory precedent.
-4.  **Deep Dive (H2):** The core story. Use specific numbers (e.g. $4.2B, 15%). Explain *technical concepts* if they appear (e.g., "Short Squeeze").
-5.  **Market Reaction (H3):** Price movement, liquidation data, or social sentiment.
-6.  **The Contrarian View / Risks (H3):** What could go wrong? (Crucial for Trust).
-7.  **Key Takeaways (H2):** <ul> list of 4-5 bullet points.
-8.  **FAQ (H2):** 3 Questions people might search for regarding this topic.
+### 3. CONTENT FORMAT (HTML)
+The 'article_html' must use ONLY these tags: <h1>, <p>, <h2>, <h3>, <ul>, <li>, <strong>, <blockquote>, <table>.
+**Architecture:**
+1. **Headline (H1):** Matches JSON headline.
+2. **Dateline:** <p><strong>[CITY], [Date]</strong> — [Lead Paragraph with Focus Keyword].</p>
+3. **Executive Summary:** A <blockquote> with key takeaways.
+4. **Market Context (H2):** Deep analysis of the background.
+5. **Core Analysis (H2):** Detailed breakdown with data.
+6. **Expert Opinion (H3):** Contrarian views or analyst sentiment.
+7. **Impact Assessment (H2):** Real-world effects on the industry.
+8. **Conclusion (H2):** Summary + Final thought.
+9. **FAQs (H2):** 4-6 Questions & Answers.
 
 ### 4. OUTPUT SCHEMA (JSON)
+Return ONLY this JSON object:
 {
-  "headline": "String (60-75 chars, High CTR, Power Words included)",
-  "slug": "String (kebab-case, keyword-rich)",
-  "meta_description": "String (145-160 chars, includes primary keyword, 'teaser' style)",
-  "tags": ["String", "String", "String", "String", "String"],
-  "article_html": "String (The full HTML content)",
-  "originality_score": Number (0.95-1.0),
+  "headline": "String (60-75 chars, optimized)",
+  "slug": "String (kebab-case, 4-5 words)",
+  "meta_description": "String (145-155 chars, includes focus keyword)",
+  "tags": ["String"],
+  "keywords": ["String"],
+  "focus_keywords": "String (Primary keyword used)",
+  "featured_image_alt": "String (SEO optimized alt text)",
+  "article_html": "String (Full HTML content)",
   "confidence": Number (0.0-1.0)
 }
 `;
 
-// Robust JSON Cleaner to prevent worker crashes
 const cleanJsonOutput = (text) => {
     const clean = text.replace(/```json|```/g, '').trim();
     try {
@@ -69,8 +70,8 @@ const cleanJsonOutput = (text) => {
 export const generateArticle = async (cleanedNewsData) => {
     try {
         const userPrompt = `
-        ### SOURCE INTEL
-        **Headline Signal:** ${cleanedNewsData.title}
+        ### SOURCE MATERIAL
+        **Headline:** ${cleanedNewsData.title}
         **Category:** ${cleanedNewsData.category.name}
         **Raw Summary:** ${cleanedNewsData.summary}
         **Full Context:** ${JSON.stringify(cleanedNewsData.content)}
@@ -78,13 +79,10 @@ export const generateArticle = async (cleanedNewsData) => {
         **Date:** ${cleanedNewsData.publishedAt}
 
         ### MISSION
-        Write a **1200+ word investigative report** on this topic.
-        - **Analyze** the implications for the ${cleanedNewsData.category.name} sector.
-        - **Identify** 3-5 LSI keywords relevant to this specific story and use them.
-        - **Explain** any jargon (e.g., if "ETF" is mentioned, briefly define its impact).
-        - **Formatting:** Use a <blockquote> for the most important quote or stat.
-        
-        **GOAL:** Create the definitive resource on this news event that makes other articles look shallow.
+        Write a definitive, deep-dive article (~2000 words) based on this data.
+        - **Focus Keyword:** Derive the most important SEO keyword from the input.
+        - **Depth:** Explain technical concepts (e.g., "Liquidity Crunch", "Layer-2 Scaling").
+        - **Uniqueness:** Do not just summarize. Synthesize a new narrative using the Inverted Pyramid style.
         `;
 
         const result = await model.generateContent({
@@ -98,26 +96,14 @@ export const generateArticle = async (cleanedNewsData) => {
 
     } catch (error) {
         console.error("❌ AI Generation Error:", error.message);
-        
-        // Fail-safe fallback to keep the pipeline alive
+        // Fallback
         return {
             headline: cleanedNewsData.title,
-            slug: cleanedNewsData.title.toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .trim()
-                .replace(/\s+/g, '-'),
-            meta_description: cleanedNewsData.summary?.substring(0, 150) || "Developing market story.",
-            article_html: `
-                <h1>${cleanedNewsData.title}</h1>
-                <p><strong>${new Date().toLocaleDateString()}</strong> — ${cleanedNewsData.summary}</p>
-                <blockquote><strong>Quick Take:</strong> Market data is currently developing. Full analysis incoming.</blockquote>
-                <h2>Details</h2>
-                <p>${cleanedNewsData.content || "Data processing..."}</p>
-                <h2>Key Takeaways</h2>
-                <ul><li>Breaking news in the ${cleanedNewsData.category.name} sector.</li></ul>
-            `,
-            tags: [cleanedNewsData.category.name, "Breaking News"],
-            originality_score: 0.5,
+            slug: cleanedNewsData.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-'),
+            meta_description: cleanedNewsData.summary?.substring(0, 150) || "Market update.",
+            article_html: `<h1>${cleanedNewsData.title}</h1><p><strong>${new Date().toLocaleDateString()}</strong> — ${cleanedNewsData.summary}</p><h2>Details</h2><p>${cleanedNewsData.content || "Developing story."}</p>`,
+            tags: [cleanedNewsData.category.name],
+            keywords: [cleanedNewsData.category.name],
             confidence: 0.1 
         };
     }

@@ -7,7 +7,7 @@ import { classifyNews, getOrCreateCategory } from '../services/classifier.servic
 
 // 🛑 RATE LIMITER: 1 req every 5 seconds (Slower = Safer)
 const limiter = new Bottleneck({
-    minTime: 5000, 
+    minTime: 20000, 
     maxConcurrent: 1 
 });
 
