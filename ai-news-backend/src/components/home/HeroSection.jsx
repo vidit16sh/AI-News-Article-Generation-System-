@@ -28,7 +28,7 @@ export default function HeroSection({ featured }) {
               src={article.imageUrl}
               alt={article.title}
               fill
-              priority // Loads immediately (Critical for speed score)
+              priority={true} // Loads immediately (Critical for speed score)
               className="object-cover object-center"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
