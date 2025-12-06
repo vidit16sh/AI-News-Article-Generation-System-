@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+
 export default function HeroSection({ featured }) {
   const fallback = {
     slug: "getting-started-with-vrajnews",
@@ -18,26 +19,24 @@ export default function HeroSection({ featured }) {
     : fallback;
 
   return (
-    <section className="mb-6">
+    <section className="mt-4 mb-6">
       <div className="grid gap-4 md:grid-cols-[1.1fr_1.6fr] md:items-stretch">
-        {/* Image column – first on mobile */}
-        <div className="order-1 md:order-2 rounded-md overflow-hidden bg-slate-100">
-          <div className="w-full h-[220px] sm:h-[260px] md:h-[280px] lg:h-[320px]">
-            {article.imageUrl ? (
+        {/* Image column – first on mobile, fixed height, full cover */}
+        <div className="order-1 md:order-2 relative h-[220px] w-full overflow-hidden rounded-md bg-slate-100 sm:h-[260px] md:h-[280px] lg:h-[320px]">
+          {article.imageUrl ? (
             <Image
               src={article.imageUrl}
               alt={article.title}
               fill
-              priority={true} // Loads immediately (Critical for speed score)
+              priority // critical for LCP
               className="object-cover object-center"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-300">
-                <span className="text-6xl">📰</span>
-              </div>
-            )}
-          </div>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <span className="text-6xl">📰</span>
+            </div>
+          )}
         </div>
 
         {/* Text column – starts from top */}
@@ -54,10 +53,10 @@ export default function HeroSection({ featured }) {
               )}
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-[2.1rem] font-light leading-snug">
+            <h1 className="text-2xl font-light leading-snug sm:text-3xl lg:text-[2.1rem]">
               <Link
                 href={`/news/${article.slug}`}
-                className="hover:underline underline-offset-[3px] decoration-red-500"
+                className="underline-offset-[3px] decoration-red-500 hover:underline"
               >
                 {article.title}
               </Link>
