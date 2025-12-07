@@ -9,9 +9,22 @@ const model = genAI.getGenerativeModel({
 
 // Rule-based keywords (Fast/Free) - Now maps to Objects
 const RULES = {
-    'Crypto': ['bitcoin', 'ethereum', 'blockchain', 'web3', 'defi', 'binance'],
-    'Finance': ['inflation', 'interest rate', 'fed', 'bank', 'economy', 'tax'],
-    'Tech': ['apple', 'google', 'microsoft', 'ai', 'software', 'update'],
+    // 🪙 CRYPTO DEEP DIVE
+    'Bitcoin': ['bitcoin', 'btc', 'satoshi', 'halving', 'lightning network'],
+    'Ethereum': ['ethereum', 'eth', 'vitalik', 'erc-20', 'layer 2', 'optimism', 'arbitrum'],
+    'DeFi': ['defi', 'uniswap', 'aave', 'dex', 'liquidity pool', 'yield farming', 'staking'],
+    'Altcoins': ['solana', 'cardano', 'xrp', 'doge', 'pepe', 'meme coin', 'avalanche'],
+    'Crypto Regulation': ['sec', 'gensler', 'crypto law', 'mica', 'stablecoin regulation'],
+
+    // 🤖 AI REVOLUTION
+    'Generative AI': ['chatgpt', 'gemini', 'midjourney', 'llm', 'claude', 'anthropic', 'open ai'],
+    'Robotics': ['robot', 'humanoid', 'boston dynamics', 'tesla bot', 'automation'],
+    'AI Hardware': ['nvidia', 'gpu', 'tsmc', 'ai chip', 'sam altman', 'h100'],
+
+    // 💱 FOREX & MACRO
+    'Forex': ['eur/usd', 'gbp', 'jpy', 'forex', 'currency pair', 'dxy', 'dollar index'],
+    'Central Banks': ['fed', 'fomc', 'powell', 'ecb', 'interest rate', 'rate hike', 'inflation', 'cpi'],
+    'Commodities': ['gold', 'oil', 'crude', 'silver', 'natural gas', 'brent'],
 };
 
 export const classifyNews = async (text, title) => {
@@ -24,7 +37,7 @@ export const classifyNews = async (text, title) => {
             return {
                 category: category,
                 priority_score: 50, // Default for rules
-                reasoning: "Matched keyword rule"
+                reasoning: `Matched keyword rule ${category}`
             };
         }
     }
