@@ -5,13 +5,20 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 const CATEGORIES = [
   { slug: "all", label: "All" },
-  { slug: "crypto", label: "Crypto" },
+  // Crypto
   { slug: "bitcoin", label: "Bitcoin" },
-  { slug: "ai-news", label: "AI News" },
-  { slug: "world-news", label: "World" },
-  { slug: "technology", label: "Technology" },
+  { slug: "ethereum", label: "Ethereum" },
+  { slug: "defi", label: "DeFi" },
+  { slug: "crypto-regulation", label: "Regulation" },
+  // AI
+  { slug: "generative-ai", label: "Gen AI" },
+  { slug: "ai-hardware", label: "AI Chips" },
+  { slug: "robotics", label: "Robotics" },
+  // Finance/Forex
+  { slug: "forex", label: "Forex" },
+  { slug: "central-banks", label: "Fed & Rates" },
+  { slug: "commodities", label: "Gold & Oil" },
 ];
-
 export default function CategoryStrip() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -66,17 +73,20 @@ export default function CategoryStrip() {
 
 function iconForCategory(slug) {
   switch (slug) {
-    case "crypto":
-      return "🪙";
-    case "bitcoin":
-      return "₿";
-    case "ai-news":
-      return "🤖";
-    case "world-news":
-      return "🌍";
-    case "technology":
-      return "💻";
-    default:
-      return "✨";
+    // Crypto
+    case "bitcoin": return "🟠";
+    case "ethereum": return "🔹";
+    case "defi": return "🦄";
+    case "crypto-regulation": return "⚖️";
+    case "altcoins": return "🚀";
+    // AI
+    case "generative-ai": return "✨";
+    case "ai-hardware": return "💾";
+    case "robotics": return "🤖";
+    // Forex
+    case "forex": return "💱";
+    case "central-banks": return "🏦";
+    case "commodities": return "🛢️";
+    default: return "📰";
   }
 }

@@ -1,18 +1,20 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Use Gemini 2.5 Pro for maximum reasoning depth
-const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-pro", 
-    generationConfig: { 
-        responseMimeType: "application/json", 
-        maxOutputTokens: 8192,
-        temperature: 0.25, // Low temp for factual accuracy
-        topP: 0.9,
-        topK: 40
-    } 
+// 🔌 Connect to DeepSeek via OpenAI SDK
+const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: process.env.DEEPSEEK_API_KEY
 });
+
+// Configuration is now handled inside the API call, 
+// but we define the constants here for clarity.
+const MODEL_CONFIG = {
+    model: "deepseek-chat", // DeepSeek V3 (Best for strict JSON & Journalism)
+    temperature: 0.25,      // Low temp for factual accuracy
+    max_tokens: 8192,       // Equivalent to maxOutputTokens
+    top_p: 0.9,
+    response_format: { type: "json_object" } // Enforces strict JSON
+};
 
 const SYSTEM_PROMPT = `
 You are the **Editor-in-Chief & SEO Architect** for a Tier-1 Financial Publication.
@@ -59,6 +61,7 @@ Return ONLY this JSON object:
 `;
 
 const cleanJsonOutput = (text) => {
+    // DeepSeek is cleaner, but we still strip markdown code blocks just in case
     const clean = text.replace(/```json|```/g, '').trim();
     try {
         return JSON.parse(clean);
@@ -86,18 +89,27 @@ export const generateArticle = async (cleanedNewsData) => {
         - **Uniqueness:** Do not just summarize. Synthesize a new narrative using the Inverted Pyramid style.
         `;
 
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: SYSTEM_PROMPT + "\n" + userPrompt }] }]
+        // 🚀 Switch to OpenAI SDK (DeepSeek)
+        const completion = await openai.chat.completions.create({
+            model: MODEL_CONFIG.model,
+            messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: userPrompt }
+            ],
+            temperature: MODEL_CONFIG.temperature,
+            max_tokens: MODEL_CONFIG.max_tokens,
+            top_p: MODEL_CONFIG.top_p,
+            response_format: MODEL_CONFIG.response_format
         });
 
-        const response = await result.response;
-        const text = response.text();
+        const text = completion.choices[0].message.content;
 
         return cleanJsonOutput(text);
 
     } catch (error) {
         console.error("❌ AI Generation Error:", error.message);
-        // Fallback
+        
+        // Fallback Logic (Preserved exactly as requested)
         return {
             headline: cleanedNewsData.title,
             slug: cleanedNewsData.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-'),

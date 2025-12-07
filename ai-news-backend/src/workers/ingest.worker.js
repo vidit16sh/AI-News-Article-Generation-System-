@@ -5,42 +5,36 @@ import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
 import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 
-// 🛑 RATE LIMITER: 1 req every 5 seconds (Slower = Safer)
+// 🛑 RATE LIMITER for Classification (Flash is fast, but let's be safe)
 const limiter = new Bottleneck({
-    minTime: 20000, 
+    minTime: 20000, // 1 request every 2 seconds
     maxConcurrent: 1 
 });
 
 const processJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
-    const { rawNewsId, retryCount = 0 } = content; // Track retries
-
-    console.log(`\n⚙️  [Ingest-Worker] Picked up: ${rawNewsId} (Retry: ${retryCount})`);
+    const { rawNewsId, retryCount = 0 } = content;
 
     try {
         const rawNews = await prisma.rawNews.findUnique({ where: { id: rawNewsId } });
 
         if (!rawNews || rawNews.processed) {
-            console.log("   ⚠️  Skipping (Missing or Processed)");
             channel.ack(msg);
             return;
         }
 
         const cleanedBody = cleanText(rawNews.rawBody);
 
-        // ⏳ AI Call
+        // 🧠 1. CLASSIFY with Gemini Flash (Cheap/Free)
         const classification = await limiter.schedule(() => 
             classifyNews(cleanedBody, rawNews.title)
         ); 
 
         const categoryName = classification.category || "General";
-        const priorityScore = classification.priority_score || 50; 
+        const priorityScore = classification.priority_score || 0; 
 
-        console.log(`   🧠 Classified: ${categoryName} (Score: ${priorityScore})`);
-        
+        // 2. Database: Save the clean version (but don't generate yet)
         const category = await getOrCreateCategory(categoryName);
-
-        // 1. Save Cleaned Data
         const finalNews = await prisma.cleanedNews.create({
             data: {
                 title: rawNews.title,
@@ -52,43 +46,40 @@ const processJob = async (msg, channel) => {
             }
         });
 
-        // 2. Mark Raw as Processed
         await prisma.rawNews.update({
             where: { id: rawNewsId },
             data: { processed: true }
         });
 
-        console.log(`   ✅ Done! Classified as: ${categoryName}`);
-
-        // 3. TRIGGER MODEL 2
-        const payload = { 
-            newsId: finalNews.id,
-            priorityScore: priorityScore
-        };
-        channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
-        console.log(`   ➡️  Triggered Model 2`);
+        // 💎 3. THE VIP FILTER (Quality Control)
+        // Only send to Generator if Score is >= 85 (Breaking/Major News)
+        // This reduces volume from ~100/day to ~5-10/day.
+        if (priorityScore >= 85) {
+            console.log(`   🚀 APPROVED (${priorityScore}/100): "${rawNews.title.substring(0, 40)}..."`);
+            console.log(`      Reason: ${classification.reasoning}`);
+            
+            const payload = { 
+                newsId: finalNews.id,
+                priorityScore: priorityScore
+            };
+            channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
+        } else {
+            console.log(`   🗑️  REJECTED (${priorityScore}/100): "${rawNews.title.substring(0, 40)}..."`);
+        }
 
         channel.ack(msg);
 
     } catch (err) {
-        console.error(`   ❌ Error: ${err.message}`);
-        
-        // 🚨 SMART RETRY LOGIC for 429s
-        if (err.message && err.message.includes('429')) {
-             // Exponential Backoff: 10s, 20s, 40s...
-             const delay = Math.min(10000 * Math.pow(2, retryCount), 60000); // Max 1 min
-             
-             console.log(`   ⏳ Rate Limit Hit - Requeuing in ${delay/1000}s...`);
-             
+        console.error(`   ❌ Ingest Error: ${err.message}`);
+        // Simple retry logic for rate limits
+        if (err.message.includes('429') && retryCount < 3) {
              setTimeout(() => {
-                 // Re-queue with incremented retry count
                  const newContent = { ...content, retryCount: retryCount + 1 };
                  channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
-                 channel.ack(msg); // Ack original to remove it
-             }, delay);
-
+                 channel.ack(msg);
+             }, 30000); // Wait 30s before retry
         } else {
-             channel.ack(msg); // Ack permanent errors
+             channel.ack(msg);
         }
     }
 };
@@ -97,9 +88,7 @@ const startWorker = async () => {
     const channel = await connectRabbit();
     await channel.assertQueue('generation_queue', { durable: true });
     channel.prefetch(1); 
-    
-    console.log("👀 Ingest Worker waiting... (Rate Limit: 1 req/5s)");
-
+    console.log("👀 Ingest Worker (VIP Filter Mode) Started...");
     channel.consume('ingest_queue', (msg) => {
         if (msg) processJob(msg, channel);
     });

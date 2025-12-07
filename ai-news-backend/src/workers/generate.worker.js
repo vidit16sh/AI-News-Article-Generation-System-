@@ -6,7 +6,7 @@ import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
 import { generateImage } from '../services/image.service.js'; 
 const limiter = new Bottleneck({
-    minTime: 6000, 
+    minTime: 2000, 
     maxConcurrent: 1 
 });
 
