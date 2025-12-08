@@ -4,10 +4,15 @@ import Footer from "../components/layout/Footer.jsx";
 
 export const metadata = {
   title: "CoinMarketBuzz",
-  description:
-    "CoinMarketBuzz curates crypto, AI, and tech news from top sources and expands them into AI-generated explainers for fast, informed reading.",
+  description: "CoinMarketBuzz curates crypto, AI, and tech news from top sources and expands them into AI-generated explainers for fast, informed reading.",
+  alternates: {
+    types: {
+      'application/rss+xml': [
+        { url: '/api/feed/rss.xml', title: 'RSS Feed' },
+      ],
+    },
+  },
 };
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className="thin-scrollbar">

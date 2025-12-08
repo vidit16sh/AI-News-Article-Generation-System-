@@ -90,7 +90,7 @@ export default async function ArticlePage({ params }) {
   const readingTime = article.readingTime || "3";
 
   // JSON-LD for Google News / rich results
-  const jsonLd = {
+  const jsonLd = article.newsJsonLd || {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: article.headline,
