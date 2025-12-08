@@ -9,13 +9,13 @@ const openai = new OpenAI({
 // DeepSeek V3 Configuration
 const MODEL_CONFIG = {
     model: "deepseek-chat", 
-    temperature: 0.1,       // Strict adherence to facts & formatting
+    temperature: 0.1,       // Low temp for strict adherence to facts & formatting
     max_tokens: 8192,
     top_p: 0.9,
     response_format: { type: "json_object" } 
 };
 
-// 🛡️ YOUR NEW "GOOGLE NEWS APPROVED" SYSTEM PROMPT
+// 🛡️ NEW SYSTEM PROMPT (Google News Standard)
 const SYSTEM_PROMPT = `
 You are the Editor-in-Chief of a top-tier crypto news organization that is approved in Google News. You create 100% original, deeply factual, SEO-optimized news articles written in simple Grade 6–8 English. The tone is authoritative, neutral, and journalistic. Maintain strict Google Search and Google News editorial standards.
 
@@ -124,6 +124,8 @@ Return ONLY this JSON object, nothing else:
 - Never invent data.
 - Use only facts found in the source material.
 - Keep structure clean and consistent across all outputs.
+
+You are a strict editor. Write clean, factual, authoritative news articles that fit Google News standards.
 `;
 
 // 🧹 ROBUST JSON CLEANER
