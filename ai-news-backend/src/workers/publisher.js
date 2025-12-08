@@ -2,7 +2,15 @@ import 'dotenv/config';
 import cron from 'node-cron';
 import prisma from '../lib/prisma.js';
 
-// Helper to trigger frontend update
+// Configuration
+const CONFIG = {
+    URGENT_THRESHOLD: 80,      // Score needed to skip the queue
+    DRIP_INTERVAL_MINS: 15,    // Standard wait time between posts
+    DRAFT_SALVAGE_MINS: 60,    // If silent for 60m, post a Draft
+    MIN_DRAFT_SCORE: 45        // Minimum quality to salvage a draft
+};
+
+// Helper: Trigger Next.js ISR Revalidation
 const triggerRevalidation = async () => {
     try {
         const apiUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -11,38 +19,99 @@ const triggerRevalidation = async () => {
             headers: { 'x-admin-key': process.env.API_SECRET_KEY },
             body: JSON.stringify({ tag: 'articles' })
         });
-    } catch (e) { console.error("Revalidate failed"); }
+        console.log("   ✨ Cache Revalidated");
+    } catch (e) { 
+        console.error("   ⚠️ Revalidate failed (Is Next.js running?)"); 
+    }
 };
 
-console.log("💧 Drip Publisher Service Started...");
+const publishArticle = async (article, reason) => {
+    console.log(`   🚀 PUBLISHING: "${article.headline}"`);
+    console.log(`      Reason: ${reason} (Score: ${article.priorityScore})`);
 
-// Run every 10 minutes
-cron.schedule('*/10 * * * *', async () => {
-    console.log(`\n💧 [${new Date().toISOString()}] Checking Queue...`);
+    await prisma.generatedArticle.update({
+        where: { id: article.id },
+        data: { 
+            status: 'PUBLISHED',
+            publishAt: new Date() // Set to NOW so it appears at the top
+        }
+    });
 
+    await triggerRevalidation();
+};
+
+console.log("💧 Smart Publisher Service Started (Check every 1 min)...");
+
+// Run every minute to check for urgent items
+cron.schedule('* * * * *', async () => {
     try {
-        // 1. Find the oldest QUEUED article with good score
-        const nextArticle = await prisma.generatedArticle.findFirst({
-            where: { status: 'QUEUED' },
-            orderBy: { priorityScore: 'desc' } // Publish highest value first
+        // 1. Get the timestamps of the last published article
+        const lastArticle = await prisma.generatedArticle.findFirst({
+            where: { status: 'PUBLISHED' },
+            orderBy: { publishAt: 'desc' }
         });
 
-        if (nextArticle) {
-            // 2. Publish it
-            await prisma.generatedArticle.update({
-                where: { id: nextArticle.id },
-                data: { 
-                    status: 'PUBLISHED',
-                    publishAt: new Date() // Update time to "Now" so it appears fresh
-                }
+        const now = new Date();
+        const lastPublishTime = lastArticle ? new Date(lastArticle.publishAt) : new Date(0);
+        const minsSinceLast = Math.floor((now - lastPublishTime) / 60000);
+
+        console.log(`\n⏱️  Last publish: ${minsSinceLast} mins ago`);
+
+        // ============================================================
+        // 🚨 LEVEL 1: URGENT PRIORITY (Skip the Timer)
+        // ============================================================
+        // Condition: Article is QUEUED and Score is very high (>80)
+        const urgentArticle = await prisma.generatedArticle.findFirst({
+            where: { 
+                status: 'QUEUED', 
+                priorityScore: { gte: CONFIG.URGENT_THRESHOLD } 
+            },
+            orderBy: { priorityScore: 'desc' }
+        });
+
+        if (urgentArticle) {
+            await publishArticle(urgentArticle, "⚡ URGENT BREAKING NEWS");
+            return; // Done for this cycle
+        }
+
+        // ============================================================
+        // 💧 LEVEL 2: STANDARD DRIP FEED (Respect the Timer)
+        // ============================================================
+        // Condition: It has been > 15 mins since last post
+        if (minsSinceLast >= CONFIG.DRIP_INTERVAL_MINS) {
+            const standardArticle = await prisma.generatedArticle.findFirst({
+                where: { status: 'QUEUED' },
+                orderBy: { priorityScore: 'desc' } // Best remaining stories first
             });
 
-            console.log(`   🚀 Released: "${nextArticle.headline}"`);
-            await triggerRevalidation();
-        } else {
-            console.log("   zzZ Queue is empty.");
+            if (standardArticle) {
+                await publishArticle(standardArticle, "💧 Standard Drip Feed");
+                return;
+            }
         }
+
+        // ============================================================
+        // ♻️ LEVEL 3: DRAFT SALVAGE (Prevent "Dead Air")
+        // ============================================================
+        // Condition: It has been > 60 mins (Site looks dead) AND we have decent drafts
+        if (minsSinceLast >= CONFIG.DRAFT_SALVAGE_MINS) {
+            const salvageArticle = await prisma.generatedArticle.findFirst({
+                where: { 
+                    status: 'DRAFT', 
+                    priorityScore: { gte: CONFIG.MIN_DRAFT_SCORE } 
+                },
+                orderBy: { createdAt: 'desc' } // Newest drafts first
+            });
+
+            if (salvageArticle) {
+                await publishArticle(salvageArticle, "♻️ Salvaging Draft (Keep Alive)");
+                return;
+            }
+        }
+
+        console.log("   zzz No actions needed.");
+
     } catch (err) {
-        console.error("Publisher Error:", err);
+        console.error("❌ Publisher Logic Error:", err);
     }
 });

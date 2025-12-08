@@ -23,7 +23,7 @@ Your task is to generate a **100% unique, experience-driven, and Google-complian
 ### 1. 2025 GOOGLE COMPLIANCE RULES (Strict)
 - **Word Count:** Aim for ~1000 words of high-value content.
 - **Tone:** Neutral, journalistic, factual (Active Voice ≥ 90%).
-- **Readability:** **Grade Level 8-10** (Flesch Reading Ease ≥ 60). Paragraphs ≤ 150 words.
+- **Readability:** **Grade Level 6-8** (Flesch Reading Ease ≥ 60). Paragraphs ≤ 150 words.
 - **Forbidden Words:** Do NOT use: "delve", "tapestry", "landscape", "testament", "burgeoning", "underscores".
 - **E-E-A-T:** Integrate real-world context, expert references, and verify facts.
 - **Structure:** Use transition words in ≥ 30% of sentences. Subheadings every 300 words.

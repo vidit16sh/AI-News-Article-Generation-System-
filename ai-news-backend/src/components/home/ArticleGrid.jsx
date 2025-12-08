@@ -1,3 +1,5 @@
+"use client"; 
+import { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 export default function ArticleGrid({ articles }) {
@@ -57,6 +59,12 @@ function ArticleCard({ article }) {
   const timeAgo = timeAgoFromDate(article.createdAt);
   const thumbnail =
     article.imageUrl || article.heroImageUrl || article.thumbnail || "";
+  
+  const [timeLabel, setTimeLabel] = useState(new Date(article.createdAt).toLocaleDateString());
+
+  useEffect(() => {
+    setTimeLabel(timeAgoFromDate(article.createdAt));
+  }, [article.createdAt]); 
 
   return (
     <Link
@@ -97,7 +105,7 @@ function ArticleCard({ article }) {
 
         <div className="mt-auto flex items-center justify-between pt-2 text-[0.7rem] text-slate-400">
           <span>By {author}</span>
-          <span>{timeAgo}</span>
+          <span>{timeLabel}</span> {/* ✅ Renders static date first, then updates to "5m ago" */}
         </div>
       </div>
     </Link>

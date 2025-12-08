@@ -52,9 +52,8 @@ const processJob = async (msg, channel) => {
         });
 
         // 💎 3. THE VIP FILTER (Quality Control)
-        // Only send to Generator if Score is >= 85 (Breaking/Major News)
-        // This reduces volume from ~100/day to ~5-10/day.
-        if (priorityScore >=45){
+        // Only send to Generator if Score is >= 45
+        if (priorityScore >= 45){
             console.log(`   🚀 APPROVED (${priorityScore}/100): "${rawNews.title.substring(0, 40)}..."`);
             console.log(`      Reason: ${classification.reasoning}`);
             
@@ -71,13 +70,18 @@ const processJob = async (msg, channel) => {
 
     } catch (err) {
         console.error(`   ❌ Ingest Error: ${err.message}`);
+        
         // Simple retry logic for rate limits
         if (err.message.includes('429') && retryCount < 3) {
-             setTimeout(() => {
-                 const newContent = { ...content, retryCount: retryCount + 1 };
-                 channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
-                 channel.ack(msg);
-             }, 30000); // Wait 30s before retry
+             // 🛠️ BUG FIX: Use 'await' to block the worker instead of background setTimeout
+             // This stops the worker from picking up new jobs while waiting (Cool Down)
+             // and ensures the 'ack' happens in the correct scope.
+             console.log(`   ⏳ 429 Rate Limit Hit - Pausing worker for 30s...`);
+             await new Promise(resolve => setTimeout(resolve, 30000));
+
+             const newContent = { ...content, retryCount: retryCount + 1 };
+             channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
+             channel.ack(msg);
         } else {
              channel.ack(msg);
         }

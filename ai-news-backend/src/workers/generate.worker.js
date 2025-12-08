@@ -134,7 +134,7 @@ const processGenerationJob = async (msg, channel) => {
         const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20; 
         
         if (isHighQuality) {
-        if (priorityScore >= 90) {
+        if (priorityScore >= 80) {
             // 🚨 BREAKING NEWS: Publish Immediately
             status = "PUBLISHED";
             console.log(`   🚨 BREAKING NEWS DETECTED (Score: ${priorityScore}) - Publishing NOW.`);
