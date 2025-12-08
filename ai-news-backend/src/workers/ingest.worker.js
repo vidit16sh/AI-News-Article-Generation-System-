@@ -7,7 +7,7 @@ import { classifyNews, getOrCreateCategory } from '../services/classifier.servic
 
 // 🛑 RATE LIMITER for Classification (Flash is fast, but let's be safe)
 const limiter = new Bottleneck({
-    minTime: 20000, // 1 request every 2 seconds
+    minTime: 4000, // 1 request every 2 seconds
     maxConcurrent: 1 
 });
 
@@ -54,7 +54,7 @@ const processJob = async (msg, channel) => {
         // 💎 3. THE VIP FILTER (Quality Control)
         // Only send to Generator if Score is >= 85 (Breaking/Major News)
         // This reduces volume from ~100/day to ~5-10/day.
-        if (priorityScore >= 85) {
+        if (priorityScore >=45){
             console.log(`   🚀 APPROVED (${priorityScore}/100): "${rawNews.title.substring(0, 40)}..."`);
             console.log(`      Reason: ${classification.reasoning}`);
             

@@ -1,9 +1,12 @@
-// scripts/audit-seo.js
 import { PrismaClient } from '@prisma/client';
 import * as cheerio from 'cheerio';
 import readability from 'text-readability';
+import natural from 'natural';
+import Sentiment from 'sentiment';
 
 const prisma = new PrismaClient();
+const tokenizer = new natural.WordTokenizer();
+const sentiment = new Sentiment();
 
 // 🎨 CONSOLE COLORS
 const RED = '\x1b[31m';
@@ -14,143 +17,133 @@ const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 
 async function auditLatestArticle() {
-    console.log(`${BLUE}${BOLD}🔍 INITIALIZING BRUTAL SEO AUDIT PROTOCOL...${RESET}\n`);
+    console.log(`${BLUE}${BOLD}🔍 INITIALIZING GOOGLE SIMULATOR AUDIT...${RESET}\n`);
 
     // 1. Fetch Latest Published Article
     const article = await prisma.generatedArticle.findFirst({
         where: { status: 'PUBLISHED' },
         orderBy: { createdAt: 'desc' },
-        include: { Category: true }
+        include: { 
+            originalNews: {
+                include: { category: true }
+            } 
+        }
     });
 
     if (!article) {
-        console.log(`${RED}❌ No PUBLISHED articles found to audit.${RESET}`);
+        console.log(`${RED}❌ No PUBLISHED articles found.${RESET}`);
         return;
     }
 
+    const categoryName = article.originalNews?.category?.name || "Unknown";
     console.log(`Analyzing: ${BOLD}"${article.headline}"${RESET}`);
+    console.log(`Category: ${categoryName}`);
     console.log(`Slug: ${article.slug}\n`);
 
     let score = 100;
     const penalties = [];
     const wins = [];
 
-    // Load HTML Parser
+    // Load HTML
     const $ = cheerio.load(article.articleHtml || '');
     const textContent = $.text();
-    const wordCount = textContent.split(/\s+/).length;
+    const cleanText = textContent.replace(/\s+/g, ' ').trim();
+    const tokens = tokenizer.tokenize(cleanText);
+    const wordCount = tokens.length;
 
     // ======================================================
-    // 💀 ZONE 1: THE "THIN CONTENT" CHECK (Panda Update)
+    // 🧠 ZONE 1: SEMANTIC DENSITY (TF-IDF Simulation)
     // ======================================================
-    if (wordCount < 800) {
-        score -= 20;
-        penalties.push(`[THIN CONTENT] Word count is ${wordCount}. Google News prefers deep dives (1000+ words).`);
-    } else if (wordCount > 2500) {
-        wins.push(`[DEPTH] Excellent length (${wordCount} words) for a feature story.`);
+    // Google hates "Fluff". It wants "Information Gain".
+    // We check if unique, complex words make up a good portion of the text.
+    const uniqueWords = new Set(tokens.map(w => w.toLowerCase()));
+    const lexicalDiversity = uniqueWords.size / wordCount;
+
+    // Standard English is ~0.3. High-quality journalism is 0.45+. AI is often < 0.35.
+    if (lexicalDiversity < 0.38) {
+        score -= 15;
+        penalties.push(`[FLUFF DETECTED] Lexical Diversity is low (${(lexicalDiversity*100).toFixed(1)}%). The AI is repeating itself. Increase 'Information Gain'.`);
     } else {
-        wins.push(`[LENGTH] Good length (${wordCount} words).`);
+        wins.push(`[DEPTH] Good vocabulary variance (${(lexicalDiversity*100).toFixed(1)}%).`);
     }
 
     // ======================================================
-    // 🤖 ZONE 2: AI FINGERPRINT DETECTION (SpamBrain)
+    // 🎭 ZONE 2: SENTIMENT CONSISTENCY (E-E-A-T)
     // ======================================================
-    // AI often uses specific transition phrases excessively.
-    const roboticPhrases = [
-        "In conclusion", "delve into", "testament to", "landscape", 
-        "It is important to note", "In summary", "remains to be seen",
-        "bustling", "vibrant", "tapestry"
-    ];
-    
-    let roboticCount = 0;
-    roboticPhrases.forEach(phrase => {
-        const regex = new RegExp(phrase, 'gi');
-        const count = (textContent.match(regex) || []).length;
-        if (count > 0) roboticCount += count;
+    // News should be neutral/objective (Score ~0). 
+    // If it's too positive (+50), it's a press release/spam.
+    // If it's too negative (-50), it's FUD (Fear, Uncertainty, Doubt).
+    const sentimentResult = sentiment.analyze(cleanText);
+    const comparativeScore = sentimentResult.comparative; // Score per word
+
+    if (Math.abs(comparativeScore) > 0.15) {
+        score -= 10;
+        penalties.push(`[BIAS ALERT] Tone is too emotional (${comparativeScore.toFixed(2)}). News must be neutral. Use 'Objective' in prompt.`);
+    } else {
+        wins.push(`[NEUTRALITY] Tone is journalistic and objective.`);
+    }
+
+    // ======================================================
+    // 🕸️ ZONE 3: LINK PROFILE (PageRank Simulation)
+    // ======================================================
+    const externalLinks = [];
+    const internalLinks = [];
+    $('a').each((i, el) => {
+        const href = $(el).attr('href');
+        if (href && href.startsWith('http')) externalLinks.push(href);
+        else internalLinks.push(href);
     });
 
-    if (roboticCount > 3) {
-        score -= 15;
-        penalties.push(`[ROBOTIC TONE] Found ${roboticCount} AI-cliché phrases ("In conclusion", "delve", etc). Rewrite to sound human.`);
+    if (externalLinks.length === 0) {
+        score -= 20; // HUGE PENALTY
+        penalties.push(`[ISOLATION] No external citations. Google views this as "Fake News". Link to sources!`);
     } else {
-        wins.push(`[HUMANITY] Low usage of robotic clichés.`);
+        wins.push(`[CITATIONS] Found ${externalLinks.length} external links.`);
     }
 
-    // ======================================================
-    // 🧠 ZONE 3: KEYWORD DENSITY & STUFFING (Penguin Update)
-    // ======================================================
-    // Extract main keyword from Slug (assuming slug is keyword-rich)
-    const mainKeyword = article.slug.split('-')[0] || "crypto"; 
-    const keywordRegex = new RegExp(mainKeyword, 'gi');
-    const keywordCount = (textContent.match(keywordRegex) || []).length;
-    const density = (keywordCount / wordCount) * 100;
-
-    if (density > 2.5) {
-        score -= 10;
-        penalties.push(`[STUFFING] Keyword density for "${mainKeyword}" is ${density.toFixed(2)}%. Keep it under 2.5%.`);
-    } else if (density < 0.3) {
+    if (internalLinks.length === 0) {
         score -= 5;
-        penalties.push(`[INVISIBLE] Keyword "${mainKeyword}" barely appears (${density.toFixed(2)}%). Google won't know what this is about.`);
-    } else {
-        wins.push(`[SEO] Healthy Keyword Density (${density.toFixed(2)}%).`);
+        penalties.push(`[SILOING] No internal links to categories. Bad for crawler navigation.`);
     }
 
     // ======================================================
-    // 🕸️ ZONE 4: STRUCTURE & HIERARCHY
+    // 📚 ZONE 4: READABILITY (Google News Standard)
     // ======================================================
-    const h2Count = $('h2').length;
-    const h3Count = $('h3').length;
-
-    if (h2Count < 3) {
-        score -= 10;
-        penalties.push(`[STRUCTURE] Only ${h2Count} <h2> tags. Google scanners need clear section breaks.`);
-    } else {
-        wins.push(`[STRUCTURE] Good hierarchy (${h2Count} H2s, ${h3Count} H3s).`);
-    }
-
-    // Check for Links (Citations)
-    const linkCount = $('a').length;
-    if (linkCount < 2) {
-        score -= 10;
-        penalties.push(`[ISOLATION] This article has no links. Google News requires citing sources or internal linking.`);
-    }
-
-    // ======================================================
-    // 🤓 ZONE 5: READABILITY (Flesch-Kincaid)
-    // ======================================================
-    // Google prefers "Easy to Read" (Grade 7-9) for mass news, 
-    // but "Grade 10-12" for financial deep dives.
-    const gradeLevel = readability.fleschKincaidGrade(textContent);
-    
+    const gradeLevel = readability.fleschKincaidGrade(cleanText);
     if (gradeLevel > 14) {
-        score -= 5;
-        penalties.push(`[COMPLEXITY] Grade Level ${gradeLevel}. Too academic. Simplify sentences.`);
-    } else if (gradeLevel < 6) {
-        score -= 5;
-        penalties.push(`[SIMPLE] Grade Level ${gradeLevel}. Too childish for finance news.`);
+        score -= 10;
+        penalties.push(`[UNREADABLE] Grade ${gradeLevel}. This is academic paper level. Lower it to Grade 10.`);
+    } else if (gradeLevel < 7) {
+        score -= 10;
+        penalties.push(`[TOO SIMPLE] Grade ${gradeLevel}. This reads like a children's book. Increase analysis depth.`);
     } else {
-        wins.push(`[READABILITY] Perfect tone (Grade ${gradeLevel}).`);
+        wins.push(`[READABILITY] Perfect Mass-Market Level (Grade ${gradeLevel}).`);
     }
 
     // ======================================================
-    // 🧩 ZONE 6: SCHEMA.ORG & METADATA (The Technicals)
+    // 🤖 ZONE 5: AI FINGERPRINTS (Advanced)
     // ======================================================
-    // Check if JSON-LD allows Google News to index it
-    if (!article.keywords || article.keywords.length === 0) {
-        score -= 10;
-        penalties.push(`[METADATA] No Keywords/Tags found.`);
-    }
-
-    if (!article.metaDescription || article.metaDescription.length < 50) {
-        score -= 10;
-        penalties.push(`[METADATA] Meta Description missing or too short.`);
-    }
-
-    // ======================================================
-    // 📊 THE FINAL VERDICT
-    // ======================================================
-    console.log(`\n${BOLD}--- AUDIT RESULTS ---${RESET}`);
+    // Specific "Lazy AI" sentence starters
+    const aiStarters = ["In conclusion", "It is important to note", "Moreover", "Furthermore", "Additionally"];
+    let starterCount = 0;
     
+    // Check start of paragraphs
+    const paragraphs = textContent.split('\n').filter(p => p.length > 50);
+    paragraphs.forEach(p => {
+        aiStarters.forEach(starter => {
+            if (p.trim().startsWith(starter)) starterCount++;
+        });
+    });
+
+    if (starterCount > 2) {
+        score -= 15;
+        penalties.push(`[ROBOTIC STRUCTURE] ${starterCount} paragraphs start with lazy transition words ("Moreover", "In conclusion").`);
+    }
+
+    // ======================================================
+    // 🏁 VERDICT
+    // ======================================================
+    console.log(`\n${BOLD}--- GOOGLE SIMULATOR RESULTS ---${RESET}`);
     console.log(`${GREEN}✅ WINS:${RESET}`);
     wins.forEach(w => console.log(`   ${w}`));
 
@@ -162,11 +155,7 @@ async function auditLatestArticle() {
     if (score < 80) gradeColor = YELLOW;
     if (score < 60) gradeColor = RED;
 
-    console.log(`${BOLD}FINAL SEO SCORE: ${gradeColor}${score}/100${RESET}`);
-
-    if (score >= 90) console.log(`${GREEN}🚀 READY TO RANK ON GOOGLE NEWS!${RESET}`);
-    else if (score >= 70) console.log(`${YELLOW}🤔 DECENT, BUT NEEDS POLISH.${RESET}`);
-    else console.log(`${RED}💀 INVISIBLE. DO NOT PUBLISH.${RESET}`);
+    console.log(`${BOLD}GOOGLE RANKING PROBABILITY: ${gradeColor}${score}%${RESET}`);
 }
 
 auditLatestArticle()
