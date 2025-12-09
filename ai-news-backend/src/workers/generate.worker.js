@@ -36,7 +36,7 @@ const triggerRevalidation = async (tag) => {
     }
 }; 
 
-const createJsonLd = (article, url) => ({
+const createJsonLd = (article, url, authorObj) => ({
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     "mainEntityOfPage": {
@@ -49,8 +49,9 @@ const createJsonLd = (article, url) => ({
     "datePublished": new Date().toISOString(),
     "dateModified": new Date().toISOString(), // Google prefers seeing this
     "author": { 
-        "@type": "Organization", 
-        "name": "AI News Desk" 
+        "@type": "Person", // ✅ Valid for Google News
+        "name": authorObj ? authorObj.name : "Editorial Team",
+        "url": authorObj ? `${process.env.NEXT_PUBLIC_SITE_URL}/authors/${authorObj.slug}` : undefined
     },
     "publisher": {
         "@type": "Organization",
@@ -83,6 +84,17 @@ const createSitemapEntry = (url) => `
   <priority>0.7</priority>
 </url>`;
 
+const assignAuthor = async () => {
+    try {
+        const count = await prisma.author.count();
+        if (count === 0) return null;
+        const skip = Math.floor(Math.random() * count);
+        return await prisma.author.findFirst({ skip });
+    } catch (e) {
+        console.error("Error assigning author:", e);
+        return null;
+    }
+};
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
     const { newsId, priorityScore = 50 } = content;
@@ -99,7 +111,8 @@ const processGenerationJob = async (msg, channel) => {
             channel.ack(msg);
             return;
         }
-
+        
+        
         // Idempotency Check
         const existing = await prisma.generatedArticle.findUnique({
             where: { originalNewsId: newsId }
@@ -108,8 +121,11 @@ const processGenerationJob = async (msg, channel) => {
             channel.ack(msg);
             return;
         }
-
+        
+        const assignedAuthor = await assignAuthor();
+        console.log(`   👤 Assigned Author: ${assignedAuthor ? assignedAuthor.name : "System"}`);
         // 1. Generate Text
+        
         console.log(`   🧠 Writing: "${cleanNews.title.substring(0, 30)}..."`);
         const aiOutput = await limiter.schedule(() => generateArticle(cleanNews));
 
@@ -124,7 +140,7 @@ const processGenerationJob = async (msg, channel) => {
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const fullUrl = `${baseUrl}/news/${aiOutput.slug}`; 
         
-        const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl);
+        const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl, assignedAuthor);
         const rssEntry = createRssEntry(aiOutput, fullUrl);
         const sitemapEntry = createSitemapEntry(fullUrl);
 
@@ -174,7 +190,8 @@ const processGenerationJob = async (msg, channel) => {
                 
                 publishAt: publishAt,
                 
-                originalNewsId: cleanNews.id
+                originalNewsId: cleanNews.id, 
+                authorId: assignedAuthor ? assignedAuthor.id : null
             }
         });
 
