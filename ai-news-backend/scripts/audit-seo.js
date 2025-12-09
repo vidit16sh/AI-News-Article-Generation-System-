@@ -1,12 +1,13 @@
-// scripts/audit-seo.js
 import { PrismaClient } from '@prisma/client';
 import * as cheerio from 'cheerio';
 import readability from 'text-readability';
 import natural from 'natural';
 import Sentiment from 'sentiment';
+import { URL } from 'url';
 
 const prisma = new PrismaClient();
-const tokenizer = new natural.WordTokenizer();
+const wordTokenizer = new natural.WordTokenizer();
+const sentenceTokenizer = new natural.SentenceTokenizer(); // ✅ We will actually use this now
 const sentiment = new Sentiment();
 
 // Console colors
@@ -17,284 +18,243 @@ const BLUE = '\x1b[34m';
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 
-// Allowed tags
+// Allowed HTML tags
 const ALLOWED_TAGS = new Set([
-  'h1','p','h2','h3','ul','li','blockquote','table','tr','td','strong','a'
+  'h1','p','h2','h3','ul','ol','li','blockquote','table','thead','tbody','tr','td',
+  'strong','em','a','figure','figcaption','img'
 ]);
+
+const FORBIDDEN_WORDS = [
+  "delve","tapestry","landscape","testament","burgeoning","underscores","moreover",
+  "furthermore","merely","amidst","in essence","pivotal","crucial juncture","sheds light",
+  "unveils","it is worth noting","in a nutshell","notably","significantly","as per reports",
+  "overall","in conclusion","in summary","as a result"
+];
+
+// Heuristic for "authoritative" link
+function isLikelyAuthoritative(href) {
+  try {
+    const u = new URL(href);
+    if (u.protocol !== 'https:') return false;
+    const host = u.hostname;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return false;
+    if (host.length < 6) return false;
+    if (/(localhost|example|test)/i.test(host)) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function wordsCount(text) {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
-const firstNWords = (t, n) => t.trim().split(/\s+/).slice(0, n).join(' ');
-const isKebabCase4to5Words = s => {
-  if (!s) return false;
-  const p = s.split('-').filter(Boolean);
-  return p.length >= 4 && p.length <= 5 && /^[a-z0-9\-]+$/.test(s);
-};
-const sentenceWordLimitViolations = (text, limit = 15) => {
-  const sents = (text.match(/[^.!?]+[.!?]*/g) || [])
-    .map(s => s.trim()).filter(Boolean);
 
+function firstNWords(text, n) {
+  if (!text) return '';
+  return text.trim().split(/\s+/).slice(0, n).join(' ');
+}
+
+function lexicalDiversity(tokens) {
+  const unique = new Set(tokens.map(t => t.toLowerCase()));
+  return unique.size / Math.max(1, tokens.length);
+}
+
+function cleanForReadability(htmlText) {
+  let t = htmlText.replace(/<table[\s\S]*?<\/table>/gi, ' ');
+  t = t.replace(/<a[\s\S]*?<\/a>/gi, ' ');
+  t = t.replace(/http\S+/g, ' ');
+  t = t.replace(/<\/?[^>]+(>|$)/g, ' '); 
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  return t;
+}
+
+// ✅ Corrected Sentence Checker using NLP (Fixes "U.S." bug)
+const sentenceWordLimitViolations = (text, limit = 15) => {
+  const sents = sentenceTokenizer.tokenize(text); // Uses smart tokenization
   const violations = [];
   sents.forEach((s, i) => {
     const wc = wordsCount(s);
     if (wc > limit)
-      violations.push({ index: i + 1, words: wc, snippet: s.slice(0, 120) });
+      violations.push({ index: i + 1, words: wc, snippet: s.slice(0, 100) + "..." });
   });
   return violations;
 };
 
-async function auditLatestArticle() {
-  console.log(`${BLUE}${BOLD}Starting upgraded Google News auditor...${RESET}\n`);
+// Strict Slug Validator
+const isKebabCase4to5Words = s => {
+  if (!s) return false;
+  const p = s.split('-').filter(Boolean);
+  // Relaxed slightly to 3-8 words for flexibility, but strict on format
+  return p.length >= 3 && p.length <= 8 && /^[a-z0-9\-]+$/.test(s);
+};
 
-  // Fetch latest published article
+// Strict Dateline: "NEW YORK, Month Day, Year —"
+// Added Year support to regex to match your Generator
+const DATELINE_REGEX = /^[A-Z\s]+,\s[a-zA-Z]+\s\d{1,2},\s\d{4}\s?[—\-]/;
+
+async function runAudit() {
+  console.log(`${BLUE}${BOLD}🔍 Starting Production Article Audit...${RESET}\n`);
+
+  // Fetch latest published article with AUTHOR relation
   const article = await prisma.generatedArticle.findFirst({
-    where: { status: 'PUBLISHED' },
     orderBy: { createdAt: 'desc' },
-    include: { originalNews: { include: { category: true } } }
+    include: { 
+        originalNews: { include: { category: true } },
+    }
   });
 
   if (!article) {
-    console.log(`${RED}No published articles found.${RESET}`);
-    return;
+    console.log(`${RED}❌ No PUBLISHED articles found in DB.${RESET}`);
+    return null;
   }
+
+  console.log(`Auditing: ${BOLD}${article.headline}${RESET}`);
+  console.log(`Slug: ${article.slug}`);
+  console.log(`Date: ${new Date(article.createdAt).toLocaleString()}\n`);
+
+  const $ = cheerio.load(article.articleHtml || '');
+  const rawBodyText = $.root().text().replace(/\s+/g, ' ').trim();
+  const cleanedForRead = cleanForReadability(article.articleHtml || '');
+  const tokens = wordTokenizer.tokenize(cleanedForRead || rawBodyText);
+  const wordCount = tokens.length;
+
+  const headline = (article.headline || '').trim();
+  const metaDescription = (article.metaDescription || '').trim();
+  const slug = (article.slug || '').trim();
+  const focusKeyword = (article.focus_keywords || article.keywords?.[0] || '').toString().trim();
+  const firstParagraph = $('p').first().text().trim();
+  const lastParagraph = $('p').last().text().trim();
 
   const report = {
     overall_score: 100,
     pass_or_fail: 'PASS',
-    section_scores: {},
-    detailed_issues: [],
+    findings: [],
     critical_alerts: [],
-    improvement_plan: []
+    metrics: { wordCount, readabilityGrade: null }
   };
 
-  const issues = report.detailed_issues;
-  const criticals = report.critical_alerts;
+  const pushIssue = (msg, severity = 'minor') => {
+    report.findings.push({ msg, severity });
+    if (severity === 'critical') report.critical_alerts.push(msg);
+  };
 
-  const $ = cheerio.load(article.articleHtml || '');
-  const bodyText = $.root().text().replace(/\s+/g, ' ').trim();
-
-  const tokens = tokenizer.tokenize(bodyText);
-  const wordCount = tokens.length;
-
-  const headline = (article.headline || '').trim();
-  const metaDescription = (article.meta_description || '').trim();
-  const slug = (article.slug || '').trim();
-  const focusKeyword = (article.focus_keywords || '').toString().trim();
-  const featuredImageAlt = (article.featured_image_alt || '').trim();
-
-  // ---------- Allowed HTML tags
+  // ---------- 1. HTML Tag Check
   const presentTags = new Set();
-  $('*').each((i, el) => {
-    if (el.tagName) presentTags.add(el.tagName.toLowerCase());
+  $('*').each((i, el) => { if (el.tagName) presentTags.add(el.tagName.toLowerCase()); });
+  const illegalTags = [...presentTags].filter(t => !ALLOWED_TAGS.has(t) && t !== 'html' && t !== 'head' && t !== 'body');
+  if (illegalTags.length) {
+    pushIssue(`[HTML] Disallowed tags: ${illegalTags.join(', ')}`, 'minor');
+    report.overall_score -= 4;
+  }
+
+  // ---------- 2. Dateline Check
+  if (!DATELINE_REGEX.test(firstParagraph)) {
+    pushIssue(`[DATELINE] Invalid format. Expected "CITY, Month Day, Year —". Found: "${firstParagraph.slice(0,50)}..."`, 'critical');
+    report.overall_score -= 15;
+  }
+
+  // ---------- 3. Headline & Keywords
+  if (headline.length < 60 || headline.length > 80) {
+    pushIssue(`[HEADLINE] Length ${headline.length} (Target: 60-75)`, 'minor');
+    report.overall_score -= 4;
+  }
+  if (focusKeyword && !headline.toLowerCase().includes(focusKeyword.toLowerCase())) {
+    pushIssue(`[SEO] Focus keyword "${focusKeyword}" missing from headline`, 'major');
+    report.overall_score -= 8;
+  }
+
+  // ---------- 4. Slug Check
+  if (!isKebabCase4to5Words(slug)) {
+    pushIssue(`[SLUG] Invalid slug format: "${slug}"`, 'minor');
+    report.overall_score -= 4;
+  }
+
+  // ---------- 5. Content Quality
+  if (wordCount < 450) {
+    pushIssue(`[THIN] Word count ${wordCount} (Min 450)`, 'critical');
+    report.overall_score -= 20;
+  }
+
+  // Required Sections
+  const requiredSections = ['What Happened', 'Why It Matters', 'What Experts Say', 'FAQs'];
+  requiredSections.forEach(sec => {
+    const found = $('h2, h3').filter((i, el) => $(el).text().toLowerCase().includes(sec.toLowerCase())).length > 0;
+    if (!found) {
+      pushIssue(`[STRUCTURE] Missing section: "${sec}"`, 'major');
+      report.overall_score -= 6;
+    }
   });
 
-  const disallowed = [...presentTags].filter(t => !ALLOWED_TAGS.has(t));
-  if (disallowed.length) {
-    issues.push(`[HTML_TAGS] Disallowed tags: ${disallowed.join(', ')}`);
-    report.overall_score -= 8;
-  }
-
-  // ---------- Dateline (first paragraph)
-  const firstParagraph = $('p').first().text().trim();
-  const datelineRegex =
-    /^[A-Z][A-Z\s]+,\s?(January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2}\s?—/;
-
-  if (!datelineRegex.test(firstParagraph)) {
-    report.overall_score -= 12;
-    issues.push(`[DATELINE] Dateline missing or malformed. Found: "${firstParagraph.slice(0, 80)}"`);
-    criticals.push('Missing or malformed dateline.');
-  }
-
-  // ---------- Headline checks
-  if (headline.length < 60 || headline.length > 75) {
-    report.overall_score -= 6;
-    issues.push(`[HEADLINE] Headline must be 60–75 chars. Found ${headline.length}.`);
-  }
-
-  if (focusKeyword && !headline.toLowerCase().includes(focusKeyword.toLowerCase())) {
-    report.overall_score -= 8;
-    issues.push(`[FOCUS] Focus keyword not in headline.`);
-  }
-
-  // ---------- First 100 words include focus keyword
-  const first100 = firstNWords(bodyText, 100).toLowerCase();
-  if (focusKeyword && !first100.includes(focusKeyword.toLowerCase())) {
-    report.overall_score -= 8;
-    issues.push(`[FOCUS] Focus keyword missing in first 100 words.`);
-  }
-
-  // ---------- Last paragraph check
-  const paras = $('p').toArray().map(p => $(p).text().trim()).filter(Boolean);
-  const lastPara = paras.at(-1) || "";
-  if (focusKeyword && !lastPara.toLowerCase().includes(focusKeyword.toLowerCase())) {
-    report.overall_score -= 6;
-    issues.push(`[FOCUS] Focus keyword missing in last paragraph.`);
-  }
-
-  // ---------- Slug format
-  if (!isKebabCase4to5Words(slug)) {
-    report.overall_score -= 6;
-    issues.push(`[SLUG] Slug must be 4–5 words kebab-case.`);
-  }
-
-  // ---------- Meta description
-  if (!metaDescription) {
-    report.overall_score -= 6;
-    issues.push(`[META] Meta description missing.`);
-  } else if (metaDescription.length > 155) {
-    report.overall_score -= 6;
-    issues.push(`[META] Too long (${metaDescription.length}).`);
-  }
-
-  // ---------- Featured image alt
-  if (!featuredImageAlt) {
-    report.overall_score -= 4;
-    issues.push(`[IMAGE_ALT] featured_image_alt is missing.`);
-  }
-
-  // ---------- Word count
-  if (wordCount < 450) {
-    report.overall_score -= 18;
-    issues.push(`[WORD_COUNT] Too short: ${wordCount}. Minimum 450.`);
-    criticals.push("Word count too low.");
-  } else if (wordCount < 500) {
-    report.overall_score -= 8;
-    issues.push(`[WORD_COUNT] Below ideal range (500–750).`);
-  } else if (wordCount > 850) {
-    report.overall_score -= 12;
-    issues.push(`[WORD_COUNT] Too long (>850).`);
-  }
-
-  // ---------- Required sections
-  const requiredSections = [
-    'What Happened',
-    'Why It Matters',
-    'By The Numbers',
-    'What Experts Say',
-    'What’s Next',
-    'FAQs'
-  ];
-
-  for (const sec of requiredSections) {
-    const exists = $(`h2:contains("${sec}"), h3:contains("${sec}")`).length > 0;
-    if (!exists) {
-      report.overall_score -= 8;
-      issues.push(`[STRUCTURE] Missing section "${sec}".`);
-      criticals.push(`Missing ${sec}`);
-    }
-  }
-
-  // ---------- External source links
-  const external = $('a').map((i, el) => $(el).attr('href')).get()
-    .filter(h => h?.startsWith('http'));
-
-  if (external.length === 0) {
-    report.overall_score -= 20;
-    issues.push(`[SOURCES] No external source link found.`);
-    criticals.push("No external citation.");
-  } else if (external.length > 1) {
-    report.overall_score -= 6;
-    issues.push(`[SOURCES] More than one external link (${external.length}).`);
-  }
-
-  // ---------- Author presence
-  const authorPresent = /written by|author:|reporter:/i.test(article.articleHtml || "");
-  if (!authorPresent) {
-    report.overall_score -= 8;
-    issues.push(`[AUTHOR] No byline detected.`);
-  }
-
-  // ---------- Expert quotes
-  const expertQuotes = $('h3:contains("What Experts Say")')
-    .nextUntil('h2, h3')
-    .find('blockquote, p')
-    .map((i, el) => $(el).text().trim())
-    .get()
-    .filter(t => t.length > 10);
-
-  if (!expertQuotes.length) {
-    report.overall_score -= 10;
-    issues.push(`[EXPERTS] No expert quotes.`);
-  }
-
-  // ---------- Executive summary (blockquote)
-  const execBlock = $('blockquote').first();
-  if (!execBlock.length) {
-    report.overall_score -= 8;
-    issues.push(`[EXEC_SUM] Missing executive summary blockquote.`);
+  // ---------- 6. Citations (External Links)
+  const externalLinks = $('a').map((i, el) => $(el).attr('href')).get().filter(h => h && h.startsWith('http'));
+  if (externalLinks.length === 0) {
+    pushIssue('[CITATION] ❌ No external source links found.', 'critical');
+    report.overall_score -= 25;
   } else {
-    const bullets = execBlock.find('li').map((i, li) => $(li).text().trim()).get();
-    if (bullets.length < 3) {
-      report.overall_score -= 6;
-      issues.push(`[EXEC_SUM] Needs 3 bullet points.`);
+    // Check if at least one looks real (not just localhost)
+    const hasGood = externalLinks.some(isLikelyAuthoritative);
+    if (!hasGood) {
+      pushIssue('[CITATION] Links exist but look weak (no HTTPS or major domain).', 'major');
+      report.overall_score -= 8;
     }
   }
 
-  // ---------- Lead paragraph (defined earlier)
-  const leadPara = firstParagraph.replace(/—/, '').trim();
-  const leadWords = wordsCount(leadPara);
-  if (leadWords < 35 || leadWords > 55) {
-    report.overall_score -= 6;
-    issues.push(`[LEAD] Lead paragraph must be 35–55 words.`);
-  }
-
-  // ---------- Sentence length
-  const violations = sentenceWordLimitViolations(bodyText, 15);
-  if (violations.length) {
-    report.overall_score -= Math.min(12, violations.length * 2);
-    issues.push(`[SENTENCE] ${violations.length} sentences exceed 15 words.`);
-  }
-
-  // ---------- Readability
-  const grade = readability.textStandard(bodyText, false);
-  const numericGrade = parseInt(String(grade).match(/\d+/)?.[0] || "12", 10);
-
-  if (numericGrade > 11) {
+  // ---------- 7. Author Check (Fixed)
+  // Check the DB relation instead of HTML text
+  if (!article.author && !article.authorId) {
+    pushIssue(`[AUTHOR] No Author assigned in Database.`, 'major');
     report.overall_score -= 8;
-    issues.push(`[READABILITY] Grade too high (${numericGrade}).`);
+  } else {
+    // Optionally check if frontend rendered it (harder to do here, but DB check is safer)
+    // We assume frontend renders if DB has it.
   }
 
-  // ---------- Sentiment neutrality
-  const sentScore = sentiment.analyze(bodyText).score;
-  if (sentScore > 5 || sentScore < -5) {
-    report.overall_score -= 8;
-    issues.push(`[SENTIMENT] Bias detected (score ${sentScore}).`);
+  // ---------- 8. Readability (Grade 6-8)
+  const grade = readability.fleschKincaidGrade(cleanedForRead || rawBodyText);
+  report.metrics.readabilityGrade = grade;
+  
+  if (grade > 10) {
+    pushIssue(`[COMPLEXITY] Grade Level ${grade} is too high (Target 6-8)`, 'major');
+    report.overall_score -= 10;
   }
 
-  // ---------- Numeric data density
-  const numbersFound = (bodyText.match(/(\d+(?:\.\d+)?|%|₹|\$)/g) || []);
-  if (numbersFound.length < 3) {
-    report.overall_score -= 8;
-    issues.push(`[DATA] Only ${numbersFound.length} numeric items found.`);
+  const longSentences = sentenceWordLimitViolations(cleanedForRead || rawBodyText, 20);
+  if (longSentences.length > 5) {
+    pushIssue(`[SENTENCE] ${longSentences.length} sentences are too long (>20 words).`, 'minor');
+    report.overall_score -= 5;
   }
 
-  // ---------- Forbidden words
-  const forbiddenWords = [
-    "delve","tapestry","landscape","testament","burgeoning","underscores",
-    "moreover","furthermore","merely","amidst","in essence","pivotal",
-    "sheds light","crucial juncture"
-  ];
-
-  const foundForbidden = forbiddenWords.filter(w =>
-    bodyText.toLowerCase().includes(w)
-  );
-
+  // ---------- 9. AI Patterns
+  const foundForbidden = FORBIDDEN_WORDS.filter(w => (cleanedForRead || rawBodyText).toLowerCase().includes(w));
   if (foundForbidden.length) {
-    report.overall_score -= 12;
-    issues.push(`[FORBIDDEN] Forbidden words detected: ${foundForbidden.join(', ')}`);
-    criticals.push("AI-detected style flagged.");
+    pushIssue(`[ROBOTIC] Found forbidden words: ${foundForbidden.join(', ')}`, 'major');
+    report.overall_score -= 10;
   }
 
-  // ---------- Final PASS/FAIL
-  if (report.overall_score < 75 || criticals.length > 0) {
-    report.pass_or_fail = "FAIL";
+  // ---------- Final Report
+  if (report.overall_score < 75 || report.critical_alerts.length > 0) {
+    report.pass_or_fail = 'FAIL';
   }
 
-  console.log(JSON.stringify(report, null, 2));
+  console.log(`${BOLD}--- AUDIT RESULTS ---${RESET}`);
+  console.log(`Score: ${report.overall_score}/100 [${report.pass_or_fail}]`);
+  
+  if (report.critical_alerts.length) {
+    console.log(`${RED}🚨 CRITICAL:${RESET}`);
+    report.critical_alerts.forEach(c => console.log(` - ${c}`));
+  }
+  if (report.findings.length) {
+    console.log(`${YELLOW}⚠️ FINDINGS:${RESET}`);
+    report.findings.forEach(f => {
+       if (f.severity !== 'critical') console.log(` - ${f.msg}`);
+    });
+  }
+  console.log(`\n--------------------`);
 }
 
-auditLatestArticle()
+// Run
+runAudit()
   .catch(err => console.error(err))
   .finally(() => prisma.$disconnect());

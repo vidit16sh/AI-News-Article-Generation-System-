@@ -47,6 +47,23 @@ model ProcessingLog {
   timestamp DateTime @default(now())
 } 
 
+model Author {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique // e.g., "james-carter"
+  role        String   // e.g., "Senior Crypto Analyst"
+  bio         String   @db.Text
+  imageUrl    String   // Path to image, e.g., "/authors/james.jpg"
+  email       String?
+  twitter     String?
+  linkedin    String?
+  
+  // Relation back to articles
+  articles    GeneratedArticle[]
+  
+  createdAt   DateTime @default(now())
+}
+
 model GeneratedArticle {
   id              String   @id @default(uuid())
   originalNewsId  String   @unique
@@ -72,6 +89,10 @@ model GeneratedArticle {
   confidenceScore  Float   @default(0.0)
   priorityScore   Int      @default(0)  // 0 to 100
   publishAt       DateTime @default(now()) // When it should go live
+  
+  authorId        String?
+  author          Author?  @relation(fields: [authorId], references: [id])
+  
   // Publishing Status
   status          String   @default("DRAFT") // DRAFT, QUEUED, PUBLISHED
    
