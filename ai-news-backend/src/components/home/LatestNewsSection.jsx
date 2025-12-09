@@ -6,11 +6,11 @@ export default function LatestNewsSection({ articles }) {
   return (
     <section>
       {/* Header row */}
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex items-center gap-3 mt-10">
         <div className="flex items-center gap-2">
           {/* Red rectangle */}
           <span className="h-[16px] w-[6px] bg-red-500 rounded-[2px]" />
-          <h2 className="text-sm font-light text-slate-800">
+          <h2 className="text-base font-light text-slate-800">
             Latest news
           </h2>
         </div>

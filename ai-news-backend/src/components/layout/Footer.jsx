@@ -1,4 +1,3 @@
-// src/components/layout/Footer.jsx
 import Link from "next/link";
 
 export default function Footer() {
@@ -6,7 +5,7 @@ export default function Footer() {
     <footer className="mt-10 border-t-4 border-[#d00000] bg-[#050816] text-slate-100">
       <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 sm:py-12">
         {/* Main layout: left subscribe, right link groups */}
-        <div className="grid gap-10 lg:grid-cols-[2.1fr_3fr]">
+        <div className="grid gap-10 md:grid-cols-[2.1fr_3fr]">
           {/* Subscribe block */}
           <div>
             <div className="mb-4 flex items-center gap-2">
@@ -17,8 +16,8 @@ export default function Footer() {
             </div>
 
             <p className="max-w-md text-[0.9rem] leading-relaxed text-slate-300">
-              Stay updated on the latest happenings in the Crypto Market Whether it&apos;s
-              business, politics, tech or finance, we deliver it in a
+              Stay updated on the latest happenings in the Crypto Market Whether
+              it&apos;s business, politics, tech or finance, we deliver it in a
               flash—straight to your inbox.
             </p>
 
@@ -64,7 +63,9 @@ export default function Footer() {
                 <FooterLink href="/category/fashion">Fashion</FooterLink>
                 <FooterLink href="/category/real-estate">Real Estate</FooterLink>
                 <FooterLink href="/category/travel">Travel</FooterLink>
-                <FooterLink href="/category/entertainment">Entertainment</FooterLink>
+                <FooterLink href="/category/entertainment">
+                  Entertainment
+                </FooterLink>
                 <FooterLink href="/category/sports">Sports</FooterLink>
                 <FooterLink href="/category/tech">Tech</FooterLink>
               </div>

@@ -14,15 +14,16 @@ export default function HeroSection({ featured }) {
     imageUrl: "",
   };
 
-  const article = featured
-    ? normalizeArticle(featured, fallback)
-    : fallback;
+  const article = featured ? normalizeArticle(featured, fallback) : fallback;
 
   return (
     <section className="mt-4 mb-6">
-      <div className="grid gap-4 md:grid-cols-[1.1fr_1.6fr] md:items-stretch">
-        {/* Image column – first on mobile, fixed height, full cover */}
-        <div className="order-1 md:order-2 relative h-[220px] w-full overflow-hidden rounded-md bg-slate-100 sm:h-[260px] md:h-[280px] lg:h-[320px]">
+      {/* NOTE:
+         - Mobile & tablet: single column
+         - Laptop+: two columns (same look as before) */}
+      <div className="grid gap-4 lg:grid-cols-[1.3fr_1.6fr] lg:items-stretch">
+        {/* Image column */}
+        <div className="order-1 lg:order-2 relative h-[260px] w-full overflow-hidden rounded-lg bg-slate-100 sm:h-[340px] md:h-[340px] lg:h-[400px] lg:w-[600px]">
           {article.imageUrl ? (
             <Image
               src={article.imageUrl}
@@ -39,8 +40,8 @@ export default function HeroSection({ featured }) {
           )}
         </div>
 
-        {/* Text column – starts from top */}
-        <div className="order-2 md:order-1 flex flex-col justify-start gap-4 px-1 md:px-0">
+        {/* Text column */}
+        <div className="order-2 lg:order-1 flex flex-col justify-start gap-4 px-1 md:px-0">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-[0.8rem]">
               <span className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-[0.8rem] font-normal text-red-600">
@@ -53,7 +54,7 @@ export default function HeroSection({ featured }) {
               )}
             </div>
 
-            <h1 className="text-2xl font-light leading-snug sm:text-3xl lg:text-[2.1rem]">
+            <h1 className="text-2xl leading-snug sm:text-3xl lg:text-[2rem]">
               <Link
                 href={`/news/${article.slug}`}
                 className="underline-offset-[3px] decoration-red-500 hover:underline"
@@ -62,7 +63,7 @@ export default function HeroSection({ featured }) {
               </Link>
             </h1>
 
-            <p className="max-w-xl text-[0.9rem] leading-relaxed text-slate-600">
+            <p className="max-w-xl text-[1rem] leading-relaxed text-[#020a1c]">
               {article.excerpt}
             </p>
           </div>

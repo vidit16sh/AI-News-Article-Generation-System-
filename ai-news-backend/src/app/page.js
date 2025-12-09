@@ -44,7 +44,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-10">
       {/* TOP: hero + latest + top stories + finance sidebar with divider */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,2.4fr)_1px_minmax(0,1fr)] lg:gap-0">
+      <div className="lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:gap-0">
         {/* LEFT SIDE */}
         <div className="space-y-6 lg:pr-8">
           <HeroSection featured={featured || rest[0]} />

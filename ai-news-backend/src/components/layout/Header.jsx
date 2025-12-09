@@ -35,7 +35,8 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white ">
       {/* DESKTOP HEADER (date + logo + location in one line) */}
-      <div className="hidden flex-col md:flex">
+      {/* Now only on lg and up */}
+      <div className="hidden flex-col lg:flex">
         {/* Top row */}
         <div className="flex h-16 items-center border-b border-slate-200 px-6 ">
           <div className="flex-1 text-[11px] font-normal text-slate-500">
@@ -80,8 +81,9 @@ export default function Header() {
         </div>
       </div>
 
-      {/* MOBILE HEADER (red bar) */}
-      <div className="flex items-center justify-between bg-[#d00000] px-4 py-3 text-white md:hidden">
+      {/* MOBILE/TABLET HEADER (red bar) */}
+      {/* Now used for < lg (so phones + tablets) */}
+      <div className="flex items-center justify-between bg-[#d00000] px-4 py-3 text-white lg:hidden">
         <LogoMobile />
 
         <div className="flex items-center gap-3">
@@ -116,7 +118,9 @@ export default function Header() {
               />
               <span
                 className={`absolute left-0 right-0 h-[2px] rounded-full bg-current transition-transform duration-200 ${
-                  isMenuOpen ? "-translate-y-[5px] -rotate-45" : "translate-y-[10px]"
+                  isMenuOpen
+                    ? "-translate-y-[5px] -rotate-45"
+                    : "translate-y-[10px]"
                 }`}
               />
             </div>
@@ -124,9 +128,9 @@ export default function Header() {
         </div>
       </div>
 
-      {/* MOBILE FULLSCREEN MENU OVERLAY */}
+      {/* MOBILE/TABLET FULLSCREEN MENU OVERLAY */}
       <div
-        className={`fixed inset-0 z-40 transform bg-white transition-transform duration-300 ease-out md:hidden ${
+        className={`fixed inset-0 z-40 transform bg-white transition-transform duration-300 ease-out lg:hidden ${
           isMenuOpen ? "translate-y-0" : "-translate-y-full pointer-events-none"
         }`}
       >
@@ -173,11 +177,7 @@ export default function Header() {
                       : "translate-y-4 opacity-0"
                   } ${index === 0 ? "delay-75" : `delay-${75 + index * 25}`}`}
                 >
-                  <Link
-                    href={item.href}
-                    onClick={closeMenu}
-                    className="block"
-                  >
+                  <Link href={item.href} onClick={closeMenu} className="block">
                     {item.label}
                   </Link>
                 </li>
@@ -240,7 +240,9 @@ function LogoMobile({ color = "white" }) {
       <span className={`text-2xl font-semibold tracking-tight ${textColorMain}`}>
         news
       </span>
-      <span className={`text-2xl font-semibold tracking-tight ${textColorFlash}`}>
+      <span
+        className={`text-2xl font-semibold tracking-tight ${textColorFlash}`}
+      >
         flash
       </span>
     </Link>
