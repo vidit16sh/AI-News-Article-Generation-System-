@@ -86,7 +86,13 @@ export default async function ArticlePage({ params }) {
       })
     : "";
 
-  const authorName = article.authorName || article.sourceName || "AI Writer";
+  const author = article.author || {
+      name: "Editorial Team",
+      role: "AI News Desk",
+      slug: "editorial-team",
+      imageUrl: null 
+  }; 
+  const authorName = author.name;
   const readingTime = article.readingTime || "3";
 
   // JSON-LD for Google News / rich results
@@ -100,8 +106,9 @@ export default async function ArticlePage({ params }) {
     dateModified: article.updatedAt || article.createdAt,
     author: [
       {
-        "@type": "Organization",
-        name: authorName,
+        "@type": "Person",
+        name: author.name,
+        url: `${baseUrl}/authors/${author.slug}`
       },
     ],
     publisher: {

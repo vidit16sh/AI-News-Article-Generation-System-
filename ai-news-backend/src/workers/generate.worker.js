@@ -1,28 +1,27 @@
 import 'dotenv/config';
 import Bottleneck from 'bottleneck';
-import stringSimilarity from 'string-similarity'; // Ensure npm install string-similarity
+import stringSimilarity from 'string-similarity'; 
 import { connectRabbit } from '../config/rabbit.js';
 import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
 import { generateImage } from '../services/image.service.js'; 
+
 const limiter = new Bottleneck({
     minTime: 2000, 
     maxConcurrent: 1 
 });
 
-
 // Helper: Check Originality
 const calculateOriginality = (aiText, sourceText) => {
     if (!sourceText || sourceText.length < 50) return 1.0;
     const similarity = stringSimilarity.compareTwoStrings(aiText, sourceText);
-    return Math.round((1.0 - similarity) * 100) / 100; // Inverse of similarity
+    return Math.round((1.0 - similarity) * 100) / 100; 
 };
 
 // Helper: Revalidate Cache
 const triggerRevalidation = async (tag) => {
     try {
         const apiUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-        // Fire and forget - don't await response to speed up worker
         fetch(`${apiUrl}/api/revalidate`, {
             method: 'POST',
             headers: {
@@ -31,38 +30,53 @@ const triggerRevalidation = async (tag) => {
             },
             body: JSON.stringify({ tag })
         }).catch(() => {}); 
-    } catch (error) {
-        // Ignore
-    }
+    } catch (error) {}
 }; 
 
-const createJsonLd = (article, url, authorObj) => ({
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": url
-    },
-    "headline": article.headline,
-    "description": article.meta_description || article.headline, // Critical for SEO
-    "image": article.imageUrl ? [article.imageUrl] : [], // Safety check
-    "datePublished": new Date().toISOString(),
-    "dateModified": new Date().toISOString(), // Google prefers seeing this
-    "author": { 
-        "@type": "Person", // ✅ Valid for Google News
-        "name": authorObj ? authorObj.name : "Editorial Team",
-        "url": authorObj ? `${process.env.NEXT_PUBLIC_SITE_URL}/authors/${authorObj.slug}` : undefined
-    },
-    "publisher": {
-        "@type": "Organization",
-        "name": "AI News Platform", // Replace with your actual Site Name
-        "logo": {
-            "@type": "ImageObject",
-            "url": "http://localhost:3000/logo.png" // Replace with your actual logo URL
-        }
+// Helper: Assign Random Author
+const assignAuthor = async () => {
+    try {
+        const count = await prisma.author.count();
+        if (count === 0) return null;
+        const skip = Math.floor(Math.random() * count);
+        return await prisma.author.findFirst({ skip });
+    } catch (e) {
+        console.error("Error assigning author:", e);
+        return null;
     }
-});
+};
 
+// JSON-LD Builder (with strict image fallback)
+const createJsonLd = (article, url, authorObj) => {
+    // Force a valid image URL for Google Schema compliance
+    const validImage = article.imageUrl && article.imageUrl.length > 0 
+        ? article.imageUrl 
+        : `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/default-news.jpg`;
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "mainEntityOfPage": { "@type": "WebPage", "@id": url },
+        "headline": article.headline,
+        "description": article.meta_description || article.headline,
+        "image": [validImage], // ✅ Always returns valid array
+        "datePublished": new Date().toISOString(),
+        "dateModified": new Date().toISOString(),
+        "author": { 
+            "@type": "Person", 
+            "name": authorObj ? authorObj.name : "Editorial Team",
+            "url": authorObj ? `${process.env.NEXT_PUBLIC_SITE_URL}/authors/${authorObj.slug}` : undefined
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "AI News Platform",
+            "logo": { 
+                "@type": "ImageObject", 
+                "url": `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/logo.png` 
+            }
+        }
+    };
+};
 
 const createRssEntry = (article, url) => `
 <item>
@@ -76,25 +90,17 @@ const createRssEntry = (article, url) => `
   <dc:creator>AI News Desk</dc:creator>
 </item>`; 
 
-const createSitemapEntry = (url) => `
+const createSitemapEntry = (url) => {
+    const w3cDate = new Date().toISOString().split('T')[0];
+    return `
 <url>
   <loc>${url}</loc>
-  <lastmod>${new Date().toISOString()}</lastmod>
+  <lastmod>${w3cDate}</lastmod>
   <changefreq>daily</changefreq>
   <priority>0.7</priority>
 </url>`;
-
-const assignAuthor = async () => {
-    try {
-        const count = await prisma.author.count();
-        if (count === 0) return null;
-        const skip = Math.floor(Math.random() * count);
-        return await prisma.author.findFirst({ skip });
-    } catch (e) {
-        console.error("Error assigning author:", e);
-        return null;
-    }
 };
+
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
     const { newsId, priorityScore = 50 } = content;
@@ -107,108 +113,79 @@ const processGenerationJob = async (msg, channel) => {
             include: { category: true }
         });
 
-        if (!cleanNews) {
-            channel.ack(msg);
-            return;
-        }
-        
-        
-        // Idempotency Check
-        const existing = await prisma.generatedArticle.findUnique({
-            where: { originalNewsId: newsId }
-        });
-        if (existing) {
-            channel.ack(msg);
-            return;
-        }
-        
+        if (!cleanNews) { channel.ack(msg); return; }
+
+        // Idempotency
+        const existing = await prisma.generatedArticle.findUnique({ where: { originalNewsId: newsId } });
+        if (existing) { channel.ack(msg); return; }
+
+        // 1. Assign Author
         const assignedAuthor = await assignAuthor();
-        console.log(`   👤 Assigned Author: ${assignedAuthor ? assignedAuthor.name : "System"}`);
-        // 1. Generate Text
-        
+        const authorName = assignedAuthor ? assignedAuthor.name : "Editorial Team";
+        console.log(`   👤 Assigned Author: ${authorName}`);
+
+        // 2. Generate Text
         console.log(`   🧠 Writing: "${cleanNews.title.substring(0, 30)}..."`);
         const aiOutput = await limiter.schedule(() => generateArticle(cleanNews));
 
-        // 2. Generate Image
+        // 3. Generate Image
         console.log(`   🎨 Generating Image (Fal.ai)...`);
-        const imageUrl = await generateImage(aiOutput.headline);
+        let imageUrl = await generateImage(aiOutput.headline);
         
-        if (!imageUrl) console.warn("   ⚠️ Image generation failed (Key issue?)."); 
+        // 🛡️ Fallback: If Fal.ai fails, use null (createJsonLd will handle the default)
+        if (!imageUrl) {
+            console.warn("   ⚠️ Image generation failed. Using default.");
+            imageUrl = null; 
+        }
 
-        // 3. Score Originality
-        const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
+        // 4. Prepare Metadata
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-        const fullUrl = `${baseUrl}/news/${aiOutput.slug}`; 
+        const fullUrl = `${baseUrl}/news/${aiOutput.slug}`;
         
         const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl, assignedAuthor);
         const rssEntry = createRssEntry(aiOutput, fullUrl);
         const sitemapEntry = createSitemapEntry(fullUrl);
+        
+        const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
 
-        // 4. Determine Status
+        // 5. Determine Status
         let status = "DRAFT";
-        let publishAt = new Date();
-        const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20; 
+        const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20;
         
         if (isHighQuality) {
-        if (priorityScore >= 80) {
-            // 🚨 BREAKING NEWS: Publish Immediately
-            status = "PUBLISHED";
-            console.log(`   🚨 BREAKING NEWS DETECTED (Score: ${priorityScore}) - Publishing NOW.`);
-        } else if (priorityScore >= 50) {
-            // 🕒 STANDARD NEWS: Queue it
-            status = "QUEUED";
-            console.log(`   🕒 Standard News (Score: ${priorityScore}) - Queued for Drip Feed.`);
-        } else {
-            // 🗑️ LOW VALUE: Keep as Draft
-            status = "DRAFT";
-            console.log(`   🗑️ Low Value (Score: ${priorityScore}) - Saved as Draft.`);
-            }
+            if (priorityScore >= 80) status = "PUBLISHED";
+            else if (priorityScore >= 50) status = "QUEUED";
         }
 
-        // 5. Save
+        // 6. Save to DB
         await prisma.generatedArticle.create({
             data: {
                 headline: aiOutput.headline,
                 slug: aiOutput.slug,
                 metaDescription: aiOutput.meta_description,
                 articleHtml: aiOutput.article_html,
-                
-                tags: aiOutput.tags || [], 
+                tags: aiOutput.tags || [],
                 keywords: aiOutput.keywords || [],
-                
-                imageUrl: imageUrl,
-                
-                rssEntry: rssEntry,         // ✅ Populated
-                sitemapEntry: sitemapEntry, // ✅ Populated
-                newsJsonLd: newsJsonLd,
-                
+                imageUrl: imageUrl, // Can be null, handled by frontend/schema logic
+                rssEntry, sitemapEntry, newsJsonLd,
                 originalityScore: realOriginalityScore,
-                confidenceScore: aiOutput.confidence || 0, 
+                confidenceScore: aiOutput.confidence || 0,
                 priorityScore: priorityScore,
-                
                 status: status,
-                
-                publishAt: publishAt,
-                
-                originalNewsId: cleanNews.id, 
-                authorId: assignedAuthor ? assignedAuthor.id : null
+                publishAt: new Date(),
+                originalNewsId: cleanNews.id,
+                authorId: assignedAuthor ? assignedAuthor.id : null 
             }
         });
 
-        console.log(`   ✨ Finished: ${aiOutput.slug} [${status}]`);
-
-    if (status === 'PUBLISHED') {
-        await triggerRevalidation('articles');
-    }
+        console.log(`   ✨ Finished: ${aiOutput.slug} [${status}] by ${authorName}`);
+        
+        if (status === 'PUBLISHED') await triggerRevalidation('articles');
         channel.ack(msg);
 
     } catch (err) {
         console.error(`   ❌ Worker Error: ${err.message}`);
-        if (err.message.includes('429')) {
-             setTimeout(() => channel.nack(msg), 5000);
-        } else {
-             channel.ack(msg);
-        }
+        channel.ack(msg); // Ack to flush bad jobs
     }
 };
 

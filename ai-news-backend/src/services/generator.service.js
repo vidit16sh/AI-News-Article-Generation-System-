@@ -56,6 +56,7 @@ Output must be **STRICT JSON ONLY**.
 ============================================================
 4. SEO REQUIREMENTS
 ============================================================
+- **VERBATIM RULE:** The Focus Keyword must appear in the Headline **EXACTLY** as written. Do not change tense (e.g., if keyword is "Listing", do NOT write "Lists").
 - **Focus Keyword:** In H1, First 100 words, Last paragraph, Meta Description.
 - **Slug:** 4-5 words, kebab-case.
 - **Meta Description:** <155 chars, compelling.
