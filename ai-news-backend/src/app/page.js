@@ -1,8 +1,8 @@
 import HeroSection from "../components/home/HeroSection";
 import LatestNewsSection from "../components/home/LatestNewsSection";
 import TopStoriesSection from "../components/home/TopStoriesSection";
-import SidebarFinanceSection from "../components/home/SidebarFinanceSection";
 import PoliticsStripSection from "../components/home/PoliticsStripSection";
+import RightSidebar from "../components/layout/RightSidebar";
 
 async function fetchLatestArticles() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -34,16 +34,13 @@ export default async function HomePage() {
   const topStoriesMain = rest[3] || featured || rest[0];
   const topStoriesList = rest.slice(4, 8);
   const politicsArticles = rest.slice(8, 12);
-  const financeArticles = rest.slice(3, 10).length
-    ? rest.slice(3, 10)
-    : rest.slice(0, 7);
 
   const politicsSource = politicsArticles.length ? politicsArticles : rest;
   const politicsForStrip = politicsSource.slice(0, 4);
 
   return (
     <div className="space-y-10">
-      {/* TOP: hero + latest + top stories + finance sidebar with divider */}
+      {/* TOP: hero + latest + top stories + right sidebar with divider */}
       <div className="lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:gap-0">
         {/* LEFT SIDE */}
         <div className="space-y-6 lg:pr-8">
@@ -66,11 +63,7 @@ export default async function HomePage() {
 
         {/* RIGHT SIDE */}
         <aside className="mt-8 space-y-6 lg:mt-0 lg:pl-8">
-          <SidebarFinanceSection
-            articles={
-              financeArticles.length ? financeArticles : rest.slice(0, 7)
-            }
-          />
+          <RightSidebar />
         </aside>
       </div>
 

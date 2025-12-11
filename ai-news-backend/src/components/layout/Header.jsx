@@ -5,17 +5,14 @@ import Link from "next/link";
 
 const PRIMARY_LINKS = [
   { label: "Latest News", href: "/" },
-  { label: "Business", href: "/category/business" },
-  { label: "Finance", href: "/category/finance" },
-  { label: "Health", href: "/category/health" },
-  { label: "Politics", href: "/category/politics" },
-  { label: "Fashion", href: "/category/fashion" },
-  { label: "Real Estate", href: "/category/real-estate" },
-  { label: "Travel", href: "/category/travel" },
-  { label: "Entertainment", href: "/category/entertainment" },
-  { label: "Sports", href: "/category/sports" },
+  { label: "Crypto", href: "/category/crypto" },
+  { label: "People", href: "/category/people" },
   { label: "Tech", href: "/category/tech" },
-  { label: "Podcast", href: "/podcast" },
+  { label: "Finance", href: "/category/finance" },
+  { label: "Web3", href: "/category/web3" },
+  { label: "BTC", href: "/category/btc" },
+  { label: "ETH", href: "/category/eth" },
+  { label: "DOGE", href: "/category/doge" },
 ];
 
 const SECONDARY_LINKS = [

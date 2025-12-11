@@ -1,5 +1,6 @@
 // app/category/[slug]/page.js
 import Link from "next/link";
+import RightSidebar from "../../../components/layout/RightSidebar";
 
 /* ---------- TEMP DATA FETCH: get all articles, ignore category ---------- */
 
@@ -81,12 +82,9 @@ export default async function CategoryPage({ params }) {
         {/* VERTICAL DIVIDER */}
         <div className="hidden w-px bg-slate-200 mx-6 lg:block" />
 
-        {/* RIGHT SIDE – Featured list */}
+        {/* RIGHT SIDE – Shared sidebar */}
         <aside className="mt-6 w-[280px] space-y-6 lg:mt-0 lg:w-[320px] lg:pl-0">
-          <CategoryFeaturedSidebar
-            label="Featured"
-            articles={sidebarArticles}
-          />
+          <RightSidebar />
         </aside>
       </div>
     </div>
@@ -217,7 +215,7 @@ function CategoryGrid({ articles }) {
   );
 }
 
-/* ---------- Right-side featured list ---------- */
+/* ---------- Right-side featured list (currently unused) ---------- */
 
 function CategoryFeaturedSidebar({ label, articles }) {
   const list = Array.isArray(articles) ? articles.slice(0, 5) : [];
