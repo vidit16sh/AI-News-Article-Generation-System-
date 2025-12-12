@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LatestNewsSection({ articles }) {
   const hasArticles = Array.isArray(articles) && articles.length > 0;
@@ -6,11 +7,11 @@ export default function LatestNewsSection({ articles }) {
   return (
     <section>
       {/* Header row */}
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex items-center gap-3 mt-10">
         <div className="flex items-center gap-2">
           {/* Red rectangle */}
           <span className="h-[16px] w-[6px] bg-red-500 rounded-[2px]" />
-          <h2 className="text-sm font-light text-slate-800">
+          <h2 className="text-base font-light text-slate-800">
             Latest news
           </h2>
         </div>
@@ -31,7 +32,8 @@ export default function LatestNewsSection({ articles }) {
           No articles available yet.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-3">
+        // Mobile: single column; md+: 3 columns (tablet/desktop)
+        <div className="grid gap-4 md:grid-cols-3">
           {articles.map((article) => (
             <LatestCard key={article.slug || article.id} article={article} />
           ))}
@@ -47,24 +49,34 @@ function LatestCard({ article }) {
   return (
     <Link
       href={`/news/${a.slug}`}
-      className="group flex h-full flex-col gap-2"
+      // Mobile: horizontal; md+: vertical
+      className="group flex h-full flex-row gap-3 md:flex-col"
     >
-      {/* Image only, fixed height */}
-      <div className="w-full h-48 sm:h-48 md:h-48 overflow-hidden rounded-md bg-slate-100">
+      {/* Image container */}
+      <div
+        className="
+          relative overflow-hidden rounded-md bg-slate-100
+          h-24 w-28 flex-none
+          sm:h-28
+          md:h-48 md:w-full
+        "
+      >
         {a.imageUrl ? (
-          <img
+          <Image
             src={a.imageUrl}
             alt={a.title}
-            className="h-full w-full object-cover object-center transition-opacity duration-200 group-hover:opacity-80 rounded-md"
+            fill
+            className="object-cover object-center transition-opacity duration-200 group-hover:opacity-80"
+            sizes="(max-width: 768px) 35vw, 30vw"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-slate-300 rounded-md">
+          <div className="flex h-full w-full items-center justify-center text-slate-300">
             <span className="text-3xl">📰</span>
           </div>
         )}
       </div>
 
-      {/* Text below image */}
+      {/* Text area */}
       <div className="flex flex-1 flex-col gap-1">
         <div className="text-[0.75rem] font-light text-slate-500">
           {a.date && `${a.date} • `}

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import FeaturedSidebar from "./FeaturedSidebar";
+import RightSidebar from "../../../components/layout/RightSidebar";
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
@@ -164,8 +164,8 @@ export default async function ArticlePage({ params }) {
         </ol>
       </nav>
 
-      {/* Desktop: left / divider / right. Mobile: stacked (unchanged) */}
-      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3.2fr)_1px_minmax(260px,1fr)] lg:items-start lg:gap-8">
+      {/* Layout wrapper – match home page spacing more closely */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-0">
         {/* MAIN ARTICLE COLUMN */}
         <main
           className="lg:pr-8"
@@ -173,7 +173,7 @@ export default async function ArticlePage({ params }) {
           itemType="https://schema.org/NewsArticle"
         >
           {/* Top meta section */}
-          <header className="mb-6 border-b border-slate-200 pb-5">
+          <header className="mb-4 border-b border-slate-200 pb-4">
             <div className="mb-3">
               <span className="inline-flex items-center rounded-md border border-red-100 bg-red-50 px-3 py-1 text-[0.7rem] font-medium tracking-wide text-red-600">
                 {category}
@@ -275,8 +275,8 @@ export default async function ArticlePage({ params }) {
         <div className="hidden h-full bg-slate-200 lg:block" />
 
         {/* RIGHT SIDEBAR – sticky on desktop */}
-        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-full lg:self-start lg:pl-4">
-          <FeaturedSidebar articles={sidebarArticles} />
+        <aside className="mt-6 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-full lg:self-start lg:pl-8">
+          <RightSidebar />
         </aside>
       </div>
     </div>
@@ -315,11 +315,7 @@ function RelatedArticlesSection({ articles }) {
       {/* Cards grid */}
       <div className="grid gap-6 md:grid-cols-3 sm:grid-cols-2">
         {normalized.map((a) => (
-          <Link
-            key={a.slug}
-            href={`/news/${a.slug}`}
-            className="group block"
-          >
+          <Link key={a.slug} href={`/news/${a.slug}`} className="group block">
             {/* Image */}
             <div className="relative mb-3 h-44 w-full overflow-hidden rounded-md bg-slate-100 sm:h-48">
               {a.imageUrl ? (
