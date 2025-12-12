@@ -78,28 +78,6 @@ const createJsonLd = (article, url, authorObj) => {
     };
 };
 
-const createRssEntry = (article, url) => `
-<item>
-  <title><![CDATA[${article.headline}]]></title>
-  <link>${url}</link>
-  <guid isPermaLink="true">${url}</guid>
-  <pubDate>${new Date().toUTCString()}</pubDate>
-  <description><![CDATA[${article.meta_description}]]></description>
-  ${article.imageUrl ? `<enclosure url="${article.imageUrl}" length="0" type="image/jpeg" />` : ''}
-  <category><![CDATA[${article.tags?.[0] || 'News'}]]></category>
-  <dc:creator>AI News Desk</dc:creator>
-</item>`; 
-
-const createSitemapEntry = (url) => {
-    const w3cDate = new Date().toISOString().split('T')[0];
-    return `
-<url>
-  <loc>${url}</loc>
-  <lastmod>${w3cDate}</lastmod>
-  <changefreq>daily</changefreq>
-  <priority>0.7</priority>
-</url>`;
-};
 
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
@@ -143,8 +121,6 @@ const processGenerationJob = async (msg, channel) => {
         const fullUrl = `${baseUrl}/news/${aiOutput.slug}`;
         
         const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl, assignedAuthor);
-        const rssEntry = createRssEntry(aiOutput, fullUrl);
-        const sitemapEntry = createSitemapEntry(fullUrl);
         
         const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
 
@@ -167,7 +143,7 @@ const processGenerationJob = async (msg, channel) => {
                 tags: aiOutput.tags || [],
                 keywords: aiOutput.keywords || [],
                 imageUrl: imageUrl, // Can be null, handled by frontend/schema logic
-                rssEntry, sitemapEntry, newsJsonLd,
+                newsJsonLd,
                 originalityScore: realOriginalityScore,
                 confidenceScore: aiOutput.confidence || 0,
                 priorityScore: priorityScore,

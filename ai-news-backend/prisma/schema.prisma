@@ -80,9 +80,6 @@ model GeneratedArticle {
   
   imageUrl        String? 
   
-  rssEntry        String?  @db.Text // Store the <item> XML
-  sitemapEntry    String?  @db.Text // Store the <url> XML
-  
   // Advanced Fields (Requested in your prompt)
   newsJsonLd      Json?    // Stores the Schema.org JSON-LD object
   originalityScore Float   @default(0.0)
