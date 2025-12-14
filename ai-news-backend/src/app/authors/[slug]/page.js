@@ -25,6 +25,12 @@ async function fetchAllArticles() {
   }
 }
 
+/* ---------- Helpers ---------- */
+
+function normalizeSlug(v) {
+  return (v || "").toString().trim().toLowerCase();
+}
+
 /* ---------- Metadata ---------- */
 
 export async function generateMetadata({ params }) {
@@ -34,8 +40,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${meta.name} | Author at VrajNews`,
     description:
-      meta.tagline ||
-      `Articles and explainers written by ${meta.name} at VrajNews.`,
+      meta.tagline || `Articles and explainers written by ${meta.name} at VrajNews.`,
   };
 }
 
@@ -47,26 +52,30 @@ export default async function AuthorPage({ params }) {
 
   const allArticles = await fetchAllArticles();
 
-  // Try to filter by author name, fallback to all articles
-  const filtered = allArticles.filter((a) => {
+  // ✅ Prefer filtering by author.slug from DB
+  const filteredBySlug = allArticles.filter((a) => {
+    const aSlug = normalizeSlug(a?.author?.slug);
+    return aSlug && aSlug === normalizeSlug(slug);
+  });
+
+  // Fallback to filtering by author name (old behavior)
+  const filteredByName = allArticles.filter((a) => {
     const name = (a.authorName || a.sourceName || "").toLowerCase().trim();
     return name === authorMeta.name.toLowerCase();
   });
 
-  const articles = filtered.length ? filtered : allArticles;
+  const articles =
+    filteredBySlug.length ? filteredBySlug : filteredByName.length ? filteredByName : allArticles;
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Banner: Meet our author */}
       <AuthorBanner />
 
       <div className="mt-2 lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2.1fr)] lg:gap-10">
-        {/* LEFT COLUMN – author profile */}
         <aside className="mb-8 lg:mb-0 lg:border-r lg:border-slate-200 lg:pr-10">
           <AuthorProfile meta={authorMeta} />
         </aside>
 
-        {/* RIGHT COLUMN – latest articles */}
         <main className="lg:pl-8">
           <LatestFromAuthor name={authorMeta.name} articles={articles} />
         </main>
@@ -95,17 +104,10 @@ function AuthorProfile({ meta }) {
 
   return (
     <div className="space-y-6">
-      {/* Avatar + name */}
       <div className="flex flex-col items-center gap-4 sm:items-start">
         <div className="relative h-28 w-28 overflow-hidden rounded-full bg-slate-200">
-          {/* If you add a real image, place it in /public/authors/<slug>.jpg and update meta.avatar */}
           {meta.avatar ? (
-            <Image
-              src={meta.avatar}
-              alt={name}
-              fill
-              className="object-cover"
-            />
+            <Image src={meta.avatar} alt={name} fill className="object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-slate-600">
               {name.charAt(0)}
@@ -114,20 +116,16 @@ function AuthorProfile({ meta }) {
         </div>
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{name}</h1>
-          {role && (
-            <p className="mt-1 text-sm font-light text-slate-500">{role}</p>
-          )}
+          {role && <p className="mt-1 text-sm font-light text-slate-500">{role}</p>}
         </div>
       </div>
 
-      {/* Bio paragraphs */}
       <div className="space-y-3 text-[0.9rem] leading-relaxed text-slate-600">
         {bioParagraphs.map((p, idx) => (
           <p key={idx}>{p}</p>
         ))}
       </div>
 
-      {/* Contact + social */}
       <div className="space-y-2 pt-2">
         <h2 className="text-sm font-semibold text-slate-900">Contact</h2>
         {email && (
@@ -139,7 +137,6 @@ function AuthorProfile({ meta }) {
         )}
 
         <div className="mt-2 flex items-center gap-3 text-slate-500">
-          {/* simple icon circles – replace with real SVGs if you want */}
           <SocialIcon label="Facebook" />
           <SocialIcon label="Twitter" />
           <SocialIcon label="Instagram" />
@@ -157,7 +154,6 @@ function SocialIcon({ label }) {
       aria-label={label}
       className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 text-[11px] text-slate-500 hover:border-slate-400 hover:text-slate-700"
     >
-      {/* Initial letter as a placeholder icon */}
       {label.charAt(0)}
     </button>
   );
@@ -171,7 +167,6 @@ function LatestFromAuthor({ name, articles }) {
 
   return (
     <section>
-      {/* Header row: red line + title */}
       <div className="mb-4 flex items-center gap-3">
         <span className="h-4 w-[2px] bg-red-500" />
         <h2 className="text-sm font-light text-slate-900">
@@ -191,7 +186,6 @@ function LatestFromAuthor({ name, articles }) {
               href={`/news/${a.slug}`}
               className="group flex h-full flex-col gap-2"
             >
-              {/* Image */}
               <div className="h-40 w-full overflow-hidden rounded-md bg-slate-100 sm:h-44 md:h-48">
                 {a.imageUrl ? (
                   <img
@@ -206,7 +200,6 @@ function LatestFromAuthor({ name, articles }) {
                 )}
               </div>
 
-              {/* Text */}
               <div className="flex flex-1 flex-col gap-1">
                 <div className="text-[0.75rem] font-light text-slate-500">
                   {a.category} {a.date && <>• {a.date}</>}
@@ -228,16 +221,13 @@ function LatestFromAuthor({ name, articles }) {
 function getAuthorMeta(slug) {
   const key = (slug || "").toLowerCase();
 
-  // You can add more authors here later
   if (key === "james-carter") {
     return {
       slug: "james-carter",
       name: "James Carter",
       role: "Economics, Business and Finance",
-      // If you add an avatar, put it in /public/authors/james-carter.jpg
-      avatar: "/authors/james-carter.jpg", // optional placeholder
-      tagline:
-        "James Carter covers economic policy, business trends, and financial markets.",
+      avatar: "/authors/james-carter.jpg",
+      tagline: "James Carter covers economic policy, business trends, and financial markets.",
       bioParagraphs: [
         "James graduated from the London School of Economics with a degree in Economics. Specializing in economics, business, and finance, he has spent a decade analyzing global markets and financial systems.",
         "He has authored several award-winning articles on economic policies and their impact on society, contributing to both academic journals and mainstream media.",
@@ -247,7 +237,6 @@ function getAuthorMeta(slug) {
     };
   }
 
-  // Default fallback author meta
   return {
     slug: key || "author",
     name: "Staff Writer",

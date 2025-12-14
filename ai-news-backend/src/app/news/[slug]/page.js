@@ -72,10 +72,7 @@ export default async function ArticlePage({ params }) {
   const articleUrl = `${baseUrl}/news/${article.slug}`;
 
   const category =
-    article.category ||
-    article.primaryCategory ||
-    article.tags?.[0] ||
-    "News";
+    article.category || article.primaryCategory || article.tags?.[0] || "News";
 
   const publishedDate = article.createdAt
     ? new Date(article.createdAt).toLocaleDateString("en-US", {
@@ -86,13 +83,17 @@ export default async function ArticlePage({ params }) {
       })
     : "";
 
+  // ✅ Use author stored in DB; fallback only if missing
   const author = article.author || {
-      name: "Editorial Team",
-      role: "AI News Desk",
-      slug: "editorial-team",
-      imageUrl: null 
-  }; 
-  const authorName = author.name;
+    name: "Editorial Team",
+    role: "AI News Desk",
+    slug: "editorial-team",
+    imageUrl: null,
+  };
+
+  const authorName = author?.name || "Editorial Team";
+  const authorSlug = author?.slug || null;
+
   const readingTime = article.readingTime || "3";
 
   // JSON-LD for Google News / rich results
@@ -107,8 +108,8 @@ export default async function ArticlePage({ params }) {
     author: [
       {
         "@type": "Person",
-        name: author.name,
-        url: `${baseUrl}/authors/${author.slug}`
+        name: authorName,
+        url: authorSlug ? `${baseUrl}/authors/${authorSlug}` : undefined,
       },
     ],
     publisher: {
@@ -193,7 +194,18 @@ export default async function ArticlePage({ params }) {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[0.75rem] font-medium text-slate-700">
                   {authorName.charAt(0)}
                 </div>
-                <span className="text-slate-700">{authorName}</span>
+
+                {/* ✅ Make author clickable if slug exists (NO UI change) */}
+                {authorSlug ? (
+                  <Link
+                    href={`/authors/${authorSlug}`}
+                    className="text-slate-700"
+                  >
+                    {authorName}
+                  </Link>
+                ) : (
+                  <span className="text-slate-700">{authorName}</span>
+                )}
               </div>
 
               <span className="hidden text-slate-400 sm:inline">•</span>
@@ -265,6 +277,17 @@ export default async function ArticlePage({ params }) {
             />
           </div>
 
+          {/* ✅ Disclaimer (ONLY CHANGE) */}
+          <div className="mt-10 border-t border-slate-200 pt-5">
+            <p className="text-[0.8rem] leading-relaxed text-slate-500">
+              <strong>Disclaimer:</strong> The information provided is not trading
+              advice, coinmarketbuzz.com holds no liability for any investments
+              made based on the information provided on this page. We strongly
+              recommend independent research and/or consultation with a qualified
+              professional before making any investment decisions.
+            </p>
+          </div>
+
           {/* RELATED ARTICLES SECTION */}
           {relatedForMain.length > 0 && (
             <RelatedArticlesSection articles={relatedForMain} />
@@ -304,7 +327,6 @@ function RelatedArticlesSection({ articles }) {
 
   return (
     <section className="mt-10">
-      {/* Heading row with red bar + title */}
       <div className="mb-4 flex items-center gap-2">
         <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
         <h2 className="text-[1rem] sm:text-[1.1rem] font-light text-slate-900">
@@ -312,11 +334,9 @@ function RelatedArticlesSection({ articles }) {
         </h2>
       </div>
 
-      {/* Cards grid */}
       <div className="grid gap-6 md:grid-cols-3 sm:grid-cols-2">
         {normalized.map((a) => (
           <Link key={a.slug} href={`/news/${a.slug}`} className="group block">
-            {/* Image */}
             <div className="relative mb-3 h-44 w-full overflow-hidden rounded-md bg-slate-100 sm:h-48">
               {a.imageUrl ? (
                 <Image
@@ -333,7 +353,6 @@ function RelatedArticlesSection({ articles }) {
               )}
             </div>
 
-            {/* Meta row */}
             <div className="mb-1 text-[0.8rem] font-light text-slate-500">
               {a.category && (
                 <>
@@ -344,7 +363,6 @@ function RelatedArticlesSection({ articles }) {
               {a.date}
             </div>
 
-            {/* Title */}
             <h3 className="line-clamp-3 text-[0.98rem] font-light leading-snug text-slate-900 group-hover:underline underline-offset-[3px]">
               {a.title}
             </h3>
@@ -359,12 +377,8 @@ function normalizeRelated(article) {
   const slug = article.slug || article.id || "#";
   const title = article.headline || article.title || "Untitled article";
   const category =
-    article.category ||
-    article.primaryCategory ||
-    article.tags?.[0] ||
-    "Business";
-  const imageUrl =
-    article.imageUrl || article.heroImageUrl || article.thumbnail || "";
+    article.category || article.primaryCategory || article.tags?.[0] || "Business";
+  const imageUrl = article.imageUrl || article.heroImageUrl || article.thumbnail || "";
 
   const date = article.createdAt
     ? new Date(article.createdAt).toLocaleDateString("en-US", {
@@ -374,11 +388,5 @@ function normalizeRelated(article) {
       })
     : "";
 
-  return {
-    slug,
-    title,
-    category,
-    imageUrl,
-    date,
-  };
+  return { slug, title, category, imageUrl, date };
 }
