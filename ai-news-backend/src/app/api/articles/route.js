@@ -26,7 +26,7 @@ export async function GET(request) {
     // 2. Category Filter
     if (category && category !== 'all') {
       where.tags = {
-        has: category // Tags are stored as Case Sensitive in DB, usually Title Case
+        has: category 
       };
     }
 
@@ -47,7 +47,17 @@ export async function GET(request) {
           tags: true,
           priorityScore: true,
           confidenceScore: true,
-          // NEW: Include source data to populate "Author/Source" in UI
+          
+          // ✅ FIX: Include Author Data for the Grid Cards
+          author: {
+            select: {
+                name: true,
+                slug: true,
+                imageUrl: true,
+                role: true
+            }
+          },
+
           originalNews: {
             select: {
               sourceUrl: true,

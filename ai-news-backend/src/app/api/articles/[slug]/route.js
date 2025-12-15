@@ -4,19 +4,26 @@ import { NextResponse } from 'next/server';
 export const revalidate = 60;
 
 export async function GET(request, { params }) {
-  // ✅ FIX: Await params because Next.js 15+ treats it as a Promise
   const { slug } = await params;
 
-  // 1. Basic Security: Sanitize slug input
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
     return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
   }
 
   try {
-    // 2. Fetch Main Article
     const article = await prisma.generatedArticle.findUnique({
       where: { slug: slug },
       include: {
+        // ✅ FIX: Explicitly include the Author relation
+        author: {
+            select: {
+                name: true,
+                slug: true,
+                imageUrl: true,
+                role: true,
+                bio: true // Include bio if your frontend needs it
+            }
+        },
         originalNews: {
             select: { categoryId: true }
         }
@@ -27,12 +34,11 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Article not found' }, { status: 404 });
     }
 
-    // 3. Fetch Related Articles (Same Tags)
     const relatedArticles = await prisma.generatedArticle.findMany({
       where: {
-        slug: { not: slug }, // Exclude current
+        slug: { not: slug },
         status: 'PUBLISHED',
-        tags: { hasSome: article.tags || [] } // Match any tag
+        tags: { hasSome: article.tags || [] }
       },
       take: 5,
       orderBy: { createdAt: 'desc' },
