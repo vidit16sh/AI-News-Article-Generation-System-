@@ -1,18 +1,28 @@
 import Link from "next/link";
+import Image from "next/image";
+import { Facebook, Instagram, Twitter, Linkedin, Youtube } from "lucide-react";
 
 export default function Footer() {
   return (
     <footer className="mt-10 border-t-4 border-[#d00000] bg-[#050816] text-slate-100">
       <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 sm:py-12">
-        {/* Main layout: left subscribe, right link groups */}
+        {/* Main layout: left brand, right link groups */}
         <div className="grid gap-10 md:grid-cols-[2.1fr_3fr]">
-          {/* Subscribe block */}
+          {/* Brand block */}
           <div>
-            <div className="mb-4 flex items-center gap-2">
-              <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
-              <h2 className="text-[1rem] sm:text-[1.1rem] font-light">
-                Subscribe to Coin Market Buzz
-              </h2>
+            {/* Logo instead of heading */}
+            <div className="mb-4 flex items-center gap-3">
+              <Link href="/" className="inline-flex items-center gap-2">
+                {/* Update src to your actual logo path */}
+                <Image
+                  src="/logo.png"
+                  alt="Coin Market Buzz"
+                  width={140}
+                  height={36}
+                  className="h-[34px] w-auto object-contain"
+                  priority={false}
+                />
+              </Link>
             </div>
 
             <p className="max-w-md text-[0.9rem] leading-relaxed text-slate-300">
@@ -20,64 +30,36 @@ export default function Footer() {
               it&apos;s business, politics, tech or finance, we deliver it in a
               flash—straight to your inbox.
             </p>
-
-            {/* Email "form" UI only – no event handlers */}
-            <div className="mt-5 flex max-w-md flex-col gap-3 sm:flex-row">
-              <input
-                type="email"
-                placeholder="youremail@gmail.com"
-                className="h-11 flex-1 rounded-md border border-slate-600 bg-[#050b1f] px-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-red-500"
-              />
-              <button
-                type="button"
-                className="h-11 rounded-md bg-[#d00000] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[#e00000]"
-              >
-                Subscribe
-              </button>
-            </div>
-
-            <p className="mt-3 max-w-md text-[0.7rem] leading-relaxed text-slate-400">
-              We don&apos;t spam, promised. Only two emails every month, you can
-              opt out anytime with just one click.
-            </p>
           </div>
 
           {/* Link groups: Company / Categories / Social */}
-          <div className="space-y-8 lg:space-y-0 lg:flex lg:items-start lg:justify-between lg:divide-x lg:divide-slate-800">
+          <div className="space-y-8 lg:space-y-0 lg:flex lg:items-start lg:justify-between">
             {/* Company */}
             <FooterColumn title="Company">
               <FooterLink href="/about">About</FooterLink>
-              <FooterLink href="/careers">Careers</FooterLink>
               <FooterLink href="/authors">Authors</FooterLink>
-              <FooterLink href="/advertise">Advertise</FooterLink>
               <FooterLink href="/contact">Contact</FooterLink>
             </FooterColumn>
 
-            {/* Categories */}
+            {/* Categories - ONE column now */}
             <FooterColumn title="Categories" className="lg:pl-8">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-[0.85rem]">
-                <FooterLink href="/category/business">Business</FooterLink>
-                <FooterLink href="/category/finance">Finance</FooterLink>
-                <FooterLink href="/category/health">Health</FooterLink>
-                <FooterLink href="/category/politics">Politics</FooterLink>
-                <FooterLink href="/category/fashion">Fashion</FooterLink>
-                <FooterLink href="/category/real-estate">Real Estate</FooterLink>
-                <FooterLink href="/category/travel">Travel</FooterLink>
-                <FooterLink href="/category/entertainment">
-                  Entertainment
-                </FooterLink>
-                <FooterLink href="/category/sports">Sports</FooterLink>
-                <FooterLink href="/category/tech">Tech</FooterLink>
-              </div>
+              <FooterLink href="/category/business">Business</FooterLink>
+              <FooterLink href="/category/finance">Finance</FooterLink>
+              <FooterLink href="/category/sports">Sports</FooterLink>
+              <FooterLink href="/category/tech">Tech</FooterLink>
+              <FooterLink href="/category/politics">Politics</FooterLink>
+              <FooterLink href="/category/crypto">Crypto</FooterLink>
+              <FooterLink href="/category/ai">AI</FooterLink>
+              <FooterLink href="/category/world">World</FooterLink>
             </FooterColumn>
 
-            {/* Social media */}
+            {/* Social media with icons */}
             <FooterColumn title="Social Media" className="lg:pl-8">
-              <FooterSocial label="Facebook" />
-              <FooterSocial label="Instagram" />
-              <FooterSocial label="Twitter" />
-              <FooterSocial label="LinkedIn" />
-              <FooterSocial label="YouTube" />
+              <FooterSocial label="Facebook" Icon={Facebook} href="#" />
+              <FooterSocial label="Instagram" Icon={Instagram} href="#" />
+              <FooterSocial label="Twitter" Icon={Twitter} href="#" />
+              <FooterSocial label="LinkedIn" Icon={Linkedin} href="#" />
+              <FooterSocial label="YouTube" Icon={Youtube} href="#" />
             </FooterColumn>
           </div>
         </div>
@@ -95,9 +77,7 @@ function FooterColumn({ title, className = "", children }) {
         <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
         <h3 className="text-[0.95rem] font-light text-slate-100">{title}</h3>
       </div>
-      <div className="space-y-1 text-[0.85rem] text-slate-300">
-        {children}
-      </div>
+      <div className="space-y-1 text-[0.85rem] text-slate-300">{children}</div>
     </div>
   );
 }
@@ -113,13 +93,17 @@ function FooterLink({ href, children }) {
   );
 }
 
-function FooterSocial({ label }) {
+function FooterSocial({ label, Icon, href }) {
   return (
-    <div className="flex items-center gap-2 text-[0.85rem] text-slate-300 hover:text-white">
-      <span className="h-4 w-4 rounded-full border border-slate-500 flex items-center justify-center text-[0.55rem]">
-        ●
+    <Link
+      href={href}
+      className="flex items-center gap-2 text-[0.85rem] text-slate-300 hover:text-white"
+      aria-label={label}
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-[#050b1f]">
+        <Icon className="h-4 w-4" />
       </span>
       <span>{label}</span>
-    </div>
+    </Link>
   );
 }
