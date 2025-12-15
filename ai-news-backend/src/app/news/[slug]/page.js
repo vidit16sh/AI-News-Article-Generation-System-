@@ -83,7 +83,6 @@ export default async function ArticlePage({ params }) {
       })
     : "";
 
-  // ✅ Use author stored in DB; fallback only if missing
   const author = article.author || {
     name: "Editorial Team",
     role: "AI News Desk",
@@ -93,51 +92,15 @@ export default async function ArticlePage({ params }) {
 
   const authorName = author?.name || "Editorial Team";
   const authorSlug = author?.slug || null;
-
   const readingTime = article.readingTime || "3";
 
-  // JSON-LD for Google News / rich results
-  const jsonLd = article.newsJsonLd || {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: article.headline,
-    description: article.metaDescription || article.excerpt || article.headline,
-    image: article.imageUrl ? [article.imageUrl] : [],
-    datePublished: article.createdAt,
-    dateModified: article.updatedAt || article.createdAt,
-    author: [
-      {
-        "@type": "Person",
-        name: authorName,
-        url: authorSlug ? `${baseUrl}/authors/${authorSlug}` : undefined,
-      },
-    ],
-    publisher: {
-      "@type": "Organization",
-      name: "Crypto AI News",
-      logo: {
-        "@type": "ImageObject",
-        url: `${baseUrl}/logo.png`,
-      },
-    },
-    mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": articleUrl,
-    },
-  };
-
-  const sidebarArticles = Array.isArray(relatedArticles) ? relatedArticles : [];
-  const relatedForMain = sidebarArticles.slice(0, 6); // up to 6 related cards
+  const sidebarArticles = Array.isArray(relatedArticles)
+    ? relatedArticles
+    : [];
+  const relatedForMain = sidebarArticles.slice(0, 6);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-0">
-      {/* JSON-LD */}
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-
+    <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-0">
       {/* Breadcrumbs */}
       <nav
         aria-label="Breadcrumb"
@@ -165,9 +128,7 @@ export default async function ArticlePage({ params }) {
         </ol>
       </nav>
 
-      {/* Layout wrapper – Increased gap to gap-12 for better separation */}
       <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-12">
-        
         {/* MAIN ARTICLE COLUMN */}
         <main
           className="lg:pr-0"
@@ -193,26 +154,37 @@ export default async function ArticlePage({ params }) {
             <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100">
-                   {author.imageUrl ? (
-                       <Image src={author.imageUrl} alt={authorName} width={40} height={40} className="object-cover" />
-                   ) : (
-                       <span className="text-sm font-bold text-slate-500">{authorName.charAt(0)}</span>
-                   )}
+                  {author.imageUrl ? (
+                    <Image
+                      src={author.imageUrl}
+                      alt={authorName}
+                      width={40}
+                      height={40}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-slate-500">
+                      {authorName.charAt(0)}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-col text-sm">
-                    {/* ✅ Make author clickable if slug exists */}
-                    {authorSlug ? (
-                      <Link
-                        href={`/authors/${authorSlug}`}
-                        className="font-semibold text-slate-900 hover:underline"
-                      >
-                        {authorName}
-                      </Link>
-                    ) : (
-                      <span className="font-semibold text-slate-900">{authorName}</span>
-                    )}
-                    <span className="text-slate-500">{author.role || "Contributor"}</span>
+                  {authorSlug ? (
+                    <Link
+                      href={`/authors/${authorSlug}`}
+                      className="font-semibold text-slate-900 hover:underline"
+                    >
+                      {authorName}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-slate-900">
+                      {authorName}
+                    </span>
+                  )}
+                  <span className="text-slate-500">
+                    {author.role || "Contributor"}
+                  </span>
                 </div>
               </div>
 
@@ -254,7 +226,7 @@ export default async function ArticlePage({ params }) {
 
           {/* Content Body Layout */}
           <div className="relative flex gap-8">
-            {/* Share column – desktop sticky */}
+            {/* Share column */}
             <div className="hidden lg:block lg:w-12 lg:flex-none">
               <div className="sticky top-32 flex flex-col gap-4">
                 <ShareIcon label="Facebook" abbr="F" />
@@ -263,48 +235,43 @@ export default async function ArticlePage({ params }) {
                 <ShareIcon label="Email" abbr="@" />
               </div>
             </div>
-
-            {/* Article body – FIXED: Clean class string without comments */}
-      <section
-  itemProp="articleBody"
-  className="
-    prose prose-lg prose-slate max-w-none flex-1
-    prose-h1:hidden
-    prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
-    prose-h2:mt-14 prose-h2:mb-6 prose-h2:text-3xl prose-h2:border-b prose-h2:border-slate-200 prose-h2:pb-2
-    prose-h3:mt-10 prose-h3:mb-4 prose-h3:text-2xl
-    prose-p:leading-8 prose-p:text-slate-700 prose-p:my-7
-    prose-li:text-slate-700 prose-li:my-3
-    prose-a:font-medium prose-a:text-blue-600 prose-a:no-underline prose-a:transition hover:prose-a:text-blue-800 hover:prose-a:underline
-    prose-blockquote:border-l-4 prose-blockquote:border-blue-600 prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:not-italic prose-blockquote:font-medium prose-blockquote:text-slate-800 prose-blockquote:rounded-r-lg
-    prose-img:rounded-xl prose-img:shadow-md prose-img:my-10
-    prose-strong:font-bold prose-strong:text-slate-900
-  "
-  dangerouslySetInnerHTML={{ __html: article.articleHtml }}
-/>
+      {/* Article body */}
+            <section
+              itemProp="articleBody"
+              className="
+                article-prose
+                prose prose-lg max-w-none
+                prose-h1:hidden
+                prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.75rem] prose-h2:font-semibold prose-h2:tracking-tight
+                prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.35rem] prose-h3:font-semibold
+                prose-p:text-slate-800 prose-p:leading-[1.85]
+                prose-ul:my-4 prose-ol:my-4
+                prose-li:my-1
+                prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900
+                prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4
+                prose-blockquote:not-italic
+                prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline
+              "
+              dangerouslySetInnerHTML={{ __html: article.articleHtml }}
+            />
           </div>
 
-          {/* ✅ Disclaimer */}
+          {/* Disclaimer */}
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
               <strong>Disclaimer:</strong> The information provided is not trading
-              advice, coinmarketbuzz.com holds no liability for any investments
-              made based on the information provided on this page. We strongly
-              recommend independent research and/or consultation with a qualified
-              professional before making any investment decisions.
+              advice. CoinMarketBuzz holds no liability for investment decisions.
             </p>
           </div>
 
-          {/* RELATED ARTICLES SECTION */}
+          {/* RELATED ARTICLES */}
           {relatedForMain.length > 0 && (
             <RelatedArticlesSection articles={relatedForMain} />
           )}
         </main>
 
-        {/* VERTICAL DIVIDER – very thin line, desktop only */}
         <div className="hidden h-full w-px bg-slate-200 lg:block" />
 
-        {/* RIGHT SIDEBAR – sticky on desktop */}
         <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:pl-4">
           <RightSidebar />
         </aside>
@@ -313,7 +280,7 @@ export default async function ArticlePage({ params }) {
   );
 }
 
-/* --------- Small share icon component --------- */
+/* --------- Share Icon --------- */
 
 function ShareIcon({ label, abbr }) {
   return (
@@ -344,32 +311,7 @@ function RelatedArticlesSection({ articles }) {
       <div className="grid gap-8 md:grid-cols-3 sm:grid-cols-2">
         {normalized.map((a) => (
           <Link key={a.slug} href={`/news/${a.slug}`} className="group block">
-            <div className="relative mb-4 aspect-[3/2] w-full overflow-hidden rounded-lg bg-slate-100 shadow-sm">
-              {a.imageUrl ? (
-                <Image
-                  src={a.imageUrl}
-                  alt={a.title}
-                  fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  sizes="(max-width: 768px) 100vw, 360px"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-slate-300">
-                  <span className="text-4xl">📰</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-500">
-              {a.category && (
-                <span className="text-blue-600 uppercase tracking-wide">
-                  {a.category}
-                </span>
-              )}
-              {a.date && <span>• {a.date}</span>}
-            </div>
-
-            <h3 className="line-clamp-2 text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-700 transition-colors">
+            <h3 className="text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-700 transition-colors">
               {a.title}
             </h3>
           </Link>
@@ -384,7 +326,8 @@ function normalizeRelated(article) {
   const title = article.headline || article.title || "Untitled article";
   const category =
     article.category || article.primaryCategory || article.tags?.[0] || "Business";
-  const imageUrl = article.imageUrl || article.heroImageUrl || article.thumbnail || "";
+  const imageUrl =
+    article.imageUrl || article.heroImageUrl || article.thumbnail || "";
 
   const date = article.createdAt
     ? new Date(article.createdAt).toLocaleDateString("en-US", {

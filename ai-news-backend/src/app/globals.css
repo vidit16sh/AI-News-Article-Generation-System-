@@ -84,7 +84,7 @@ html {
 
 body {
   margin: 0;
-  @apply bg-white text-slate-900; /* Uses Tailwind for colors */
+  @apply bg-white text-slate-900;
   font-family: "Satoshi", sans-serif;
 }
 
@@ -114,9 +114,65 @@ a {
   background: #6b7280;
 }
 
+/* --- Article Prose (Cointribune-style spacing) --- */
+@layer components {
+  .article-prose.prose {
+    font-size: 1.06rem;
+    line-height: 1.9;
+  }
 
-.prose p {
-  margin-top: 1.5em;
-  margin-bottom: 1.5em;
-  line-height: 1.75;
+  .article-prose.prose p {
+    margin: 0.75rem 0 !important;
+    line-height: 1.9 !important;
+  }
+
+  .article-prose.prose h2 {
+    margin-top: 3rem !important;
+    margin-bottom: 0.75rem !important;
+    font-weight: 700;
+  }
+
+  .article-prose.prose h3 {
+    margin-top: 2rem !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 700;
+  }
+
+  .article-prose.prose ul,
+  .article-prose.prose ol {
+    margin: 1rem 0 1.25rem !important;
+    padding-left: 1.25rem !important;
+  }
+
+  .article-prose.prose li {
+    margin: 0.25rem 0 !important;
+  }
+
+  .article-prose.prose blockquote {
+    position: relative;
+    margin: 2rem 0 !important;
+    padding: 1.25rem 1.5rem !important;
+    background: #f8fafc !important;
+    border-left: 4px solid #2563eb !important;
+  }
+
+  .article-prose.prose blockquote::before {
+    content: "In brief";
+    position: absolute;
+    top: -0.75rem;
+    left: 1rem;
+    background: #2563eb;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .article-prose.prose blockquote > ul,
+  .article-prose.prose blockquote > ol {
+    margin: 0 !important;
+  }
 }

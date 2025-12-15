@@ -2,17 +2,17 @@ import OpenAI from "openai";
 
 // 🔌 Connect to DeepSeek via OpenAI SDK
 const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: process.env.DEEPSEEK_API_KEY
+  baseURL: "https://api.deepseek.com",
+  apiKey: process.env.DEEPSEEK_API_KEY,
 });
 
 // DeepSeek V3 Configuration
 const MODEL_CONFIG = {
-    model: "deepseek-chat", 
-    temperature: 0.1,       // Low temp is CRITICAL for following your strict formatting rules
-    max_tokens: 8192,
-    top_p: 0.9,
-    response_format: { type: "json_object" } 
+  model: "deepseek-chat",
+  temperature: 0.1, // Low temp is CRITICAL for following your strict formatting rules
+  max_tokens: 8192,
+  top_p: 0.9,
+  response_format: { type: "json_object" },
 };
 
 // 🛡️ OPTIMIZED SYSTEM PROMPT (Google News Standard - Efficient Version)
@@ -47,6 +47,36 @@ Output must be **STRICT JSON ONLY**.
 10. Conclusion (Contains Focus Keyword)
 
 ============================================================
+2B. HTML OUTPUT RULES (STRICT)
+============================================================
+- Use headings ONLY as <h1>, <h2>, <h3>. NEVER put a heading inside <p>.
+  Bad: <p>What Happened</p>
+  Good: <h2>What Happened</h2>
+
+- Paragraphs:
+  - Use <p> only for real paragraph text (2–4 sentences).
+  - Avoid single-line or “micro” paragraphs unless it is the dateline.
+  - Merge closely related sentences into the same <p>.
+
+- Heading Flow:
+  - After every <h2> or <h3>, the next element MUST be <p>, <blockquote>, or <ul>.
+  - NEVER wrap lists or blockquotes inside <p> tags.
+
+- Lists:
+  - If there are 3 or more related points, use <ul><li> instead of multiple <p>.
+  - Each <li> should contain one clear sentence.
+
+- FAQs:
+  - Format EACH FAQ as:
+    <p><strong>Question?</strong> Answer...</p>
+  - Do NOT split questions and answers into separate paragraphs.
+
+- Clean HTML:
+  - No empty tags.
+  - No <p><br/></p>.
+  - No visual spacing tricks.
+
+============================================================
 3. READABILITY (Grade 6-8)
 ============================================================
 - **Simple:** Write for a smart 12-year-old.
@@ -79,33 +109,41 @@ Output must be **STRICT JSON ONLY**.
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
-    try {
-        let clean = text.replace(/```json/g, '').replace(/```/g, '');
-        const firstOpen = clean.indexOf('{');
-        const lastClose = clean.lastIndexOf('}');
-        
-        if (firstOpen !== -1 && lastClose !== -1) {
-            clean = clean.substring(firstOpen, lastClose + 1);
-        }
-        clean = clean.replace(/<br\s*\/?>/gi, "");
-        return JSON.parse(clean);
-    } catch (e) {
-        console.error("❌ JSON Repair Failed Snippet:", text.substring(0, 100));
-        throw new Error("AI produced invalid JSON");
+  try {
+    let clean = text.replace(/```json/g, "").replace(/```/g, "");
+    const firstOpen = clean.indexOf("{");
+    const lastClose = clean.lastIndexOf("}");
+
+    if (firstOpen !== -1 && lastClose !== -1) {
+      clean = clean.substring(firstOpen, lastClose + 1);
     }
+    clean = clean.replace(/<br\s*\/?>/gi, "");
+    return JSON.parse(clean);
+  } catch (e) {
+    console.error("❌ JSON Repair Failed Snippet:", text.substring(0, 100));
+    throw new Error("AI produced invalid JSON");
+  }
 };
 
 // 🚑 SMART MANUAL FALLBACK
 const generateFallbackArticle = (data) => {
-    console.log("⚠️ Triggering Smart Manual Fallback...");
-    
-    const safeDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    const paragraphs = data.content ? data.content.split('\n').filter(p => p.length > 20 && p.length < 200) : [];
-    const categoryName = data.category?.name || "Crypto";
-    
-    let htmlContent = `
+  console.log("⚠️ Triggering Smart Manual Fallback...");
+
+  const safeDate = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const paragraphs = data.content
+    ? data.content.split("\n").filter((p) => p.length > 20 && p.length < 200)
+    : [];
+  const categoryName = data.category?.name || "Crypto";
+
+  let htmlContent = `
         <h1>${data.title}</h1>
-        <p><strong>NEW YORK, ${safeDate}</strong> — ${data.summary || "Here is the latest update."}</p>
+        <p><strong>NEW YORK, ${safeDate}</strong> — ${
+    data.summary || "Here is the latest update."
+  }</p>
         
         <blockquote>
             <ul>
@@ -116,44 +154,57 @@ const generateFallbackArticle = (data) => {
         </blockquote>
 
         <h2>What Happened</h2>
-        <p>There is a new development regarding <strong>${data.title}</strong>. This is important for traders and investors in the ${categoryName} space.</p>
+        <p>There is a new development regarding <strong>${
+          data.title
+        }</strong>. This is important for traders and investors in the ${categoryName} space.</p>
         
         <h2>The Details</h2>
     `;
 
-    if (paragraphs.length > 0) {
-        paragraphs.slice(0, 4).forEach(p => {
-            htmlContent += `<p>${p}</p>`;
-        });
-    }
+  if (paragraphs.length > 0) {
+    paragraphs.slice(0, 4).forEach((p) => {
+      htmlContent += `<p>${p}</p>`;
+    });
+  }
 
-    htmlContent += `
+  htmlContent += `
         <h2>Source</h2>
         <p>This story relies on data from <strong><a href="${data.sourceUrl}" target="_blank" rel="nofollow">this report</a></strong>.</p>
     `;
 
-    return {
-        headline: data.title,
-        slug: data.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-'),
-        meta_description: data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
-        article_html: htmlContent,
-        tags: [categoryName, "News"],
-        keywords: [categoryName, "Cryptocurrency"],
-        focus_keywords: categoryName,
-        featured_image_alt: `News about ${data.title}`,
-        confidence: 0.5 
-    };
+  return {
+    headline: data.title,
+    slug: data.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-"),
+    meta_description:
+      data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
+    article_html: htmlContent,
+    tags: [categoryName, "News"],
+    keywords: [categoryName, "Cryptocurrency"],
+    focus_keywords: categoryName,
+    featured_image_alt: `News about ${data.title}`,
+    confidence: 0.5,
+  };
 };
 
 export const generateArticle = async (cleanedNewsData) => {
-    const MAX_RETRIES = 2;
-    
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const categorySlug = cleanedNewsData.category?.name?.toLowerCase().replace(/\s+/g, '-') || "crypto";
-            const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const MAX_RETRIES = 2;
 
-            const userPrompt = `
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const categorySlug =
+        cleanedNewsData.category?.name?.toLowerCase().replace(/\s+/g, "-") ||
+        "crypto";
+      const dateStr = new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+
+      const userPrompt = `
             ### INPUT SOURCE DATA
             **Headline:** ${cleanedNewsData.title}
             **Category:** ${cleanedNewsData.category.name}
@@ -172,40 +223,42 @@ export const generateArticle = async (cleanedNewsData) => {
             3. **Dateline:** Start with: <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
             `;
 
-            const completion = await openai.chat.completions.create({
-                model: MODEL_CONFIG.model,
-                messages: [
-                    { role: "system", content: SYSTEM_PROMPT },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature: MODEL_CONFIG.temperature,
-                max_tokens: MODEL_CONFIG.max_tokens,
-                top_p: MODEL_CONFIG.top_p,
-                response_format: MODEL_CONFIG.response_format
-            });
+      const completion = await openai.chat.completions.create({
+        model: MODEL_CONFIG.model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: MODEL_CONFIG.temperature,
+        max_tokens: MODEL_CONFIG.max_tokens,
+        top_p: MODEL_CONFIG.top_p,
+        response_format: MODEL_CONFIG.response_format,
+      });
 
-            const text = completion.choices[0].message.content;
-            const json = cleanJsonOutput(text);
+      const text = completion.choices[0].message.content;
+      const json = cleanJsonOutput(text);
 
-            if (!json || typeof json !== 'object') {
-                throw new Error("Parsed JSON is null or invalid.");
-            }
+      if (!json || typeof json !== "object") {
+        throw new Error("Parsed JSON is null or invalid.");
+      }
 
-            // Self-Healing: Guarantee the Source Link exists
-            if (!json.article_html.includes('href="http') && !json.article_html.includes("href='http")) {
-                json.article_html += `<p>Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
-            }
+      // Self-Healing: Guarantee the Source Link exists
+      if (
+        !json.article_html.includes('href="http') &&
+        !json.article_html.includes("href='http")
+      ) {
+        json.article_html += `<p>Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
+      }
 
-            return json; 
+      return json;
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt} Failed:`, error.message);
 
-        } catch (error) {
-            console.error(`❌ Attempt ${attempt} Failed:`, error.message);
-            
-            if (attempt < MAX_RETRIES) {
-                await new Promise(res => setTimeout(res, 2000));
-            }
-        }
+      if (attempt < MAX_RETRIES) {
+        await new Promise((res) => setTimeout(res, 2000));
+      }
     }
+  }
 
-    return generateFallbackArticle(cleanedNewsData);
+  return generateFallbackArticle(cleanedNewsData);
 };
