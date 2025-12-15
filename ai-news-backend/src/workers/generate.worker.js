@@ -105,7 +105,26 @@ const processGenerationJob = async (msg, channel) => {
         // 2. Generate Text
         console.log(`   🧠 Writing: "${cleanNews.title.substring(0, 30)}..."`);
         const aiOutput = await limiter.schedule(() => generateArticle(cleanNews));
+        
+        if (aiOutput.status === 'WEAK') {
+            console.warn(`   🗑️ Discarding WEAK article: "${aiOutput.headline}" (Generation Failed)`);
+            channel.ack(msg); // Ack to remove from queue so we don't retry forever
+            return;
+        } 
+        
+        let finalStatus = "DRAFT"; 
 
+        if (priorityScore > 80) {
+            finalStatus = "PUBLISHED";
+        } else if (priorityScore >= 60) {
+            finalStatus = "QUEUED";
+        } else if (priorityScore >= 45) {
+            finalStatus = "DRAFT";
+        } else {
+            console.warn(`   🗑️ Discarding LOW SCORE article: ${priorityScore} (Threshold is 45)`);
+            channel.ack(msg);
+            return;
+        }
         // 3. Generate Image
         console.log(`   🎨 Generating Image (Fal.ai)...`);
         let imageUrl = await generateImage(aiOutput.headline);
@@ -125,7 +144,8 @@ const processGenerationJob = async (msg, channel) => {
         const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
 
         // 5. Determine Status
-        let status = "DRAFT";
+        let status = aiOutput.status || "DRAFT"; 
+        
         const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20;
         
         if (isHighQuality) {

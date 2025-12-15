@@ -40,7 +40,12 @@ const SEO_STRATEGY = {
     "Virtual currency updates",
     "Defi news updates",
   ],
-};
+}; 
+
+const FORBIDDEN_WORDS = [
+  "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
+  "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore"
+];
 
 // 🛡️ FINAL PRODUCTION SYSTEM PROMPT (DeepSeek Optimized - Competitor Killer)
 const SYSTEM_PROMPT = `
@@ -141,70 +146,67 @@ const cleanJsonOutput = (text) => {
     console.error("❌ JSON Repair Failed Snippet:", text.substring(0, 100));
     throw new Error("AI produced invalid JSON");
   }
+}; 
+
+
+const auditAndFixArticle = (json) => {
+  let html = json.article_html || ""; // Safety: Default to empty string
+  let score = 100;
+  
+  // A. Forbidden Word Remover (Auto-Fix)
+  FORBIDDEN_WORDS.forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    if (regex.test(html)) {
+      html = html.replace(regex, ""); // Silently remove the word
+      score -= 5;
+    }
+  });
+
+  // B. Length Check (Critical Failure)
+  const wordCount = html.replace(/<[^>]*>/g, '').split(/\s+/).length;
+  if (wordCount < 500) { 
+    throw new Error(`Article too short: ${wordCount} words. Minimum 500 required.`);
+  }
+
+  // C. Headline Keyword Check (Safety Patched)
+  if (json.headline && json.focus_keywords) { // 👈 Added check to prevent crash
+      if (!json.headline.toLowerCase().includes(json.focus_keywords.toLowerCase())) {
+        json.headline = `${json.focus_keywords}: ${json.headline}`;
+      }
+  }
+
+  
+  json.article_html = html; 
+  json.confidence = score / 100; 
+  return json;
 };
 
 // 🚑 SMART MANUAL FALLBACK
 const generateFallbackArticle = (data) => {
-  console.log("⚠️ Triggering Smart Manual Fallback...");
-
-  const safeDate = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-  const paragraphs = data.content
-    ? data.content.split("\n").filter((p) => p.length > 20 && p.length < 200)
-    : [];
+  console.log("⚠️ Triggering Safe Mode Fallback...");
+  const safeDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  
+  // Tag as "Market Brief" so users know it's short
   const categoryName = data.category?.name || "Crypto";
-
-  let htmlContent = `
-        <h1>${data.title}</h1>
-        <p><strong>NEW YORK, ${safeDate}</strong> — ${
-    data.summary || "Here is the latest update."
-  }</p>
-        
-        <blockquote>
-            <ul>
-                <li>Breaking news in the ${categoryName} sector.</li>
-                <li>Analysts are monitoring the situation closely.</li>
-                <li>Full details and context provided below.</li>
-            </ul>
-        </blockquote>
-
-        <h2>What Happened</h2>
-        <p>There is a new development regarding <strong>${
-          data.title
-        }</strong>. This is important for traders and investors in the ${categoryName} space.</p>
-        
-        <h2>The Details</h2>
-    `;
-
-  if (paragraphs.length > 0) {
-    paragraphs.slice(0, 4).forEach((p) => {
-      htmlContent += `<p>${p}</p>`;
-    });
-  }
-
-  htmlContent += `
-        <h2>Source</h2>
-        <p>This story relies on data from <strong><a href="${data.sourceUrl}" target="_blank" rel="nofollow">this report</a></strong>.</p>
-    `;
-
+  
   return {
     headline: data.title,
-    slug: data.title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-"),
-    meta_description:
-      data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
-    article_html: htmlContent,
-    tags: [categoryName, "News"],
-    keywords: [categoryName, "Cryptocurrency"],
+    slug: data.title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-"),
+    meta_description: data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
+    // Simplified structure for fallback
+    article_html: `
+        <h1>${data.title}</h1>
+        <p><strong>NEW YORK, ${safeDate}</strong> — ${data.summary}</p>
+        <blockquote><ul><li>Developing Story: Details are still emerging.</li><li>Category: ${categoryName} Market Update.</li></ul></blockquote>
+        <h2>Market Update</h2>
+        <p>We are tracking a developing story regarding <strong>${data.title}</strong>. Data indicates significant activity in the ${categoryName} sector.</p>
+        <p>This report relies on data from <strong><a href="${data.sourceUrl}" target="_blank" rel="nofollow">the original report</a></strong>. CoinMarketBuzz analysts are reviewing the details and will update this analysis shortly.</p>
+    `,
+    tags: [categoryName, "Market Brief"], // Special tag
+    keywords: [categoryName, "Crypto News"],
     focus_keywords: categoryName,
-    featured_image_alt: `News about ${data.title}`,
-    confidence: 0.5,
+    status: "WEAK", // 🚨 SAFETY: Save as DRAFT so a human must review before publishing
+    confidence: 0.1,
   };
 };
 
@@ -258,13 +260,15 @@ export const generateArticle = async (cleanedNewsData) => {
       });
 
       const text = completion.choices[0].message.content;
-      const json = cleanJsonOutput(text);
+      
+      // 1. Basic JSON Clean
+      let json = cleanJsonOutput(text);
 
       if (!json || typeof json !== "object") {
         throw new Error("Parsed JSON is null or invalid.");
       }
 
-      // Self-Healing: Guarantee the Source Link exists
+      // 2. Self-Healing: Add Source Link if missing
       if (
         !json.article_html.includes('href="http') &&
         !json.article_html.includes("href='http")
@@ -272,7 +276,11 @@ export const generateArticle = async (cleanedNewsData) => {
         json.article_html += `<p>Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
       }
 
-      return json;
+      // 3. 🚨 SAFETY NET: Run the Auditor
+      // This will THROW an error if content is too short, triggering a retry
+      json = auditAndFixArticle(json); 
+
+      return { ...json, status: "STRONG" };
     } catch (error) {
       console.error(`❌ Attempt ${attempt} Failed:`, error.message);
 
