@@ -3,8 +3,12 @@ import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 
 export const metadata = {
-  title: "CoinMarketBuzz",
-  description: "CoinMarketBuzz curates crypto, AI, and tech news from top sources and expands them into AI-generated explainers for fast, informed reading.",
+  title: {
+    template: '%s | CoinMarketBuzz - Crypto News & Market Updates',
+    default: 'CoinMarketBuzz | Latest Cryptocurrency News, Bitcoin Prices & Ethereum Updates',
+  },
+  description: "Your daily source for breaking cryptocurrency news, live crypto prices, and market analysis. Get updates on Bitcoin, Ethereum, Shiba Inu, and DeFi trends.",
+  keywords: ["Cryptocurrency news", "Bitcoin news", "Ethereum news", "Crypto market updates", "Crypto prices live", "Blockchain news"], // ✅ Added Client Keywords
   alternates: {
     types: {
       'application/rss+xml': [
