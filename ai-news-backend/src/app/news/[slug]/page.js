@@ -141,17 +141,17 @@ export default async function ArticlePage({ params }) {
       {/* Breadcrumbs */}
       <nav
         aria-label="Breadcrumb"
-        className="mb-4 text-xs font-medium text-slate-500"
+        className="mb-6 text-xs font-medium text-slate-500"
       >
         <ol className="flex flex-wrap items-center gap-1">
           <li>
-            <Link href="/" className="hover:text-slate-800">
+            <Link href="/" className="hover:text-slate-800 transition-colors">
               Home
             </Link>
           </li>
           <li>/</li>
           <li>
-            <Link href="/news" className="hover:text-slate-800">
+            <Link href="/news" className="hover:text-slate-800 transition-colors">
               News
             </Link>
           </li>
@@ -165,62 +165,67 @@ export default async function ArticlePage({ params }) {
         </ol>
       </nav>
 
-      {/* Layout wrapper – match home page spacing more closely */}
-      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-0">
+      {/* Layout wrapper – Increased gap to gap-12 for better separation */}
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-12">
+        
         {/* MAIN ARTICLE COLUMN */}
         <main
-          className="lg:pr-8"
+          className="lg:pr-0"
           itemScope
           itemType="https://schema.org/NewsArticle"
         >
           {/* Top meta section */}
-          <header className="mb-4 border-b border-slate-200 pb-4">
-            <div className="mb-3">
-              <span className="inline-flex items-center rounded-md border border-red-100 bg-red-50 px-3 py-1 text-[0.7rem] font-medium tracking-wide text-red-600">
+          <header className="mb-8 border-b border-slate-200 pb-8">
+            <div className="mb-4">
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">
                 {category}
               </span>
             </div>
 
             <h1
               itemProp="headline"
-              className="mb-4 text-3xl font-light leading-tight text-slate-900 sm:text-[2.2rem]"
+              className="mb-6 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-[2.75rem]"
             >
               {article.headline}
             </h1>
 
             {/* Author row */}
-            <div className="flex flex-wrap items-center gap-3 text-[0.8rem] text-slate-500">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[0.75rem] font-medium text-slate-700">
-                  {authorName.charAt(0)}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+                   {author.imageUrl ? (
+                       <Image src={author.imageUrl} alt={authorName} width={40} height={40} className="object-cover" />
+                   ) : (
+                       <span className="text-sm font-bold text-slate-500">{authorName.charAt(0)}</span>
+                   )}
                 </div>
 
-                {/* ✅ Make author clickable if slug exists (NO UI change) */}
-                {authorSlug ? (
-                  <Link
-                    href={`/authors/${authorSlug}`}
-                    className="text-slate-700"
-                  >
-                    {authorName}
-                  </Link>
-                ) : (
-                  <span className="text-slate-700">{authorName}</span>
-                )}
+                <div className="flex flex-col text-sm">
+                    {/* ✅ Make author clickable if slug exists */}
+                    {authorSlug ? (
+                      <Link
+                        href={`/authors/${authorSlug}`}
+                        className="font-semibold text-slate-900 hover:underline"
+                      >
+                        {authorName}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-slate-900">{authorName}</span>
+                    )}
+                    <span className="text-slate-500">{author.role || "Contributor"}</span>
+                </div>
               </div>
 
-              <span className="hidden text-slate-400 sm:inline">•</span>
-
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-4 text-sm text-slate-500">
                 {publishedDate && (
                   <time
                     itemProp="datePublished"
                     dateTime={article.createdAt}
-                    className="text-slate-500"
                   >
                     {publishedDate}
                   </time>
                 )}
-                <span className="text-slate-400">•</span>
+                <span>·</span>
                 <span>{readingTime} min read</span>
               </div>
             </div>
@@ -228,58 +233,60 @@ export default async function ArticlePage({ params }) {
 
           {/* Hero image */}
           {article.imageUrl && (
-            <figure className="mb-8 overflow-hidden rounded-md bg-slate-100">
-              <div className="relative h-64 w-full sm:h-80 lg:h-[420px]">
+            <figure className="mb-10 overflow-hidden rounded-2xl shadow-sm">
+              <div className="relative aspect-[16/9] w-full bg-slate-100">
                 <Image
                   src={article.imageUrl}
                   alt={article.headline}
                   fill
                   priority
                   className="object-cover"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 800px"
+                  sizes="(max-width: 768px) 100vw, 800px"
                 />
               </div>
               {article.imageCaption && (
-                <figcaption className="px-2 py-2 text-[0.7rem] text-slate-500 sm:px-0">
+                <figcaption className="mt-3 text-center text-sm italic text-slate-500">
                   {article.imageCaption}
                 </figcaption>
               )}
             </figure>
           )}
 
-          {/* Body + share bar (desktop) */}
-          <div className="lg:flex lg:items-start lg:gap-6">
-            {/* Share column – desktop only */}
-            <div className="hidden text-slate-400 lg:flex lg:flex-col lg:items-center lg:gap-4 lg:pt-1">
-              <span className="text-[0.65rem] uppercase tracking-[0.18em] text-slate-400">
-                Share
-              </span>
-              <ShareIcon label="Facebook" abbr="f" />
-              <ShareIcon label="Twitter" abbr="t" />
-              <ShareIcon label="LinkedIn" abbr="in" />
-              <ShareIcon label="Email" abbr="@" />
+          {/* Content Body Layout */}
+          <div className="relative flex gap-8">
+            {/* Share column – desktop sticky */}
+            <div className="hidden lg:block lg:w-12 lg:flex-none">
+              <div className="sticky top-32 flex flex-col gap-4">
+                <ShareIcon label="Facebook" abbr="F" />
+                <ShareIcon label="Twitter" abbr="T" />
+                <ShareIcon label="LinkedIn" abbr="L" />
+                <ShareIcon label="Email" abbr="@" />
+              </div>
             </div>
 
-            {/* Article body – spacing tuned for readability */}
-            <section
-              itemProp="articleBody"
-              className="
-                prose prose-slate max-w-none
-                prose-p:my-5
-                prose-p:text-[0.97rem]
-                prose-li:my-2
-                prose-headings:mt-8 prose-headings:mb-3
-                prose-headings:font-semibold
-                prose-a:text-blue-600 hover:prose-a:text-blue-700
-                leading-relaxed
-              "
-              dangerouslySetInnerHTML={{ __html: article.articleHtml }}
-            />
+            {/* Article body – FIXED: Clean class string without comments */}
+      <section
+  itemProp="articleBody"
+  className="
+    prose prose-lg prose-slate max-w-none flex-1
+    prose-h1:hidden
+    prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
+    prose-h2:mt-14 prose-h2:mb-6 prose-h2:text-3xl prose-h2:border-b prose-h2:border-slate-200 prose-h2:pb-2
+    prose-h3:mt-10 prose-h3:mb-4 prose-h3:text-2xl
+    prose-p:leading-8 prose-p:text-slate-700 prose-p:my-7
+    prose-li:text-slate-700 prose-li:my-3
+    prose-a:font-medium prose-a:text-blue-600 prose-a:no-underline prose-a:transition hover:prose-a:text-blue-800 hover:prose-a:underline
+    prose-blockquote:border-l-4 prose-blockquote:border-blue-600 prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:not-italic prose-blockquote:font-medium prose-blockquote:text-slate-800 prose-blockquote:rounded-r-lg
+    prose-img:rounded-xl prose-img:shadow-md prose-img:my-10
+    prose-strong:font-bold prose-strong:text-slate-900
+  "
+  dangerouslySetInnerHTML={{ __html: article.articleHtml }}
+/>
           </div>
 
-          {/* ✅ Disclaimer (ONLY CHANGE) */}
-          <div className="mt-10 border-t border-slate-200 pt-5">
-            <p className="text-[0.8rem] leading-relaxed text-slate-500">
+          {/* ✅ Disclaimer */}
+          <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
+            <p>
               <strong>Disclaimer:</strong> The information provided is not trading
               advice, coinmarketbuzz.com holds no liability for any investments
               made based on the information provided on this page. We strongly
@@ -295,10 +302,10 @@ export default async function ArticlePage({ params }) {
         </main>
 
         {/* VERTICAL DIVIDER – very thin line, desktop only */}
-        <div className="hidden h-full bg-slate-200 lg:block" />
+        <div className="hidden h-full w-px bg-slate-200 lg:block" />
 
         {/* RIGHT SIDEBAR – sticky on desktop */}
-        <aside className="mt-6 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-full lg:self-start lg:pl-8">
+        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:pl-4">
           <RightSidebar />
         </aside>
       </div>
@@ -313,7 +320,7 @@ function ShareIcon({ label, abbr }) {
     <button
       type="button"
       aria-label={`Share on ${label}`}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-[0.7rem] font-semibold uppercase text-slate-500 hover:border-red-500 hover:text-red-600"
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-[0.7rem] font-semibold uppercase text-slate-500 hover:border-red-500 hover:text-red-600 hover:bg-slate-50 transition-colors"
     >
       {abbr}
     </button>
@@ -326,24 +333,24 @@ function RelatedArticlesSection({ articles }) {
   const normalized = articles.map((a) => normalizeRelated(a));
 
   return (
-    <section className="mt-10">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="h-[16px] w-[6px] rounded-[2px] bg-red-500" />
-        <h2 className="text-[1rem] sm:text-[1.1rem] font-light text-slate-900">
+    <section className="mt-16 border-t border-slate-200 pt-10">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="h-6 w-1.5 rounded-full bg-red-600" />
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">
           Related Articles
         </h2>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 sm:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-3 sm:grid-cols-2">
         {normalized.map((a) => (
           <Link key={a.slug} href={`/news/${a.slug}`} className="group block">
-            <div className="relative mb-3 h-44 w-full overflow-hidden rounded-md bg-slate-100 sm:h-48">
+            <div className="relative mb-4 aspect-[3/2] w-full overflow-hidden rounded-lg bg-slate-100 shadow-sm">
               {a.imageUrl ? (
                 <Image
                   src={a.imageUrl}
                   alt={a.title}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, 360px"
                 />
               ) : (
@@ -353,17 +360,16 @@ function RelatedArticlesSection({ articles }) {
               )}
             </div>
 
-            <div className="mb-1 text-[0.8rem] font-light text-slate-500">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-500">
               {a.category && (
-                <>
+                <span className="text-blue-600 uppercase tracking-wide">
                   {a.category}
-                  {a.date && " • "}
-                </>
+                </span>
               )}
-              {a.date}
+              {a.date && <span>• {a.date}</span>}
             </div>
 
-            <h3 className="line-clamp-3 text-[0.98rem] font-light leading-snug text-slate-900 group-hover:underline underline-offset-[3px]">
+            <h3 className="line-clamp-2 text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-700 transition-colors">
               {a.title}
             </h3>
           </Link>

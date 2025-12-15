@@ -1,4 +1,5 @@
 @import "tailwindcss";
+/* --- Typography System (Satoshi) --- */
 
 /* Light (300) */
 @font-face {
@@ -8,7 +9,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Satoshi";
   src: url("/fonts/satoshi/Satoshi-LightItalic.woff2") format("woff2");
@@ -34,7 +34,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Satoshi";
   src: url("/fonts/satoshi/Satoshi-MediumItalic.woff2") format("woff2");
@@ -51,7 +50,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Satoshi";
   src: url("/fonts/satoshi/Satoshi-BoldItalic.woff2") format("woff2");
@@ -68,7 +66,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Satoshi";
   src: url("/fonts/satoshi/Satoshi-BlackItalic.woff2") format("woff2");
@@ -77,6 +74,7 @@
   font-display: swap;
 }
 
+/* --- Global Resets --- */
 
 html {
   scroll-behavior: smooth;
@@ -86,7 +84,7 @@ html {
 
 body {
   margin: 0;
-  color: #020617; /* slate-950-ish */
+  @apply bg-white text-slate-900; /* Uses Tailwind for colors */
   font-family: "Satoshi", sans-serif;
 }
 
@@ -95,24 +93,30 @@ a {
   color: inherit;
 }
 
-
-
 ::selection {
   background: #3b82f6; /* blue-500 */
   color: #ffffff;
 }
 
-/* Optional “thin scrollbar” utility we used in layout.js */
+/* --- Custom Utilities --- */
+
 .thin-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
 .thin-scrollbar::-webkit-scrollbar-track {
-  background: #e5e7eb; /* slate-200 */
+  background: #e5e7eb;
 }
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  background: #9ca3af; /* slate-400 */
+  background: #9ca3af;
   border-radius: 999px;
 }
 .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280; /* slate-500 */
+  background: #6b7280;
+}
+
+
+.prose p {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  line-height: 1.75;
 }
