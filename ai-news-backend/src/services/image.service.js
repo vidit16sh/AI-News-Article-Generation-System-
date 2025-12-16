@@ -1,71 +1,91 @@
 import { fal } from "@fal-ai/client";
 
-// Configure Fal.ai
+// Ensure API Key exists
+if (!process.env.FAL_KEY) {
+  console.warn("⚠️ FAL_KEY is missing in .env. Image generation will be skipped.");
+}
+
 fal.config({
   credentials: process.env.FAL_KEY,
 });
 
-// New "Photorealistic News" Style Guide
+// 📸 STYLE 1: SERIOUS (Bloomberg / Reuters Style)
+// Best for: Regulation, Lawsuits, Hacks, Government news
 const REALISM_PROMPT = `
-Style: Cinematic Editorial Photography, Award-Winning Photojournalism.
-Quality: 8k resolution, hyper-realistic, highly detailed textures, sharp focus.
-Lighting: Dramatic studio lighting or natural cinematic lighting (volumetric fog, golden hour, or moody cyber-noir depending on context).
-Camera: Shot on 35mm lens, f/1.8 aperture for depth of field.
-Vibe: Impactful, serious, trustworthy, breaking news, eye-catching.
-Constraints: No text overlays, no watermarks, no cartoonish or 3D render styles.
+Style: Award-winning Photojournalism, Cinematic Editorial Photography.
+Visuals: Highly detailed, hyper-realistic, dramatic lighting (volumetric fog, studio rim lighting), depth of field (bokeh).
+Camera: Shot on Sony A7R IV, 35mm lens, f/1.8 aperture.
+Texture: 8k resolution, ray tracing, sharp focus, incredibly detailed textures.
+Mood: Serious, trustworthy, impactful, "Breaking News" aesthetic.
+Composition: Rule of thirds, centered subject, professional color grading (cool corporate tones or dramatic warm tones).
 `;
 
-const generateImage = async (headline) => {
-  // 🔍 DEBUGGING
-  if (!process.env.FAL_KEY) {
-      console.error("❌ FATAL: FAL_KEY is missing in .env!");
-      return null;
-  }
+// 🎨 STYLE 2: CRYPTO-POP (The Block / CoinDesk Feature Style)
+// Best for: Price Actions, NFT drops, Community sentiment, Op-Ed
+const CRYPTO_POP_PROMPT = `
+Style: High-End 3D Editorial Illustration, Digital Art (Beeple meets Pixar).
+Visuals: Octane Render, Unreal Engine 5, isometric or abstract 3D composition.
+Materials: Glass, chrome, brushed gold, matte plastic, glowing neon accents.
+Colors: Vibrant, cyberpunk, vaporwave, rich gradients (purple/blue/teal).
+Mood: Futuristic, chaotic-good, energetic, "Web3 Culture".
+Composition: Abstract representations of the subject (e.g., a glass bull running through a digital city), clean lines.
+`;
+
+export const generateImage = async (headline, style = "REALISM") => {
+  if (!process.env.FAL_KEY) return null;
 
   try {
-    console.log(`   🎨 Generating Realistic Image for: "${headline.substring(0, 20)}..."`);
+    console.log(`   🎨 Generating [${style}] Art for: "${headline.substring(0, 30)}..."`);
 
-    // 1. Light cleaning: Remove only structural characters that confuse prompts, 
-    // BUT keep the $$$ and % signs as they add context (e.g., "$1B Hack" is different from "Hack")
+    // 1. Clean the headline to remove confusing chars, but KEEP $ and %
     const cleanSubject = headline
-        .replace(/[:\-]/g, " ") // Remove colons/hyphens
-        .replace(/\s+/g, " ")   // Fix double spaces
-        .trim();
+      .replace(/[:"()]/g, "") // Remove quotes/colons
+      .trim();
 
-    // 2. Construct a prompt focused on visual storytelling
+    // 2. Select Prompt Base
+    const basePrompt = style === "POP" ? CRYPTO_POP_PROMPT : REALISM_PROMPT;
+
+    // 3. Construct the Engineering Prompt
     const fullPrompt = `
-    ${REALISM_PROMPT}
-    Subject: A compelling, photorealistic scene representing the news story: "${cleanSubject}".
-    Context: Make it look like a high-budget header image for a top-tier financial news site (Bloomberg, Reuters, The Verge).
-    Focus: Capture the essence of the headline visually. If it's about crypto, show realistic physical coins or high-tech server farms. If politics, show a dramatic meeting or capitol building. If tech, show futuristic hardware.
+    ${basePrompt}
+    
+    SUBJECT DIRECTIVE: Create a visual representation of: "${cleanSubject}".
+    
+    SCENE RULES:
+    - If the headline mentions a specific coin (e.g., Bitcoin, Ethereum), incorporate its logo or a symbolic representation (e.g., a gold coin with 'B').
+    - If the headline is about a "Hack" or "Crash", use red tones, shattered glass, or dark moody lighting.
+    - If the headline is about a "Rally" or "Bull Run", use green tones, upward arrows, or ascending geometry.
+    - NO TEXT: Do not attempt to write words or the headline inside the image.
     `;
 
+    // 4. Call Flux (Schnell is fast/cheap, Dev is higher quality. Schnell is fine for news if prompted well)
     const result = await fal.subscribe("fal-ai/flux/schnell", {
       input: {
         prompt: fullPrompt,
         image_size: "landscape_16_9",
-        num_inference_steps: 4, // Flux Schnell is fast, 4 is usually enough
-        seed: Math.floor(Math.random() * 1000000),
-        enable_safety_checker: true,
-        guidance_scale: 7.5
+        num_inference_steps: 4, // 4 is standard for Schnell
+        seed: Math.floor(Math.random() * 1000000), // Randomize seed to avoid identical images for similar news
+        enable_safety_checker: true, // Keep false for news (avoids false positives on "wars" or "attacks")
+        guidance_scale: 7.5,
+        sync_mode: true
       },
-      logs: true, 
+      logs: false, 
     });
 
-    // ✅ Check BOTH possible locations for images
+    // 5. Extract URL safely
     const images = result.images || (result.data && result.data.images);
 
     if (images && images.length > 0) {
+      // ✅ SUCCESS: Return the URL. 
+      // The 'generate.worker.js' will take this URL and pass it to 'storage.service.js' to save locally.
       return images[0].url;
     }
     
-    console.error("❌ Fal.ai returned no images. Raw Response:", JSON.stringify(result));
+    console.warn("   ⚠️ Fal.ai returned no images.");
     return null;
 
   } catch (error) {
-    console.error("❌ Fal.ai Exception:", error.message);
+    console.error("   ❌ Image Gen Error:", error.message);
     return null; 
   }
 };
-
-export { generateImage };

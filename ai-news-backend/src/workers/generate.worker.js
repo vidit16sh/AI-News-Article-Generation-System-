@@ -5,6 +5,9 @@ import { connectRabbit } from '../config/rabbit.js';
 import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
 import { generateImage } from '../services/image.service.js'; 
+import { downloadAndSaveImage } from '../services/storage.service.js'; 
+// 1. Updated Import to include Chart Generation
+import { getEnrichedMarketData, generateChartUrl } from '../services/marketData.service.js'; 
 
 const limiter = new Bottleneck({
     minTime: 2000, 
@@ -44,13 +47,13 @@ const assignAuthor = async () => {
         console.error("Error assigning author:", e);
         return null;
     }
-};
+};        
 
 // JSON-LD Builder (with strict image fallback)
 const createJsonLd = (article, url, authorObj) => {
     // Force a valid image URL for Google Schema compliance
     const validImage = article.imageUrl && article.imageUrl.length > 0 
-        ? article.imageUrl 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}${article.imageUrl}` // Ensure full URL
         : `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/default-news.jpg`;
 
     return {
@@ -59,7 +62,7 @@ const createJsonLd = (article, url, authorObj) => {
         "mainEntityOfPage": { "@type": "WebPage", "@id": url },
         "headline": article.headline,
         "description": article.meta_description || article.headline,
-        "image": [validImage], // ✅ Always returns valid array
+        "image": [validImage], 
         "datePublished": new Date().toISOString(),
         "dateModified": new Date().toISOString(),
         "author": { 
@@ -69,7 +72,7 @@ const createJsonLd = (article, url, authorObj) => {
         },
         "publisher": {
             "@type": "Organization",
-            "name": "AI News Platform",
+            "name": "CoinMarketBuzz",
             "logo": { 
                 "@type": "ImageObject", 
                 "url": `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/logo.png` 
@@ -78,6 +81,24 @@ const createJsonLd = (article, url, authorObj) => {
     };
 };
 
+// Helper: Get recent articles to create internal links
+const getRecentArticlesForLinking = async (currentNewsId) => {
+    try {
+        const articles = await prisma.generatedArticle.findMany({
+            where: { 
+                status: 'PUBLISHED', 
+                originalNewsId: { not: currentNewsId } 
+            },
+            take: 4, 
+            orderBy: { publishAt: 'desc' },
+            select: { headline: true, slug: true }
+        });
+        return articles;
+    } catch (e) {
+        console.error("   ⚠️ Error fetching recent articles:", e.message);
+        return [];
+    }
+}; 
 
 const processGenerationJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
@@ -97,63 +118,108 @@ const processGenerationJob = async (msg, channel) => {
         const existing = await prisma.generatedArticle.findUnique({ where: { originalNewsId: newsId } });
         if (existing) { channel.ack(msg); return; }
 
-        // 1. Assign Author
-        const assignedAuthor = await assignAuthor();
-        const authorName = assignedAuthor ? assignedAuthor.name : "Editorial Team";
-        console.log(`   👤 Assigned Author: ${authorName}`);
+        // 1. Assign Author & Persona
+        const assignedAuthorProfile = getAuthorForCategory(cleanNews.title, cleanNews.tags || []);
+        const dbAuthor = await prisma.author.findFirst({
+            where: { slug: assignedAuthorProfile.slug }
+        }); 
+        const authorName = dbAuthor ? dbAuthor.name : "Editorial Team"; 
+        const selectedPersona = assignedAuthorProfile.personaKey;
+        console.log(`   👤 Author: ${authorName} | 🎭 Persona: ${selectedPersona}`); 
+        // 2. Data Injection (Market Data + Sentiment)
+        console.log(`   📊 Checking for Market Data...`);
+        const marketData = await getEnrichedMarketData(cleanNews.title + " " + cleanNews.summary); 
 
-        // 2. Generate Text
+        if (marketData) {
+            console.log(`   ✅ Live Data Found (Injecting...)`);
+        } 
+
+        // 3. Internal Linking Strategy
+        const recentArticles = await getRecentArticlesForLinking(newsId);
+
+        // 4. Generate Text (Pass Persona + Data + Links)
         console.log(`   🧠 Writing: "${cleanNews.title.substring(0, 30)}..."`);
-        const aiOutput = await limiter.schedule(() => generateArticle(cleanNews));
-        
+        const aiOutput = await limiter.schedule(() => 
+            generateArticle(cleanNews, marketData, recentArticles, selectedPersona)
+        );
+        // 🛑 FILTER 1: Discard WEAK generations
         if (aiOutput.status === 'WEAK') {
-            console.warn(`   🗑️ Discarding WEAK article: "${aiOutput.headline}" (Generation Failed)`);
-            channel.ack(msg); // Ack to remove from queue so we don't retry forever
+            console.warn(`   🗑️ Discarding WEAK article: "${aiOutput.headline}"`);
+            channel.ack(msg); 
             return;
         } 
         
+        // 🛑 FILTER 2: Determine Status based on Priority Score
         let finalStatus = "DRAFT"; 
-
-        if (priorityScore > 80) {
-            finalStatus = "PUBLISHED";
-        } else if (priorityScore >= 60) {
-            finalStatus = "QUEUED";
-        } else if (priorityScore >= 45) {
-            finalStatus = "DRAFT";
-        } else {
-            console.warn(`   🗑️ Discarding LOW SCORE article: ${priorityScore} (Threshold is 45)`);
+        if (priorityScore > 80) finalStatus = "PUBLISHED";
+        else if (priorityScore >= 60) finalStatus = "QUEUED";
+        else if (priorityScore >= 45) finalStatus = "DRAFT";
+        else {
+            console.warn(`   🗑️ Discarding LOW SCORE: ${priorityScore}`);
             channel.ack(msg);
             return;
         }
-        // 3. Generate Image
-        console.log(`   🎨 Generating Image (Fal.ai)...`);
-        let imageUrl = await generateImage(aiOutput.headline);
-        
-        // 🛡️ Fallback: If Fal.ai fails, use null (createJsonLd will handle the default)
-        if (!imageUrl) {
-            console.warn("   ⚠️ Image generation failed. Using default.");
-            imageUrl = null; 
+
+        // 5. VISUAL STRATEGY: Chart vs. AI Image
+        let finalImageUrl = null;
+        const headlineLower = aiOutput.headline.toLowerCase();
+        const tagsString = (aiOutput.tags || []).join(' ').toLowerCase(); 
+
+        const isMarketStory = 
+            headlineLower.includes("price") || 
+            headlineLower.includes("prediction") || 
+            headlineLower.includes("analysis") || 
+            headlineLower.includes("chart") ||
+            headlineLower.includes("market") ||
+            tagsString.includes("market");
+
+        // B. Is it SERIOUS/LEGAL? (Crime, Law, Regulation)
+        const isSeriousStory = 
+            headlineLower.includes("sec") || 
+            headlineLower.includes("sue") || 
+            headlineLower.includes("hack") || 
+            headlineLower.includes("scam") || 
+            headlineLower.includes("law") || 
+            headlineLower.includes("regulation") ||
+            headlineLower.includes("ban");
+
+        // A. Try to generate a Real Chart first
+        if (isMarketStory && !isSeriousStory) {
+            // Priority: CHART
+            console.log(`   ⚖️ Editorial Decision: MARKET STORY -> Generate Chart`);
+            const textForDetection = `${aiOutput.headline} ${cleanNews.title}`; 
+            const chartUrl = await generateChartUrl(textForDetection);
+            if (chartUrl) {
+                console.log(`      ✅ Chart Created.`);
+                finalImageUrl = await downloadAndSaveImage(chartUrl, aiOutput.slug + "-chart");
+            }
+        }
+        // B. Fallback to AI Art (If no chart or coin not found)
+        if (!finalImageUrl) {
+            let imageStyle = "POP"; // Default style
+            
+            if (isSeriousStory) {
+                console.log(`   ⚖️ Editorial Decision: SERIOUS STORY -> Realism Style`);
+                imageStyle = "REALISM";
+            } else {
+                console.log(`   ⚖️ Editorial Decision: CULTURE STORY -> Pop/3D Style`);
+                imageStyle = "POP";
+            }
+
+            console.log(`      🎨 Generating AI Art [${imageStyle}]...`);
+            let tempImageUrl = await generateImage(aiOutput.headline, imageStyle);
+            
+            if (tempImageUrl) {
+                finalImageUrl = await downloadAndSaveImage(tempImageUrl, aiOutput.slug);
+            }
         }
 
-        // 4. Prepare Metadata
+        // 6. Prepare Metadata & Save
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const fullUrl = `${baseUrl}/news/${aiOutput.slug}`;
-        
-        const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl }, fullUrl, assignedAuthor);
-        
+        const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl: finalImageUrl}, fullUrl, assignedAuthor);
         const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
 
-        // 5. Determine Status
-        let status = aiOutput.status || "DRAFT"; 
-        
-        const isHighQuality = aiOutput.confidence >= 0.85 && realOriginalityScore >= 0.20;
-        
-        if (isHighQuality) {
-            if (priorityScore >= 80) status = "PUBLISHED";
-            else if (priorityScore >= 50) status = "QUEUED";
-        }
-
-        // 6. Save to DB
         await prisma.generatedArticle.create({
             data: {
                 headline: aiOutput.headline,
@@ -162,21 +228,21 @@ const processGenerationJob = async (msg, channel) => {
                 articleHtml: aiOutput.article_html,
                 tags: aiOutput.tags || [],
                 keywords: aiOutput.keywords || [],
-                imageUrl: imageUrl, // Can be null, handled by frontend/schema logic
+                imageUrl: finalImageUrl, 
                 newsJsonLd,
                 originalityScore: realOriginalityScore,
                 confidenceScore: aiOutput.confidence || 0,
                 priorityScore: priorityScore,
-                status: status,
+                status: finalStatus,
                 publishAt: new Date(),
                 originalNewsId: cleanNews.id,
                 authorId: assignedAuthor ? assignedAuthor.id : null 
             }
         });
 
-        console.log(`   ✨ Finished: ${aiOutput.slug} [${status}] by ${authorName}`);
+        console.log(`   ✨ Finished: ${aiOutput.slug} [${finalStatus}]`);
         
-        if (status === 'PUBLISHED') await triggerRevalidation('articles');
+        if (finalStatus === 'PUBLISHED') await triggerRevalidation('articles');
         channel.ack(msg);
 
     } catch (err) {

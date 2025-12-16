@@ -94,5 +94,7 @@ model GeneratedArticle {
   status          String   @default("DRAFT") // DRAFT, QUEUED, PUBLISHED
    
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @updatedAt 
+  @@index([status, publishAt]) // Fast lookups for "Recent Published Articles"
+  @@index([slug])
 }

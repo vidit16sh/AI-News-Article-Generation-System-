@@ -16,6 +16,12 @@ const MODEL_CONFIG = {
 };
 
 // 🧠 CLIENT SEO KNOWLEDGE BANK
+const PERSONAS = {
+  "THE_ANALYST": "You are a cold, data-driven Technical Analyst. You focus on support levels, volume, and moving averages. You trust charts, not hype.",
+  "THE_INSIDER": "You are an investigative crypto journalist. You look for the 'story behind the story'. You are skeptical of official announcements and look for on-chain proof.",
+  "THE_MACRO": "You are a Macro-Economist. You connect crypto moves to the Fed, inflation, and global stocks. You see the big picture."
+} 
+
 const SEO_STRATEGY = {
   primary: [
     "Cryptocurrency news",
@@ -46,6 +52,7 @@ const FORBIDDEN_WORDS = [
   "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
   "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore"
 ];
+
 
 // 🛡️ FINAL PRODUCTION SYSTEM PROMPT (DeepSeek Optimized - Competitor Killer)
 const SYSTEM_PROMPT = `
@@ -234,8 +241,8 @@ export const generateArticle = async (cleanedNewsData) => {
             **Date (Use for dateline):** ${dateStr}
             **Raw Summary:** ${cleanedNewsData.summary}
             **Full Context:** ${JSON.stringify(cleanedNewsData.content)}
-
-            ### CRITICAL INSTRUCTION
+           ${marketData ? `${marketData}\n(MANDATORY: You MUST integrate the 'Fear & Greed' sentiment and 'Distance from ATH' stats into the analysis to prove this is a current report.)` : ""} 
+           ${linkContext}
             Do not just rewrite the news. **ANALYZE IT.**
             1. If this is about a token price, act like a **Technical Chart Analyst** (Mention Support/Resistance).
             2. If this is about regulation/law, act like a **Legal Expert**.
