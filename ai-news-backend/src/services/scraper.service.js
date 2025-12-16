@@ -26,9 +26,16 @@ export const scrapeArticle = async (url) => {
         
         // 3. Set a Real User Agent (Double protection)
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
+        await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+                req.abort();
+            } else {
+            req.continue();
+            }
+        });
         // 4. Navigate (Wait for network idle to ensure JS loads)
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
         // 5. If it's a Google Redirect, Puppeteer will follow it naturally.
         // We get the FINAL URL to verify source.

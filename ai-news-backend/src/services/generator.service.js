@@ -26,7 +26,7 @@ const PERSONAS = {
 const FORBIDDEN_WORDS = [
   "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
   "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore", "rapidly evolving", 
-  "ever-changing", "dynamic world"
+  "ever-changing", "dynamic world", "latest updates on cryptocurrency market" // Explicitly banned this spam phrase
 ];
 
 const SEO_STRATEGY = {
@@ -34,13 +34,9 @@ const SEO_STRATEGY = {
     "Cryptocurrency news", "Bitcoin news", "Ethereum news", "Altcoin news", "Crypto market updates",
   ],
   longTail: [
-    "Latest updates on cryptocurrency market", "Daily crypto news and analysis", "Top crypto news today",
-    "Breaking crypto news", "Crypto trading news", "New cryptocurrency releases", "Bitcoin price news",
+    "Daily crypto analysis", "Top crypto news today", "Breaking crypto news", "Bitcoin price action",
   ],
-  synonyms: [
-    "Digital currency updates", "Coin market news", "Blockchain stocks news", "Virtual currency updates", "Defi news updates",
-  ],
-}; 
+};
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
@@ -82,7 +78,10 @@ const auditAndFixArticle = (json) => {
   // C. Headline Keyword Check 
   if (json.headline && json.focus_keywords) {
       if (!json.headline.toLowerCase().includes(json.focus_keywords.toLowerCase())) {
-        json.headline = `${json.focus_keywords}: ${json.headline}`;
+        // Only append if it fits naturally, otherwise ignore to avoid spammy look
+        if (json.headline.length < 50) {
+            json.headline = `${json.focus_keywords}: ${json.headline}`;
+        }
       }
   }
   
@@ -127,11 +126,14 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
 
   // 2. Build Internal Link Strategy
   const internalLinkInstructions = recentArticles.length > 0 
-    ? `\n### 🔗 LINKING STRATEGY: 
-       You MUST weave the following links NATURALLY into the text where relevant (do not just list them at the end):
-       ${recentArticles.map(l => `- Use text "${l.headline}" linking to "/news/${l.slug}"`).join("\n")}`
-    : "";
-
+    ? `\n### 🔗 LINKING STRATEGY (STRICT): 
+       - You have the following related articles: ${recentArticles.map(l => `"${l.headline}" (URL: /news/${l.slug})`).join(", ")}.
+       - RULE: ONLY insert these links if they are *contextually relevant* to the specific paragraph.
+       - RULE: DO NOT force a link about "Spain Regulation" into a paragraph about "US Jobs". 
+       - RULE: If they don't fit naturally, add a "Related Developments" list at the end of the "Market Context" section.
+       - RULE: Do NOT use the exact headline as the anchor text. Use natural phrasing (e.g., "Amid recent regulatory shifts in Spain...").`
+    : ""; 
+  
   // 🛡️ ENHANCED SYSTEM PROMPT
   const BASE_SYSTEM_PROMPT = `
 You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier f news outlet approved by Google News.
@@ -144,7 +146,8 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
 ============================================================
 - **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
-- **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype.
+- **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype. 
+- **No Hallucinations:** If the source text does not contain a quote from a specific person (e.g., Michael Saylor, Cathie Wood), **DO NOT INVENT ONE**. Attribute sentiment to "Market Analysts" or "Bulls" instead.
 - **Sourcing:** Attribute every claim. Use phrases like "According to on-chain data," "In a statement to investors," etc.
 - **Originality:** You must provide **ANALYSIS**, not just reporting. Explain *why* this matters for the 5-year horizon.
 - **Citations:** Include EXACTLY ONE HTML link to the Source URL provided in the text.
