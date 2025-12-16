@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import WebSocket from 'ws';
 import { connectRabbit } from '../config/rabbit.js';
-import prisma from '../lib/prisma.js';
+import prisma from '../lib/prisma.js'; 
+import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 
 // ⚙️ CONFIGURATION
 const WS_URL = 'wss://stream.binance.com:9443/ws/btcusdt@kline_1m';
@@ -94,8 +95,12 @@ const triggerAlert = async (headline, open, close, volume) => {
             console.log("   Info: Alert skipped (Cooldown active)");
             return;
         }
-
+        
+        const classification = await classifyNews(headline, `Bitcoin Market Alert Vol: ${volume}`);
+        const category = await getOrCreateCategory(classification.category_slug);
+        
         // 2. Create "Artificial" News Item
+        
         const saved = await prisma.cleanedNews.create({
             data: {
                 title: headline,
@@ -103,7 +108,7 @@ const triggerAlert = async (headline, open, close, volume) => {
                 content: `(Auto-Generated Market Alert) Bitcoin spot markets on Binance recorded a significant move. The asset opened the minute at $${open} and closed at $${close}, representing a volatility spike of over ${THRESHOLD_PRICE_CHANGE}%. High volume suggests institutional activity.`,
                 sourceUrl: `https://binance.com/btc-volatility-${Date.now()}`,
                 status: 'PENDING',
-                category: { connect: { slug: 'finance' } }, // Ensure this category exists in DB!
+                category: { connect: { id: category.id } }, // Ensure this category exists in DB!
                 publishedAt: new Date()
             }
         });

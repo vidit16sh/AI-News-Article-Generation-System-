@@ -10,8 +10,9 @@ datasource db {
 }
 
 model Category {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
+  id    Int           @id @default(autoincrement())
+  name  String        // Display Name (e.g. "Bitcoin")
+  slug  String        @unique 
   news  CleanedNews[]
 }
 
@@ -30,7 +31,7 @@ model CleanedNews {
   title        String
   summary      String
   content      String
-  sourceUrl    String
+  sourceUrl    String   @unique
   publishedAt  DateTime
   categoryId   Int
   category     Category @relation(fields: [categoryId], references: [id])

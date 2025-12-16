@@ -9,133 +9,38 @@ const openai = new OpenAI({
 // DeepSeek V3 Configuration
 const MODEL_CONFIG = {
   model: "deepseek-chat",
-  temperature: 0.1, // Low temp is CRITICAL for following your strict formatting rules
+  temperature: 0.1, // Low temp is CRITICAL for following strict formatting rules
   max_tokens: 8192,
   top_p: 0.9,
   response_format: { type: "json_object" },
 };
 
-// 🧠 CLIENT SEO KNOWLEDGE BANK
+// 🧠 CLIENT SEO KNOWLEDGE BANK (Expanded)
 const PERSONAS = {
-  "THE_ANALYST": "You are a cold, data-driven Technical Analyst. You focus on support levels, volume, and moving averages. You trust charts, not hype.",
-  "THE_INSIDER": "You are an investigative crypto journalist. You look for the 'story behind the story'. You are skeptical of official announcements and look for on-chain proof.",
-  "THE_MACRO": "You are a Macro-Economist. You connect crypto moves to the Fed, inflation, and global stocks. You see the big picture."
-} 
-
-const SEO_STRATEGY = {
-  primary: [
-    "Cryptocurrency news",
-    "Bitcoin news",
-    "Ethereum news",
-    "Altcoin news",
-    "Crypto market updates",
-  ],
-  longTail: [
-    "Latest updates on cryptocurrency market",
-    "Daily crypto news and analysis",
-    "Top crypto news today",
-    "Breaking crypto news",
-    "Crypto trading news",
-    "New cryptocurrency releases",
-    "Bitcoin price news",
-  ],
-  synonyms: [
-    "Digital currency updates",
-    "Coin market news",
-    "Blockchain stocks news",
-    "Virtual currency updates",
-    "Defi news updates",
-  ],
-}; 
+  "THE_ANALYST": "You are a cold, data-driven Technical Analyst. You focus on support levels, volume, RSI divergence, and moving averages. You trust charts, not hype.",
+  "THE_INSIDER": "You are an investigative crypto journalist. You look for the 'story behind the story'. You are skeptical of official announcements, check on-chain movements, and question liquidity.",
+  "THE_MACRO": "You are a Macro-Economist. You connect crypto moves to the Fed, inflation, bond yields, and global stocks. You see the big picture.",
+  "THE_FUTURIST": "You are a forward-looking technologist. You focus on protocol upgrades, GitHub commits, developer adoption, and the long-term vision of Web3 technology."
+};
 
 const FORBIDDEN_WORDS = [
   "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
-  "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore"
+  "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore", "rapidly evolving", 
+  "ever-changing", "dynamic world"
 ];
 
-
-// 🛡️ FINAL PRODUCTION SYSTEM PROMPT (DeepSeek Optimized - Competitor Killer)
-const SYSTEM_PROMPT = `
-You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier financial news outlet approved by Google News.
-Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals CoinDesk and CoinGape.
-**DO NOT** just summarize. **ANALYZE.**
-
-============================================================
-1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
-============================================================
-- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>[CITY], [Month] [Day], [Year]</strong> — ...</p>
-- **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype.
-- **Sourcing:** Attribute every claim. Use phrases like "According to on-chain data," "In a statement to investors," etc.
-- **Originality:** You must provide **ANALYSIS**, not just reporting. Explain *why* this matters for the 5-year horizon.
-- **Citations:** Include EXACTLY ONE HTML link to the Source URL provided.
-
-============================================================
-2. ARTICLE STRUCTURE (HTML Tags Only)
-============================================================
-**Phase 1: The Hook**
-1. <h1>Headline</h1> (60-80 chars, strictly containing Focus Keyword. MUST be punchy/click-worthy but accurate.)
-2. **Executive Summary:** A <blockquote><ul> list of 3-4 key bullet points (The "TL;DR" for traders).
-3. **Dateline & Lede:** The opening paragraph summarizing the "Who, What, When" immediately.
-
-**Phase 2: The Deep Dive (CoinTribune Style)**
-4. <h2>Market Context & Background</h2> (Connect this event to historical trends. e.g., "This mirrors the 2021 correction...")
-5. <h2>What Happened?</h2> (Detailed reporting. Use specific numbers, dates, and names.)
-6. <h2>Technical Analysis & Price Action</h2> (MANDATORY: Discuss Support/Resistance levels, RSI, and Moving Averages. If policy-related: Discuss Legal Precedents.)
-
-**Phase 3: The Impact (CoinGabbar Style)**
-7. <h2>Why It Matters</h2> (Institutional impact vs. Retail impact.)
-8. <h2>By The Numbers</h2> (A rich <ul> list of 5+ hard data points: Market Cap change, Liquidation volume, etc.)
-9. <h3>Community Sentiment</h3> (Synthesize what industry leaders are saying on X/Twitter. Use quotes.)
-
-**Phase 4: The Forecast (CoinGape Style)**
-10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.)
-11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.)
-
-============================================================
-2B. HTML OUTPUT RULES (STRICT)
-============================================================
-- **Headings:** Use <h1>, <h2>, <h3> ONLY. NEVER put a heading inside <p>.
-- **Paragraphs:** Use <p> for text. Avoid "micro-paragraphs" (1 sentence). Merge related thoughts.
-- **Flow:** After every heading, the next tag MUST be <p>, <blockquote>, or <ul>.
-- **Lists:** Use <ul><li> for 3+ points. NEVER wrap lists inside <p>.
-- **FAQs:** Format as <p><strong>Question?</strong> Answer...</p>.
-- **Cleanliness:** NO <br/> tags. NO empty tags.
-
-============================================================
-3. "ANTI-AI" & QUALITY GUARDRAILS
-============================================================
-- **Forbidden Words (Instant Fail):** "Delve", "Tapestry", "Landscape", "Underscore", "Pivotal", "Crucial", "In conclusion", "Realm", "Bustling".
-- **Sentence Variance:** Mix short punchy sentences with complex analytical sentences.
-- **Formatting:** Use <strong> for every single dollar amount or percentage (e.g., <strong>$92,000</strong>).
-- **China/Regulation Rule:** If discussing China/HK regulation, remain strictly neutral and cite official announcements only.
-- **No Financial Advice:** Never say "You should buy." Say "Analysts suggest..." or "Historical patterns indicate..."
-
-============================================================
-4. SEO REQUIREMENTS (STRICT)
-============================================================
-- **Target Audience:** Traders and investors looking for "Daily crypto news and analysis".
-- **Keywords Strategy:**
-   1. **Focus Keyword:** Select ONE relevant "Long-Tail" term (e.g., "${SEO_STRATEGY.longTail.join('", "')}") that matches the story.
-   2. **Placement:** The Focus Keyword MUST appear in the **H1 Headline** and the **First Paragraph**.
-   3. **Synonyms:** Use at least 2 terms from this list in the body: "${SEO_STRATEGY.synonyms.join('", "')}".
-- **Slug:** Create a URL-friendly slug based on the long-tail keyword (e.g., latest-bitcoin-price-news).
-- **Meta Description:** Must start with a primary keyword like "Latest crypto news: ..." and be <155 chars.
-
-============================================================
-5. JSON OUTPUT SCHEMA
-============================================================
-{
-  "headline": "String",
-  "slug": "String",
-  "meta_description": "String",
-  "tags": ["String"],
-  "keywords": ["String"],
-  "focus_keywords": "String",
-  "featured_image_alt": "String",
-  "article_html": "String",
-  "confidence": Number
-}
-`;
+const SEO_STRATEGY = {
+  primary: [
+    "Cryptocurrency news", "Bitcoin news", "Ethereum news", "Altcoin news", "Crypto market updates",
+  ],
+  longTail: [
+    "Latest updates on cryptocurrency market", "Daily crypto news and analysis", "Top crypto news today",
+    "Breaking crypto news", "Crypto trading news", "New cryptocurrency releases", "Bitcoin price news",
+  ],
+  synonyms: [
+    "Digital currency updates", "Coin market news", "Blockchain stocks news", "Virtual currency updates", "Defi news updates",
+  ],
+}; 
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
@@ -155,33 +60,31 @@ const cleanJsonOutput = (text) => {
   }
 }; 
 
-
 const auditAndFixArticle = (json) => {
-  let html = json.article_html || ""; // Safety: Default to empty string
+  let html = json.article_html || ""; 
   let score = 100;
   
   // A. Forbidden Word Remover (Auto-Fix)
   FORBIDDEN_WORDS.forEach(word => {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     if (regex.test(html)) {
-      html = html.replace(regex, ""); // Silently remove the word
+      html = html.replace(regex, ""); 
       score -= 5;
     }
   });
 
   // B. Length Check (Critical Failure)
   const wordCount = html.replace(/<[^>]*>/g, '').split(/\s+/).length;
-  if (wordCount < 500) { 
-    throw new Error(`Article too short: ${wordCount} words. Minimum 500 required.`);
+  if (wordCount < 400) { 
+    throw new Error(`Article too short: ${wordCount} words. Minimum 400 required.`);
   }
 
-  // C. Headline Keyword Check (Safety Patched)
-  if (json.headline && json.focus_keywords) { // 👈 Added check to prevent crash
+  // C. Headline Keyword Check 
+  if (json.headline && json.focus_keywords) {
       if (!json.headline.toLowerCase().includes(json.focus_keywords.toLowerCase())) {
         json.headline = `${json.focus_keywords}: ${json.headline}`;
       }
   }
-
   
   json.article_html = html; 
   json.confidence = score / 100; 
@@ -192,15 +95,12 @@ const auditAndFixArticle = (json) => {
 const generateFallbackArticle = (data) => {
   console.log("⚠️ Triggering Safe Mode Fallback...");
   const safeDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  
-  // Tag as "Market Brief" so users know it's short
   const categoryName = data.category?.name || "Crypto";
   
   return {
     headline: data.title,
     slug: data.title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-"),
     meta_description: data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
-    // Simplified structure for fallback
     article_html: `
         <h1>${data.title}</h1>
         <p><strong>NEW YORK, ${safeDate}</strong> — ${data.summary}</p>
@@ -209,55 +109,148 @@ const generateFallbackArticle = (data) => {
         <p>We are tracking a developing story regarding <strong>${data.title}</strong>. Data indicates significant activity in the ${categoryName} sector.</p>
         <p>This report relies on data from <strong><a href="${data.sourceUrl}" target="_blank" rel="nofollow">the original report</a></strong>. CoinMarketBuzz analysts are reviewing the details and will update this analysis shortly.</p>
     `,
-    tags: [categoryName, "Market Brief"], // Special tag
+    tags: [categoryName, "Market Brief"], 
     keywords: [categoryName, "Crypto News"],
     focus_keywords: categoryName,
-    status: "WEAK", // 🚨 SAFETY: Save as DRAFT so a human must review before publishing
+    status: "WEAK", 
     confidence: 0.1,
   };
 };
 
-export const generateArticle = async (cleanedNewsData) => {
+// 🚀 MAIN GENERATOR FUNCTION
+export const generateArticle = async (cleanedNewsData, marketData = null, recentArticles = [], selectedPersonaKey = "THE_ANALYST") => {
   const MAX_RETRIES = 2;
+
+  // 1. Prepare Persona
+  const personaDescription = PERSONAS[selectedPersonaKey] || PERSONAS["THE_ANALYST"];
+  const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+  // 2. Build Internal Link Strategy
+  const internalLinkInstructions = recentArticles.length > 0 
+    ? `\n### 🔗 LINKING STRATEGY: 
+       You MUST weave the following links NATURALLY into the text where relevant (do not just list them at the end):
+       ${recentArticles.map(l => `- Use text "${l.headline}" linking to "/news/${l.slug}"`).join("\n")}`
+    : "";
+
+  // 🛡️ ENHANCED SYSTEM PROMPT
+  const BASE_SYSTEM_PROMPT = `
+You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier financial news outlet approved by Google News.
+Your Persona: ${personaDescription}
+
+Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals CoinDesk and CoinGape.
+**DO NOT** just summarize. **ANALYZE.**
+
+============================================================
+1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
+============================================================
+- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
+- **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype.
+- **Sourcing:** Attribute every claim. Use phrases like "According to on-chain data," "In a statement to investors," etc.
+- **Originality:** You must provide **ANALYSIS**, not just reporting. Explain *why* this matters for the 5-year horizon.
+- **Citations:** Include EXACTLY ONE HTML link to the Source URL provided in the text.
+- **Link Hierarchy:** You MUST include the Source URL citation. Additionally, if the prompt provides "Internal Links," you MUST weave them naturally into the text.
+- **Data Integrity:** If the input text is short, DO NOT invent quotes or specific event details to fill space. Instead, expand deeply on "Market Context" and "Why It Matters" using general knowledge.
+============================================================
+2. ARTICLE STRUCTURE (HTML Tags Only)
+============================================================
+**Phase 1: The Hook**
+1. <h1>Headline</h1> (60-80 chars, strictly containing Focus Keyword. MUST be punchy/click-worthy but accurate.)
+2. **Executive Summary:** A <blockquote><ul> list of 3-4 key bullet points (The "TL;DR" for traders).
+3. **Dateline & Lede:** The opening paragraph summarizing the "Who, What, When" immediately.
+
+**Phase 2: The Deep Dive**
+4. <h2>Market Context & Background</h2> (Connect this event to historical trends. e.g., "This mirrors the 2021 correction...")
+5. <h2>What Happened?</h2> (Detailed reporting. Use specific numbers, dates, and names.)
+6. <h2>Technical Analysis & Price Action</h2> (MANDATORY: Discuss Support/Resistance levels, RSI, and Moving Averages. If policy-related: Discuss Legal Precedents.)
+
+**Phase 3: The Data Snapshot (NEW)**
+7. <h2>By The Numbers</h2> 
+   (Create a simple HTML <table> with 2 columns: 'Metric' and 'Value'. Fill it with 4-5 key data points from the story/market data.)
+
+**Phase 4: The Impact**
+8. <h2>Why It Matters</h2> (Institutional impact vs. Retail impact.)
+9. <h3>Community Sentiment</h3> (Synthesize what industry leaders are saying on X/Twitter. Use quotes.)
+
+**Phase 5: The Forecast**
+10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.)
+11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.)
+
+============================================================
+3. HTML OUTPUT RULES (STRICT)
+============================================================
+- **Headings:** Use <h1>, <h2>, <h3> ONLY. NEVER put a heading inside <p>.
+- **Paragraphs:** Use <p> for text. Avoid "micro-paragraphs" (1 sentence). Merge related thoughts.
+- **Lists:** Use <ul><li> for 3+ points. NEVER wrap lists inside <p>.
+- **Tables:** Use <table border="1" style="border-collapse: collapse; width: 100%;"> for the Data Snapshot.
+- **Cleanliness:** NO <br/> tags. NO empty tags. 
+- **Bolding Logic:** Only bold the **Critical Price Points** (ATH, Current Price, Support Levels). Do not bold every minor figure.
+
+============================================================
+4. "ANTI-AI" & QUALITY GUARDRAILS
+============================================================
+- **Forbidden Words (Instant Fail):** "Delve", "Tapestry", "Landscape", "Underscore", "Pivotal", "Crucial", "In conclusion", "Realm", "Bustling".
+- **Opening Ban:** NEVER start the article with "In the rapidly evolving world..." or "The crypto market is buzzing...". Start with the NEWS.
+- **Sentence Variance:** Mix short punchy sentences with complex analytical sentences.
+- **Formatting:** Use <strong> for every single dollar amount or percentage (e.g., <strong>$92,000</strong>).
+- **No Financial Advice:** Never say "You should buy." Say "Analysts suggest..." or "Historical patterns indicate..."
+- **Time Sensitivity:** Never use phrases like "In recent news" or "Recently." Be specific: "On Tuesday," "This week," or "Following the announcement."
+============================================================
+5. SEO REQUIREMENTS (STRICT)
+============================================================
+- **Keywords Strategy:**
+   1. **Focus Keyword:** Select ONE relevant "Long-Tail" term (e.g., "${SEO_STRATEGY.longTail.join('", "')}") that matches the story.
+   2. **Placement:** The Focus Keyword MUST appear in the **H1 Headline** and the **First Paragraph**.
+   3. **Synonyms:** Use at least 2 terms from this list in the body: "${SEO_STRATEGY.synonyms.join('", "')}".
+- **Meta Description:** Must start with a primary keyword like "Latest crypto news: ..." and be <155 chars.
+
+============================================================
+6. JSON OUTPUT SCHEMA
+============================================================
+{
+  "headline": "String",
+  "slug": "String",
+  "meta_description": "String",
+  "tags": ["String"],
+  "keywords": ["String"],
+  "focus_keywords": "String",
+  "featured_image_alt": "String",
+  "article_html": "String",
+  "confidence": Number
+}
+`;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const categorySlug =
-        cleanedNewsData.category?.name?.toLowerCase().replace(/\s+/g, "-") ||
-        "crypto";
-      const dateStr = new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      });
+      const categorySlug = cleanedNewsData.category?.slug?.toLowerCase() || "crypto";
 
-      // 🧠 UPGRADED USER PROMPT: Forces Analysis over Reporting
+      // 🧠 USER PROMPT: Injecting Data + Context
       const userPrompt = `
             ### INPUT SOURCE DATA
             **Headline:** ${cleanedNewsData.title}
-            **Category:** ${cleanedNewsData.category.name}
-            **Category Slug (Use for linking):** /category/${categorySlug}
-            **Source URL (Use for citation):** ${cleanedNewsData.sourceUrl}
-            **Date (Use for dateline):** ${dateStr}
+            **Category:** ${cleanedNewsData.category?.name || "Crypto"}
+            **Category Slug:** /news/category/${categorySlug}
+            **Source URL:** ${cleanedNewsData.sourceUrl}
+            **Date:** ${dateStr}
             **Raw Summary:** ${cleanedNewsData.summary}
-            **Full Context:** ${JSON.stringify(cleanedNewsData.content)}
-           ${marketData ? `${marketData}\n(MANDATORY: You MUST integrate the 'Fear & Greed' sentiment and 'Distance from ATH' stats into the analysis to prove this is a current report.)` : ""} 
-           ${linkContext}
-            Do not just rewrite the news. **ANALYZE IT.**
-            1. If this is about a token price, act like a **Technical Chart Analyst** (Mention Support/Resistance).
-            2. If this is about regulation/law, act like a **Legal Expert**.
-            3. Connect this event to **Historical Trends** (e.g., "Similar to the 2021 bull run...").
+            **Full Context:** ${JSON.stringify(cleanedNewsData.content || "").substring(0, 6000)}
+            
+            ${marketData ? `### 📊 LIVE MARKET DATA (Inject this into the Data Snapshot Table!):\n${marketData}\n(MANDATORY: Integrate Fear & Greed / Price Stats)` : ""} 
+            
+            ${internalLinkInstructions}
+
+            **TONE INSTRUCTION:** ${personaDescription}
             
             ### 🛡️ FINAL CHECKS:
-            1. **Headline:** MUST be between 60-75 characters.
-            2. **Keyword:** The 'focus_keywords' you choose MUST appear VERBATIM in the 'headline'.
-            3. **Dateline:** Start with: <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
+            1. **Headline:** 60-75 chars.
+            2. **Keyword:** 'focus_keywords' MUST appear VERBATIM in 'headline'.
+            3. **Dateline:** Start with <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
+            4. **Table:** Did you include the HTML Table for 'By The Numbers'?
             `;
 
       const completion = await openai.chat.completions.create({
         model: MODEL_CONFIG.model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: BASE_SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
         temperature: MODEL_CONFIG.temperature,
@@ -267,30 +260,22 @@ export const generateArticle = async (cleanedNewsData) => {
       });
 
       const text = completion.choices[0].message.content;
-      
-      // 1. Basic JSON Clean
       let json = cleanJsonOutput(text);
 
       if (!json || typeof json !== "object") {
         throw new Error("Parsed JSON is null or invalid.");
       }
 
-      // 2. Self-Healing: Add Source Link if missing
-      if (
-        !json.article_html.includes('href="http') &&
-        !json.article_html.includes("href='http")
-      ) {
-        json.article_html += `<p>Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
+      // Self-Healing Source Link
+      if (!json.article_html.includes('href="http')) {
+        json.article_html += `<p class="text-sm mt-4 text-slate-500">Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
       }
 
-      // 3. 🚨 SAFETY NET: Run the Auditor
-      // This will THROW an error if content is too short, triggering a retry
       json = auditAndFixArticle(json); 
 
       return { ...json, status: "STRONG" };
     } catch (error) {
       console.error(`❌ Attempt ${attempt} Failed:`, error.message);
-
       if (attempt < MAX_RETRIES) {
         await new Promise((res) => setTimeout(res, 2000));
       }

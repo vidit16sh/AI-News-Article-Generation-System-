@@ -3,7 +3,7 @@ import Bottleneck from 'bottleneck';
 import { connectRabbit } from '../config/rabbit.js'; 
 import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
-import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
+import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js'; 
 
 // 🛑 RATE LIMITER for Classification (Flash is fast, but let's be safe)
 const limiter = new Bottleneck({
@@ -30,11 +30,11 @@ const processJob = async (msg, channel) => {
             classifyNews(cleanedBody, rawNews.title)
         ); 
 
-        const categoryName = classification.category || "General";
+        const categorySlug = classification.category_slug || "altcoins";
         const priorityScore = classification.priority_score || 0; 
 
         // 2. Database: Save the clean version (but don't generate yet)
-        const category = await getOrCreateCategory(categoryName);
+        const category = await getOrCreateCategory(categorySlug);
         const finalNews = await prisma.cleanedNews.create({
             data: {
                 title: rawNews.title,

@@ -5,7 +5,8 @@ import { connectRabbit } from '../config/rabbit.js';
 import prisma from '../lib/prisma.js';
 import { generateArticle } from '../services/generator.service.js';
 import { generateImage } from '../services/image.service.js'; 
-import { downloadAndSaveImage } from '../services/storage.service.js'; 
+import { downloadAndSaveImage } from '../services/storage.service.js';  
+import { getAuthorForCategory } from '../config/authors.js';
 // 1. Updated Import to include Chart Generation
 import { getEnrichedMarketData, generateChartUrl } from '../services/marketData.service.js'; 
 
