@@ -134,7 +134,7 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
 
   // 🛡️ ENHANCED SYSTEM PROMPT
   const BASE_SYSTEM_PROMPT = `
-You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier financial news outlet approved by Google News.
+You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier f news outlet approved by Google News.
 Your Persona: ${personaDescription}
 
 Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals CoinDesk and CoinGape.

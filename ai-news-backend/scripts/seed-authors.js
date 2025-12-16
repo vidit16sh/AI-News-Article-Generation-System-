@@ -1,69 +1,70 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
 
-const authors = [
+// The Master List (Must match config/authors.js exactly)
+const AUTHORS = [
   {
-    name: "James Carter",
-    slug: "james-carter",
-    role: "Senior Crypto Analyst",
-    bio: "James is a veteran financial journalist with over a decade of experience covering cryptocurrency markets, DeFi protocols, and regulatory shifts. Formerly at Bloomberg and CoinDesk.",
-    // Professional Male Avatar
-    imageUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80",
-    twitter: "@james_crypto_news"
+    name: "Mohit Kumar",
+    role: "Founder & Editor-in-Chief",
+    slug: "mohit-kumar",
+    bio: "Mohit is the founder of CoinMarketBuzz, covering macro-financial trends and regulatory frameworks in the digital asset space. He bridges the gap between traditional finance and the crypto economy.",
+    imageUrl: "/authors/mohit.jpg",
+    linkedin: "https://www.linkedin.com/in/mohit-kumar-3b497758/",
+    focus: ["Regulation", "Bitcoin"] // Prisma expects a string/JSON, not array? *See note below
   },
   {
-    name: "Sarah Jenkins",
-    slug: "sarah-jenkins",
-    role: "AI & Tech Reporter",
-    bio: "Sarah specializes in the intersection of Artificial Intelligence and Blockchain. She breaks down complex LLM and neural network developments into readable insights for investors.",
-    // Professional Female Avatar
-    imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80",
-    twitter: "@sarah_tech_ai"
+    name: "Neelima Kumar",
+    role: "Senior Quantitative Analyst",
+    slug: "neelima-kumar",
+    bio: "Neelima is a Senior Quantitative Analyst at Stockpil, specializing in algorithmic trading strategies and on-chain liquidity analysis. She tracks institutional capital flows to identify emerging trends.",
+    imageUrl: "/authors/neelima.jpg",
+    linkedin: "https://www.linkedin.com/in/neelima-kumar-335127383/",
+    focus: ["DeFi", "Analysis"]
   },
   {
-    name: "Michael Chen",
-    slug: "michael-chen",
-    role: "Global Markets Editor",
-    bio: "Michael covers macro-economic trends, Fed policies, and Asian markets. His analysis focuses on how global liquidity flows impact Bitcoin and Ethereum price action.",
-    // Professional Male Avatar
-    imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80",
-    twitter: "@chen_macro_markets"
-  },
-  {
-    name: "Elena Rodriguez",
-    slug: "elena-rodriguez",
-    role: "Web3 & NFT Specialist",
-    bio: "Elena explores the cultural side of crypto, covering NFTs, Gaming, and the Metaverse. She brings a creative perspective to the technical world of Web3.",
-    // Professional Female Avatar
-    imageUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80",
-    twitter: "@elena_web3"
+    name: "CoinMarketBuzz Desk",
+    role: "Automated Data Insights",
+    slug: "editorial-desk",
+    bio: "Real-time market updates powered by the CoinMarketBuzz algorithmic data engine, monitoring 24/7 global trading activity.",
+    imageUrl: "/logo.png",
+    linkedin: null,
+    focus: ["News"]
   }
 ];
 
 async function main() {
-  console.log("🌱 Seeding Editorial Team...");
+  console.log("🔄 Syncing Authors...");
 
-  for (const author of authors) {
-    const result = await prisma.author.upsert({
+  for (const author of AUTHORS) {
+    // Upsert: Create if not exists, Update if exists
+    await prisma.author.upsert({
       where: { slug: author.slug },
       update: {
+        name: author.name,
         role: author.role,
         bio: author.bio,
-        imageUrl: author.imageUrl
+        imageUrl: author.imageUrl,
+        linkedin: author.linkedin
+        // Note: 'focus' is likely not in your DB Schema based on previous checks, 
+        // if it is, uncomment: focus: author.focus
       },
-      create: author,
+      create: {
+        name: author.name,
+        role: author.role,
+        slug: author.slug,
+        bio: author.bio,
+        imageUrl: author.imageUrl,
+        linkedin: author.linkedin
+      }
     });
-    console.log(`   ✅ Upserted: ${result.name}`);
+    console.log(`   ✅ Synced: ${author.name}`);
   }
 
-  console.log("🚀 Seed Complete! Your newsroom is ready.");
+  console.log("🎉 Done! Database now matches Config.");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect());

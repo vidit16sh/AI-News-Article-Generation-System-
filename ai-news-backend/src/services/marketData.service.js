@@ -1,5 +1,3 @@
-import fetch from 'node-fetch'; // Standard in Node 18+, but good to keep for safety
-
 const COIN_MAP = {
   'bitcoin': 'bitcoin', 'btc': 'bitcoin',
   'ethereum': 'ethereum', 'eth': 'ethereum',

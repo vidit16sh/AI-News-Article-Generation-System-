@@ -37,19 +37,6 @@ const triggerRevalidation = async (tag) => {
     } catch (error) {}
 }; 
 
-// Helper: Assign Random Author
-const assignAuthor = async () => {
-    try {
-        const count = await prisma.author.count();
-        if (count === 0) return null;
-        const skip = Math.floor(Math.random() * count);
-        return await prisma.author.findFirst({ skip });
-    } catch (e) {
-        console.error("Error assigning author:", e);
-        return null;
-    }
-};        
-
 // JSON-LD Builder (with strict image fallback)
 const createJsonLd = (article, url, authorObj) => {
     // Force a valid image URL for Google Schema compliance
@@ -121,10 +108,10 @@ const processGenerationJob = async (msg, channel) => {
 
         // 1. Assign Author & Persona
         const assignedAuthorProfile = getAuthorForCategory(cleanNews.title, cleanNews.tags || []);
-        const dbAuthor = await prisma.author.findFirst({
-            where: { slug: assignedAuthorProfile.slug }
+        const assignedAuthor = await prisma.author.findFirst({
+        where: { slug: assignedAuthorProfile.slug }
         }); 
-        const authorName = dbAuthor ? dbAuthor.name : "Editorial Team"; 
+        const authorName = assignedAuthor ? assignedAuthor.name : "Editorial Team"; 
         const selectedPersona = assignedAuthorProfile.personaKey;
         console.log(`   👤 Author: ${authorName} | 🎭 Persona: ${selectedPersona}`); 
         // 2. Data Injection (Market Data + Sentiment)

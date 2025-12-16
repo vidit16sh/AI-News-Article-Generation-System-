@@ -11,12 +11,13 @@ const parser = new Parser({
     }
 });
 
+// Helper: Sleep to avoid rate limits (politeness)
 const randomSleep = () => {
     const ms = Math.floor(Math.random() * 4000) + 3000; 
     return new Promise(resolve => setTimeout(resolve, ms));
 };
 
-// 1. COINNESS FETCHER
+// 1. COINNESS FETCHER (Kept mostly the same, works well for APIs)
 export const fetchCoinNess = async () => {
     const apiUrl = process.env.COINNESS_API_URL || "https://api.coinness.com/feed/v1/breaking-news?languageCode=en";
     console.log(`\n🔍 Fetching CoinNess...`);
@@ -41,7 +42,7 @@ export const fetchCoinNess = async () => {
             const sourceUrl = item.shareUrl || `https://coinness.com/news/${item.id}`;
 
             try {
-                // ✅ SAFE INSERT: Try to create, catch duplicates
+                // ✅ SAFE INSERT
                 const raw = await prisma.rawNews.create({
                     data: {
                         sourceUrl,
@@ -58,14 +59,11 @@ export const fetchCoinNess = async () => {
                 newCount++;
 
             } catch (dbError) {
-                // Ignore unique constraint violations (P2002), log others
-                if (dbError.code === 'P2002') {
-                    // process.stdout.write("s"); 
-                } else {
+                if (dbError.code !== 'P2002') { // Ignore unique constraint violations
                     console.error(`   ⚠️ DB Error: ${dbError.message}`);
                 }
             }
-            // Always mark as seen in Redis to prevent future attempts
+            // Always mark as seen
             await redis.set(uniqueId, '1', 'EX', 86400);
         }
         if (newCount > 0) console.log(`✅ CoinNess: ${newCount} new items.`);
@@ -75,7 +73,7 @@ export const fetchCoinNess = async () => {
     }
 };
 
-// 2. RSS FETCHER
+// 2. RSS FETCHER (IMPROVED for Google News & Redirects)
 export const fetchRSS = async (url) => {
     console.log(`\n🔍 Fetching RSS: ${url}`);
     const channel = await connectRabbit();
@@ -85,33 +83,65 @@ export const fetchRSS = async (url) => {
         let newCount = 0;
 
         for (const item of feed.items) {
-            const link = item.link;
-
-            const isCached = await redis.get(`news:${link}`);
+            // 1. REDIS CHECK: Fast check on the Feed Link (e.g. google redirect link)
+            const cacheKey = `news:${item.link || item.guid}`;
+            const isCached = await redis.get(cacheKey);
             if (isCached) { process.stdout.write("."); continue; }
 
-            // 1. Pre-Check DB (Optimization)
-            const existingRaw = await prisma.rawNews.findUnique({ where: { sourceUrl: link } });
-            if (existingRaw) { await redis.set(`news:${link}`, '1', 'EX', 86400); continue; }
-
-            let bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
+            // 2. SCRAPE & RESOLVE
+            // We behave as if the content is always short/missing (common in Google News)
+            // This forces a scrape to get the REAL URL and FULL Content.
+            await randomSleep(); 
             
+            let bestContent = "";
+            let finalUrl = item.link; // Default to RSS link
+
+            try {
+                const scrapedData = await scrapeArticle(item.link);
+                
+                // Handle new Scraper return format ({ content, url }) AND old format (string)
+                if (scrapedData) {
+                    if (typeof scrapedData === 'object' && scrapedData.content) {
+                        bestContent = scrapedData.content;
+                        if (scrapedData.url) finalUrl = scrapedData.url; // Capture the real Resolved URL
+                    } else if (typeof scrapedData === 'string') {
+                        bestContent = scrapedData;
+                    }
+                    console.log(`   📝 Scraped ${bestContent.length} chars from ${finalUrl.substring(0,30)}...`);
+                }
+            } catch (scrapeErr) {
+                console.warn(`   ⚠️ Scraping failed for ${item.link}, falling back to RSS feed data.`);
+            }
+
+            // Fallback: If scraping failed or returned nothing, use RSS data
+            if (!bestContent || bestContent.length < 200) {
+                bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
+            }
+
+            // Quality Control: If we still don't have enough text, skip it.
             if (bestContent.length < 200) {
-                await randomSleep(); 
-                const scrapedText = await scrapeArticle(link);
-                if (scrapedText) {
-                    bestContent = scrapedText;
-                    console.log(`   📝 Scraped ${bestContent.length} chars.`);
+                // Mark as seen so we don't retry immediately
+                await redis.set(cacheKey, '1', 'EX', 3600); 
+                continue; 
+            }
+
+            // 3. DB CHECK (Smart): Check if the FINAL Resolved URL exists
+            // This prevents adding the same Decrypt article twice if it came from different RSS feeds
+            if (finalUrl !== item.link) {
+                const existingReal = await prisma.rawNews.findUnique({ where: { sourceUrl: finalUrl } });
+                if (existingReal) {
+                    await redis.set(cacheKey, '1', 'EX', 86400); // Cache the redirect link too
+                    continue;
                 }
             }
 
             const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
 
             try {
-                // ✅ SAFE INSERT: Wrap creation in try/catch
+                // ✅ SAFE INSERT
                 const raw = await prisma.rawNews.create({
                     data: {
-                        sourceUrl: link,
+                        sourceUrl: finalUrl, // Save the REAL URL, not the Google Redirect
                         title: item.title,
                         rawBody: bestContent, 
                         publishedAt: pubDate,   
@@ -125,15 +155,14 @@ export const fetchRSS = async (url) => {
                 newCount++;
 
             } catch (dbError) {
-                // Catch "Unique constraint failed" error and ignore it
                 if (dbError.code === 'P2002') {
-                    process.stdout.write("s"); // Log 's' for skipped/duplicate
+                    process.stdout.write("s"); 
                 } else {
                     console.error(`   ⚠️ DB Insert Error: ${dbError.message}`);
                 }
             }
-            // Always update Redis so we don't try again
-            await redis.set(`news:${link}`, '1', 'EX', 86400);
+            // Always update Redis
+            await redis.set(cacheKey, '1', 'EX', 86400);
         }
         console.log(`\n✅ Saved ${newCount} NEW articles.`);
         return newCount;
