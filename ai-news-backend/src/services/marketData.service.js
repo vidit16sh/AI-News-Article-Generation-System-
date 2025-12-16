@@ -98,78 +98,88 @@ export const getEnrichedMarketData = async (text) => {
 export const generateChartUrl = async (text) => {
     try {
         const coinId = identifyCoin(text);
-        if (!coinId) return null; // No coin identified, cannot make a chart
+        if (!coinId) return null;
 
-        // A. Fetch 7 days of price data (Sparkline data)
-        const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=7`);
-        const data = await res.json();
-        
-        if (!data.prices || data.prices.length === 0) return null;
+        // A. Fetch Data (Price + 24h Change info for the header)
+        const [chartRes, coinRes] = await Promise.all([
+            fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=7`),
+            fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`)
+        ]);
 
-        // B. Process Data (Downsample for cleaner chart)
-        // CoinGecko returns hourly data for 7 days (~168 points). QuickChart handles ~20-30 best.
-        const prices = data.prices.map(p => p[1]);
-        const timestamps = data.prices.map(p => p[0]);
-        
-        // Filter to keep roughly 1 point per 6-8 hours
-        const filterStep = Math.ceil(prices.length / 24); 
-        const cleanPrices = prices.filter((_, i) => i % filterStep === 0);
-        const cleanLabels = timestamps.filter((_, i) => i % filterStep === 0)
-                                      .map(ts => new Date(ts).toLocaleDateString('en-US', {weekday:'short'}));
+        const chartData = await chartRes.json();
+        const coinData = await coinRes.json();
 
-        // Determine Trend Color (Green if up over 7 days, Red if down)
-        const startPrice = cleanPrices[0];
-        const endPrice = cleanPrices[cleanPrices.length - 1];
-        const isGreen = endPrice >= startPrice;
+        if (!chartData.prices || chartData.prices.length === 0) return null;
+
+        // B. Process Data
+        const prices = chartData.prices.map(p => p[1]);
+        const timestamps = chartData.prices.map(p => p[0]);
+        const currentPrice = coinData[coinId].usd;
+        const change24h = coinData[coinId].usd_24h_change;
         
-        // C. Construct QuickChart URL
+        // Downsample to ~40 points for a smooth curve
+        const step = Math.ceil(prices.length / 40);
+        const cleanPrices = prices.filter((_, i) => i % step === 0);
+        const cleanLabels = timestamps.filter((_, i) => i % step === 0)
+            .map(ts => new Date(ts).toLocaleDateString('en-US', {weekday: 'short'}));
+
+        // Trend Logic
+        const isBullish = change24h >= 0;
+        const color = isBullish ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)'; // Green-500 or Red-500
+        const bgColor = isBullish ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+
+        // C. Construct QuickChart Config (The "TradingView" Look)
         const chartConfig = {
             type: 'line',
             data: {
                 labels: cleanLabels,
                 datasets: [{
-                    label: `${coinId.toUpperCase()} (7D)`,
+                    label: 'Price',
                     data: cleanPrices,
-                    borderColor: isGreen ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)', // Green or Red
-                    backgroundColor: isGreen ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', // Light fill
+                    borderColor: color,
+                    backgroundColor: bgColor,
                     borderWidth: 3,
-                    pointRadius: 0, // Clean line without dots
+                    pointRadius: 0,
                     fill: true,
-                    lineTension: 0.4 // Smooth curves
+                    tension: 0.4
                 }]
             },
             options: {
-                title: { 
-                    display: true, 
-                    text: `${coinId.toUpperCase()} Price Action (7 Days)`,
-                    fontSize: 20,
-                    fontColor: '#111',
-                    padding: 10
-                },
+                layout: { padding: { top: 20, bottom: 20, left: 20, right: 20 } },
                 legend: { display: false },
+                title: {
+                    display: true,
+                    text: [
+                        `${coinId.toUpperCase()} • $${currentPrice.toLocaleString()}`, // Line 1: Ticker + Price
+                        `${change24h > 0 ? '+' : ''}${change24h.toFixed(2)}% (7 Days)` // Line 2: Change
+                    ],
+                    fontColor: '#ffffff',
+                    fontSize: 24,
+                    fontStyle: 'bold',
+                    padding: 20
+                },
                 scales: {
-                    xAxes: [{ 
+                    xAxes: [{
                         gridLines: { display: false },
-                        ticks: { fontSize: 10, fontColor: '#666' }
+                        ticks: { fontColor: '#9ca3af', fontSize: 10, maxRotation: 0 }
                     }],
-                    yAxes: [{ 
-                        gridLines: { color: 'rgba(0,0,0,0.05)' },
-                        ticks: { 
-                            fontSize: 10, 
-                            fontColor: '#666',
-                            callback: (val) => '$' + val.toLocaleString() 
+                    yAxes: [{
+                        gridLines: { color: '#374151', borderDash: [5, 5] }, // Dashed grid
+                        ticks: {
+                            fontColor: '#9ca3af',
+                            fontSize: 11,
+                            callback: (val) => '$' + val.toLocaleString()
                         }
                     }]
                 }
             }
         };
 
-        const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&width=800&height=400&backgroundColor=white`;
-        
-        return chartUrl;
+        // Dark Mode Background URL
+        return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&width=1200&height=630&backgroundColor=%23111827`;
 
     } catch (e) {
-        console.error("Chart Generation Error:", e.message);
+        console.error("Chart Error:", e.message);
         return null;
     }
 };

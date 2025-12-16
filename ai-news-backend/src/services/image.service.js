@@ -9,64 +9,101 @@ fal.config({
   credentials: process.env.FAL_KEY,
 });
 
-// 📸 STYLE 1: SERIOUS (Bloomberg / Reuters Style)
-// Best for: Regulation, Lawsuits, Hacks, Government news
-const REALISM_PROMPT = `
-Style: Award-winning Photojournalism, Cinematic Editorial Photography.
-Visuals: Highly detailed, hyper-realistic, dramatic lighting (volumetric fog, studio rim lighting), depth of field (bokeh).
-Camera: Shot on Sony A7R IV, 35mm lens, f/1.8 aperture.
-Texture: 8k resolution, ray tracing, sharp focus, incredibly detailed textures.
-Mood: Serious, trustworthy, impactful, "Breaking News" aesthetic.
-Composition: Rule of thirds, centered subject, professional color grading (cool corporate tones or dramatic warm tones).
+// 🎨 STYLE 1: HIGH-END TECH EDITORIAL (The Verge / Polygon Style)
+// Best for: Market Analysis, Protocol Updates, Defi, Tech deep dives
+const EDITORIAL_PROMPT = `
+Style: Abstract Tech Editorial, Double Exposure, Data Visualization Art.
+Visuals: Glassmorphism, glowing fiber optics, floating financial candlesticks, isometric geometry, intricate 3D render.
+Colors: Deep navy background with neon cyan, magenta, and electric gold accents.
+Mood: Sophisticated, institutional, intelligent, futuristic.
+Composition: Minimalist center focus, clean negative space, rule of thirds.
 `;
 
-// 🎨 STYLE 2: CRYPTO-POP (The Block / CoinDesk Feature Style)
-// Best for: Price Actions, NFT drops, Community sentiment, Op-Ed
-const CRYPTO_POP_PROMPT = `
-Style: High-End 3D Editorial Illustration, Digital Art (Beeple meets Pixar).
-Visuals: Octane Render, Unreal Engine 5, isometric or abstract 3D composition.
-Materials: Glass, chrome, brushed gold, matte plastic, glowing neon accents.
-Colors: Vibrant, cyberpunk, vaporwave, rich gradients (purple/blue/teal).
-Mood: Futuristic, chaotic-good, energetic, "Web3 Culture".
-Composition: Abstract representations of the subject (e.g., a glass bull running through a digital city), clean lines.
+// 🐸 STYLE 2: MEME / CULTURE (The Reddit / Twitter / Degens Style)
+// Best for: Dogecoin, Pepe, NFT drops, Community hype, Viral stories
+const MEME_PROMPT = `
+Style: High-Definition Digital Oil Painting, Satirical Caricature, Internet Culture Art.
+Visuals: Exaggerated expressions, cosmic backgrounds, rocket ships, laser eyes, chaotic energy, surreal humor.
+Colors: Vibrant, highly saturated, warm oranges, greens, and purples.
+Mood: Hype, FOMO, fun, energetic, "To The Moon".
+Reference: "Wojak" emotion but high-quality render, 4k digital art.
 `;
 
-export const generateImage = async (headline, style = "REALISM") => {
+// ⚖️ STYLE 3: SERIOUS / REGULATION (Bloomberg / WSJ Style)
+// Best for: SEC lawsuits, Bans, Hacks, Government regulation, Crime
+const SERIOUS_PROMPT = `
+Style: Cinematic Photojournalism, Courtroom Sketch aesthetic mixed with Hyper-Realism.
+Visuals: Gavels, government buildings, shredded documents, red tape, stormy skies, dramatic shadows.
+Colors: Desaturated, cold blue, slate grey, steel, high contrast.
+Mood: Tense, urgent, trustworthy, breaking news.
+Composition: Dramatic angles, depth of field (bokeh).
+`;
+
+export const generateImage = async (headline, style = "EDITORIAL") => {
   if (!process.env.FAL_KEY) return null;
 
   try {
-    console.log(`   🎨 Generating [${style}] Art for: "${headline.substring(0, 30)}..."`);
+    // 1. Clean the headline to remove confusing chars
+    const cleanSubject = headline.replace(/[:"()]/g, "").trim();
+    const lowerHead = cleanSubject.toLowerCase();
 
-    // 1. Clean the headline to remove confusing chars, but KEEP $ and %
-    const cleanSubject = headline
-      .replace(/[:"()]/g, "") // Remove quotes/colons
-      .trim();
+    // 2. Smart Style Detection (Override 'style' based on content)
+    let selectedPrompt = EDITORIAL_PROMPT; // Default
 
-    // 2. Select Prompt Base
-    const basePrompt = style === "POP" ? CRYPTO_POP_PROMPT : REALISM_PROMPT;
+    // A. Detect MEME Context
+    if (
+        lowerHead.includes('doge') || 
+        lowerHead.includes('pepe') || 
+        lowerHead.includes('shib') || 
+        lowerHead.includes('bonk') || 
+        lowerHead.includes('wif') || 
+        lowerHead.includes('meme') ||
+        lowerHead.includes('moon')
+    ) {
+        selectedPrompt = MEME_PROMPT;
+        style = "MEME";
+    } 
+    // B. Detect SERIOUS Context
+    else if (
+        lowerHead.includes('sec') || 
+        lowerHead.includes('sue') || 
+        lowerHead.includes('ban') || 
+        lowerHead.includes('hack') || 
+        lowerHead.includes('jail') || 
+        lowerHead.includes('law') || 
+        lowerHead.includes('arrest') ||
+        lowerHead.includes('collapse')
+    ) {
+        selectedPrompt = SERIOUS_PROMPT;
+        style = "SERIOUS";
+    }
+
+    console.log(`   🎨 Generating [${style}] Art for: "${cleanSubject.substring(0, 30)}..."`);
 
     // 3. Construct the Engineering Prompt
     const fullPrompt = `
-    ${basePrompt}
+    ${selectedPrompt}
     
     SUBJECT DIRECTIVE: Create a visual representation of: "${cleanSubject}".
     
     SCENE RULES:
-    - If the headline mentions a specific coin (e.g., Bitcoin, Ethereum), incorporate its logo or a symbolic representation (e.g., a gold coin with 'B').
-    - If the headline is about a "Hack" or "Crash", use red tones, shattered glass, or dark moody lighting.
-    - If the headline is about a "Rally" or "Bull Run", use green tones, upward arrows, or ascending geometry.
-    - NO TEXT: Do not attempt to write words or the headline inside the image.
+    - If "Bitcoin" is mentioned, use an Orange/Gold circular motif or digital gold texture.
+    - If "Ethereum" is mentioned, use a Blue/Purple diamond/crystal motif.
+    - If "Bull" or "Rally", use upward trends, green lights, ascending geometry.
+    - If "Bear" or "Crash", use downward trends, red lights, shattered glass.
+    - NO TEXT: Do not attempt to write words, letters, or the headline inside the image.
     `;
 
-    // 4. Call Flux (Schnell is fast/cheap, Dev is higher quality. Schnell is fine for news if prompted well)
+    // 4. Call Flux (Schnell)
+    // We disable safety checker for news (so "war" or "attack" headlines aren't blocked)
     const result = await fal.subscribe("fal-ai/flux/schnell", {
       input: {
         prompt: fullPrompt,
         image_size: "landscape_16_9",
-        num_inference_steps: 4, // 4 is standard for Schnell
-        seed: Math.floor(Math.random() * 1000000), // Randomize seed to avoid identical images for similar news
-        enable_safety_checker: true, // Keep false for news (avoids false positives on "wars" or "attacks")
-        guidance_scale: 7.5,
+        num_inference_steps: 4, 
+        seed: Math.floor(Math.random() * 1000000), 
+        enable_safety_checker: false, 
+        guidance_scale: 7.0, // Slightly lower than 7.5 for more creativity
         sync_mode: true
       },
       logs: false, 
@@ -76,8 +113,6 @@ export const generateImage = async (headline, style = "REALISM") => {
     const images = result.images || (result.data && result.data.images);
 
     if (images && images.length > 0) {
-      // ✅ SUCCESS: Return the URL. 
-      // The 'generate.worker.js' will take this URL and pass it to 'storage.service.js' to save locally.
       return images[0].url;
     }
     

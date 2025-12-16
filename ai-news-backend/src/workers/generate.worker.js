@@ -150,6 +150,7 @@ const processGenerationJob = async (msg, channel) => {
 
         // 5. VISUAL STRATEGY: Chart vs. AI Image
         let finalImageUrl = null;
+        
         const headlineLower = aiOutput.headline.toLowerCase();
         const tagsString = (aiOutput.tags || []).join(' ').toLowerCase(); 
 
@@ -161,44 +162,48 @@ const processGenerationJob = async (msg, channel) => {
             headlineLower.includes("market") ||
             tagsString.includes("market");
 
-        // B. Is it SERIOUS/LEGAL? (Crime, Law, Regulation)
-        const isSeriousStory = 
-            headlineLower.includes("sec") || 
-            headlineLower.includes("sue") || 
-            headlineLower.includes("hack") || 
-            headlineLower.includes("scam") || 
-            headlineLower.includes("law") || 
-            headlineLower.includes("regulation") ||
-            headlineLower.includes("ban");
-
-        // A. Try to generate a Real Chart first
-        if (isMarketStory && !isSeriousStory) {
-            // Priority: CHART
-            console.log(`   ⚖️ Editorial Decision: MARKET STORY -> Generate Chart`);
-            const textForDetection = `${aiOutput.headline} ${cleanNews.title}`; 
-            const chartUrl = await generateChartUrl(textForDetection);
-            if (chartUrl) {
-                console.log(`      ✅ Chart Created.`);
-                finalImageUrl = await downloadAndSaveImage(chartUrl, aiOutput.slug + "-chart");
-            }
+        // A. Always Generate the "Clickable" Featured Image (AI Art)
+        // We pass the category slug to help the image service decide style (MEME, SERIOUS, or EDITORIAL)
+        const categorySlug = cleanNews.category ? cleanNews.category.slug : 'altcoins';
+        const aiImage = await generateImage(aiOutput.headline, categorySlug);
+        
+        if (aiImage) {
+            finalImageUrl = await downloadAndSaveImage(aiImage, aiOutput.slug);
+        } else {
+            // Fallback if AI image failed
+            finalImageUrl = '/default-news.jpg';
         }
-        // B. Fallback to AI Art (If no chart or coin not found)
-        if (!finalImageUrl) {
-            let imageStyle = "POP"; // Default style
-            
-            if (isSeriousStory) {
-                console.log(`   ⚖️ Editorial Decision: SERIOUS STORY -> Realism Style`);
-                imageStyle = "REALISM";
-            } else {
-                console.log(`   ⚖️ Editorial Decision: CULTURE STORY -> Pop/3D Style`);
-                imageStyle = "POP";
-            }
 
-            console.log(`      🎨 Generating AI Art [${imageStyle}]...`);
-            let tempImageUrl = await generateImage(aiOutput.headline, imageStyle);
+        // B. If Market Story, Generate Chart & INJECT into Body
+        // This ensures the reader gets the data INSIDE the article, while the feed looks pretty with Art.
+        if (isMarketStory) {
+            console.log(`   📊 Market Story Detected: Generating Chart...`);
+            const textForDetection = `${aiOutput.headline} ${cleanNews.title}`; 
+            const rawChartUrl = await generateChartUrl(textForDetection);
             
-            if (tempImageUrl) {
-                finalImageUrl = await downloadAndSaveImage(tempImageUrl, aiOutput.slug);
+            if (rawChartUrl) {
+                // Save chart locally so we don't depend on external hosting
+                const localChart = await downloadAndSaveImage(rawChartUrl, aiOutput.slug + "-chart");
+                
+                if (localChart) {
+                    console.log(`      ✅ Chart Injected into Article Body.`);
+                    
+                    // HTML Template for the Chart
+                    const chartHtml = `
+                        <figure class="my-8">
+                            <img src="${localChart}" alt="${aiOutput.headline} Price Chart" class="w-full rounded-lg shadow-lg border border-gray-800" />
+                            <figcaption class="text-center text-sm text-gray-400 mt-2">7-Day Price Action via CoinGecko</figcaption>
+                        </figure>
+                    `;
+                    
+                    // Inject after the first closing paragraph </p> to make it prominent
+                    if (aiOutput.article_html.includes('</p>')) {
+                        aiOutput.article_html = aiOutput.article_html.replace('</p>', `</p>${chartHtml}`);
+                    } else {
+                        // Fallback: Append to top if no paragraphs found
+                        aiOutput.article_html = chartHtml + aiOutput.article_html;
+                    }
+                }
             }
         }
 
