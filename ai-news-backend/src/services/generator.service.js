@@ -21,7 +21,14 @@ const PERSONAS = {
   "THE_INSIDER": "You are an investigative crypto journalist. You look for the 'story behind the story'. You are skeptical of official announcements, check on-chain movements, and question liquidity.",
   "THE_MACRO": "You are a Macro-Economist. You connect crypto moves to the Fed, inflation, bond yields, and global stocks. You see the big picture.",
   "THE_FUTURIST": "You are a forward-looking technologist. You focus on protocol upgrades, GitHub commits, developer adoption, and the long-term vision of Web3 technology."
-};
+}; 
+
+const PROMPT_VARIANTS = [
+  "Style Mode: BREAKING NEWS. Short, punchy sentences. Data-first. Urgent tone. Use fragments for speed.",
+  "Style Mode: DEEP DIVE. Connect cause and effect. Use transitions like 'Consequently' and 'Underlying this trend'. Focus on the 'Why'.",
+  "Style Mode: MARKET CONTEXT. Focus heavily on historical comparison (e.g., 'Similar to the 2021 correction').",
+  "Style Mode: SKEPTICAL ANALYSIS. Question the official narrative. Look for contradictions in the data. Use a critical voice."
+];
 
 const FORBIDDEN_WORDS = [
   "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
@@ -56,7 +63,7 @@ const cleanJsonOutput = (text) => {
   }
 }; 
 
-const auditAndFixArticle = (json) => {
+const auditAndFixArticle = (json,sourceUrl) => {
   let html = json.article_html || ""; 
   let score = 100;
   
@@ -83,6 +90,17 @@ const auditAndFixArticle = (json) => {
             json.headline = `${json.focus_keywords}: ${json.headline}`;
         }
       }
+  } 
+
+  const sourceNote = `
+    <p class="text-sm mt-8 text-slate-500 italic border-t pt-4">
+      <strong>Source Note:</strong> Market data and factual reporting in this article are sourced from 
+      <a href="${sourceUrl}" target="_blank" rel="nofollow" class="text-blue-600 hover:underline">original reports</a>. 
+      Commentary and analysis provided by CoinMarketBuzz.
+    </p>
+  `; 
+  if (!html.includes("Source Note:")) {
+    html += sourceNote;
   }
   
   json.article_html = html; 
@@ -121,7 +139,8 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
   const MAX_RETRIES = 2;
 
   // 1. Prepare Persona
-  const personaDescription = PERSONAS[selectedPersonaKey] || PERSONAS["THE_ANALYST"];
+  const personaDescription = PERSONAS[selectedPersonaKey] || PERSONAS["THE_ANALYST"]; 
+  const randomStyle = PROMPT_VARIANTS[Math.floor(Math.random() * PROMPT_VARIANTS.length)];
   const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   // 2. Build Internal Link Strategy
@@ -137,7 +156,7 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
   // 🛡️ ENHANCED SYSTEM PROMPT
   const BASE_SYSTEM_PROMPT = `
 You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier f news outlet approved by Google News.
-Your Persona: ${personaDescription}
+Your Persona: ${personaDescription} , Your Style: ${randomStyle}
 
 Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals CoinDesk and CoinGape.
 **DO NOT** just summarize. **ANALYZE.**
@@ -274,7 +293,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
         json.article_html += `<p class="text-sm mt-4 text-slate-500">Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
       }
 
-      json = auditAndFixArticle(json); 
+      json = auditAndFixArticle(json, cleanedNewsData.sourceUrl); 
 
       return { ...json, status: "STRONG" };
     } catch (error) {
