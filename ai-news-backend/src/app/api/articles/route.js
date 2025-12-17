@@ -5,10 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q') || '';
-  const category = searchParams.get('category') || 'all';
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '12');
+
+  const query = (searchParams.get('q') || '').trim();
+  const category = (searchParams.get('category') || 'all').trim().toLowerCase();
+  const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
+
+  // ✅ Default 20 (as requested), cap to 50
+  const limitRaw = parseInt(searchParams.get('limit') || '20', 10) || 20;
+  const limit = Math.min(Math.max(limitRaw, 1), 50);
 
   try {
     const where = {
@@ -19,23 +23,24 @@ export async function GET(request) {
     if (query) {
       where.OR = [
         { headline: { contains: query, mode: 'insensitive' } },
-        { metaDescription: { contains: query, mode: 'insensitive' } }
+        { metaDescription: { contains: query, mode: 'insensitive' } },
       ];
     }
 
-    // 2. Category Filter
+    // 2. Category Filter (server-side)
     if (category && category !== 'all') {
-      where.tags = {
-        has: category 
-      };
+      // ✅ Your current DB logic stores categories in tags array
+      where.tags = { has: category };
     }
 
     // 3. Execute Query
+    const skip = (page - 1) * limit;
+
     const [articles, total] = await prisma.$transaction([
       prisma.generatedArticle.findMany({
         where,
         take: limit,
-        skip: (page - 1) * limit,
+        skip,
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -47,26 +52,26 @@ export async function GET(request) {
           tags: true,
           priorityScore: true,
           confidenceScore: true,
-          
-          // ✅ FIX: Include Author Data for the Grid Cards
+
+          // ✅ Include Author Data for the Grid Cards
           author: {
             select: {
-                name: true,
-                slug: true,
-                imageUrl: true,
-                role: true
-            }
+              name: true,
+              slug: true,
+              imageUrl: true,
+              role: true,
+            },
           },
 
           originalNews: {
             select: {
               sourceUrl: true,
-              title: true
-            }
-          }
-        }
+              title: true,
+            },
+          },
+        },
       }),
-      prisma.generatedArticle.count({ where })
+      prisma.generatedArticle.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -74,10 +79,9 @@ export async function GET(request) {
       meta: {
         total,
         page,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
-
   } catch (error) {
     console.error('API Error:', error);
     return NextResponse.json({ error: 'Search failed' }, { status: 500 });

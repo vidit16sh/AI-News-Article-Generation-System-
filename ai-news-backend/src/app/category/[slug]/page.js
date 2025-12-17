@@ -2,34 +2,28 @@
 import Link from "next/link";
 import RightSidebar from "../../../components/layout/RightSidebar";
 
-/* ---------- TEMP DATA FETCH: get all articles ---------- */
+/* ---------- Server-side category fetch ---------- */
 
-async function fetchAllArticles() {
+async function fetchCategoryArticles(slug) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
-    const res = await fetch(`${baseUrl}/api/articles?limit=50`, {
-      next: { revalidate: 60 },
-    });
+    const res = await fetch(
+      `${baseUrl}/api/articles?category=${encodeURIComponent(slug)}&limit=20`,
+      { next: { revalidate: 60 } }
+    );
 
     if (!res.ok) {
-      console.error("Failed to fetch articles for category page:", res.status);
+      console.error("Failed to fetch category articles:", res.status);
       return [];
     }
 
     const json = await res.json();
     return Array.isArray(json.data) ? json.data : [];
   } catch (err) {
-    console.error("Error fetching articles for category page:", err);
+    console.error("Error fetching category articles:", err);
     return [];
   }
-}
-
-/* ---------- Helpers ---------- */
-
-function normalizeCategory(value) {
-  if (!value) return "";
-  return value.toString().trim().toLowerCase();
 }
 
 /* ---------- Metadata ---------- */
@@ -51,23 +45,12 @@ export async function generateMetadata({ params }) {
 
 export default async function CategoryPage({ params }) {
   const { slug } = await params;
-  const safeSlug = slug ?? "news";
+  const safeSlug = (slug ?? "news").toString().trim().toLowerCase();
 
-  const allArticles = await fetchAllArticles();
   const categoryMeta = getCategoryMeta(safeSlug);
 
-  // ✅ FIX: FILTER ARTICLES BY CATEGORY
-  const filteredArticles = allArticles.filter((article) => {
-    const articleCategory =
-      article.category ||
-      article.primaryCategory ||
-      (Array.isArray(article.tags) && article.tags[0]) ||
-      "";
-
-    return (
-      normalizeCategory(articleCategory) === normalizeCategory(safeSlug)
-    );
-  });
+  // ✅ FIX: Fetch already-filtered data from the server
+  const filteredArticles = await fetchCategoryArticles(safeSlug);
 
   if (!filteredArticles.length) {
     return (
@@ -137,9 +120,7 @@ function CategoryHero({ article }) {
             <span className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-red-600">
               {a.category}
             </span>
-            {a.date && (
-              <span className="text-slate-500">{a.date}</span>
-            )}
+            {a.date && <span className="text-slate-500">{a.date}</span>}
           </div>
 
           <h1 className="text-2xl font-light leading-snug sm:text-3xl">
