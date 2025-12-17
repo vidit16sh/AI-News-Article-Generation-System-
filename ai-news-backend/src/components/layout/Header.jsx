@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import BreakingNewsTicker from "./BreakingNewsTicker";
 
 const PRIMARY_LINKS = [
   { label: "Latest News", href: "/" },
-  { label: "Crypto", href: "/category/crypto" },
-  { label: "People", href: "/category/people" },
-  { label: "Tech", href: "/category/tech" },
-  { label: "Finance", href: "/category/finance" },
-  { label: "Web3", href: "/category/web3" },
-  { label: "BTC", href: "/category/btc" },
-  { label: "ETH", href: "/category/eth" },
-  { label: "DOGE", href: "/category/doge" },
+
+  // Backend category slugs (exact match)
+  { label: "Bitcoin", href: "/category/bitcoin" },
+  { label: "Ethereum", href: "/category/ethereum" },
+  { label: "DeFi", href: "/category/defi" },
+  { label: "Regulation", href: "/category/regulation" },
+  { label: "AI Hardware", href: "/category/ai-hardware" },
+
+  // Finance -> Market Analysis (backend slug: analysis)
+  { label: "Market Analysis", href: "/category/analysis" },
 ];
 
 const SECONDARY_LINKS = [

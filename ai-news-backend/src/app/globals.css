@@ -175,4 +175,61 @@ a {
   .article-prose.prose blockquote > ol {
     margin: 0 !important;
   }
+
+  /* -----------------------------------------
+     ✅ Tables inside article-prose (Data Snapshot)
+     - Borders + padding
+     - Mobile overflow-x scroll
+  ------------------------------------------ */
+
+  .article-prose.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0 !important;
+    font-size: 0.95rem;
+    display: block; /* enables horizontal scrolling */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .article-prose.prose thead {
+    background: #f8fafc; /* slate-50 */
+  }
+
+  .article-prose.prose th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    color: #0f172a; /* slate-900 */
+    border: 1px solid #e2e8f0; /* slate-200 */
+    white-space: nowrap;
+  }
+
+  .article-prose.prose td {
+    padding: 0.75rem 1rem;
+    border: 1px solid #e2e8f0; /* slate-200 */
+    color: #334155; /* slate-700 */
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  .article-prose.prose tbody tr:nth-child(even) {
+    background: #f9fafb;
+  }
+
+  .article-prose.prose caption {
+    caption-side: bottom;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #64748b; /* slate-500 */
+  }
+}
+
+@keyframes ticker {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }

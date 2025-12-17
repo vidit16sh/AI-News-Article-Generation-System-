@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import RightSidebar from "../../../components/layout/RightSidebar";
+import AuthorBioBox from "../../../components/article/AuthorBioBox";
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
@@ -68,8 +69,20 @@ export default async function ArticlePage({ params }) {
   }
 
   const { article, relatedArticles } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const articleUrl = `${baseUrl}/news/${article.slug}`;
+
+  // ✅ JSON-LD (NewsArticle schema) from API
+  const newsJsonLdRaw = article?.newsJsonLd;
+  let newsJsonLd = null;
+
+  try {
+    newsJsonLd =
+      typeof newsJsonLdRaw === "string"
+        ? JSON.parse(newsJsonLdRaw)
+        : newsJsonLdRaw;
+  } catch (e) {
+    console.warn("Invalid newsJsonLd JSON:", e);
+    newsJsonLd = null;
+  }
 
   const category =
     article.category || article.primaryCategory || article.tags?.[0] || "News";
@@ -86,7 +99,7 @@ export default async function ArticlePage({ params }) {
   const author = article.author || {
     name: "Editorial Team",
     role: "AI News Desk",
-    slug: "editorial-team",
+    slug: null,
     imageUrl: null,
   };
 
@@ -114,7 +127,10 @@ export default async function ArticlePage({ params }) {
           </li>
           <li>/</li>
           <li>
-            <Link href="/news" className="hover:text-slate-800 transition-colors">
+            <Link
+              href="/news"
+              className="hover:text-slate-800 transition-colors"
+            >
               News
             </Link>
           </li>
@@ -135,6 +151,14 @@ export default async function ArticlePage({ params }) {
           itemScope
           itemType="https://schema.org/NewsArticle"
         >
+          {/* ✅ Inject NewsArticle JSON-LD for Google */}
+          {newsJsonLd && (
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
+            />
+          )}
+
           {/* Top meta section */}
           <header className="mb-8 border-b border-slate-200 pb-8">
             <div className="mb-4">
@@ -190,10 +214,7 @@ export default async function ArticlePage({ params }) {
 
               <div className="flex items-center gap-4 text-sm text-slate-500">
                 {publishedDate && (
-                  <time
-                    itemProp="datePublished"
-                    dateTime={article.createdAt}
-                  >
+                  <time itemProp="datePublished" dateTime={article.createdAt}>
                     {publishedDate}
                   </time>
                 )}
@@ -235,7 +256,8 @@ export default async function ArticlePage({ params }) {
                 <ShareIcon label="Email" abbr="@" />
               </div>
             </div>
-      {/* Article body */}
+
+            {/* ✅ Article body (ONLY ONCE) */}
             <section
               itemProp="articleBody"
               className="
@@ -255,6 +277,9 @@ export default async function ArticlePage({ params }) {
               dangerouslySetInnerHTML={{ __html: article.articleHtml }}
             />
           </div>
+
+          {/* ✅ Author Bio Box (after content) */}
+          <AuthorBioBox author={article.author} />
 
           {/* Disclaimer */}
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
@@ -325,7 +350,10 @@ function normalizeRelated(article) {
   const slug = article.slug || article.id || "#";
   const title = article.headline || article.title || "Untitled article";
   const category =
-    article.category || article.primaryCategory || article.tags?.[0] || "Business";
+    article.category ||
+    article.primaryCategory ||
+    article.tags?.[0] ||
+    "Business";
   const imageUrl =
     article.imageUrl || article.heroImageUrl || article.thumbnail || "";
 
