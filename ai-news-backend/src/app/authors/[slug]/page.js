@@ -10,66 +10,49 @@ export const dynamic = "force-dynamic";
 async function getAuthorWithArticles(slug) {
   if (!slug) return null;
 
-  return prisma.author.findUnique({
-    where: { slug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      role: true,
-      imageUrl: true,
+  try {
+    return await prisma.author.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        role: true,
+        imageUrl: true,
+        bio: true, 
+        linkedin: true, 
 
-      // ✅ Persona / Bio fields (use whichever exists in your DB)
-      bio: true,
-      bioText: true,
-      personaBio: true,
-      about: true,
-      description: true,
-      summary: true,
-
-      // Optional socials if you have them
-      twitterUrl: true,
-      linkedinUrl: true,
-      websiteUrl: true,
-
-      articles: {
-        where: { status: "PUBLISHED" },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-        select: {
-          id: true,
-          slug: true,
-          headline: true,
-          metaDescription: true,
-          imageUrl: true,
-          createdAt: true,
-          tags: true,
+        articles: {
+          where: { status: "PUBLISHED" },
+          orderBy: { publishAt: "desc" },
+          take: 50,
+          select: {
+            id: true,
+            slug: true,
+            headline: true,
+            metaDescription: true,
+            imageUrl: true,
+            publishAt: true,
+            tags: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error("❌ Error fetching author data:", error);
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const author = await getAuthorWithArticles(slug);
 
-  if (!author) return { title: "Author Not Found | VrajNews" };
-
-  const bio =
-    author.personaBio ||
-    author.bio ||
-    author.bioText ||
-    author.about ||
-    author.description ||
-    author.summary ||
-    "";
+  if (!author) return { title: "Author Not Found | CoinMarketBuzz" };
 
   return {
-    title: `${author.name} | Author at VrajNews`,
-    description:
-      bio ||
-      `${author.name} publishes AI-assisted crypto & tech explainers with editorial oversight.`,
+    title: `${author.name} | Author at CoinMarketBuzz`,
+    description: author.bio || `Read the latest crypto analysis by ${author.name}.`,
   };
 }
 
@@ -81,168 +64,137 @@ export default async function AuthorPage({ params }) {
 
   const name = author.name || "Editorial Team";
   const role = author.role || "Contributor";
-  const imageUrl = author.imageUrl || null;
+  // Fallback if image is missing
+  const imageUrl = (author.imageUrl && author.imageUrl.startsWith('/')) 
+    ? author.imageUrl 
+    : "/default-news.jpg";
 
-  // ✅ This is what Google wants to see clearly on-page
-  const personaBio =
-    author.personaBio ||
-    author.bio ||
-    author.bioText ||
-    author.about ||
-    author.description ||
-    author.summary ||
-    "";
-
-  const articles = Array.isArray(author.articles) ? author.articles : [];
-
+  const bio = author.bio || "Crypto market analyst and contributor.";
+  const articles = author.articles || []; 
+  
   return (
     <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-0">
       {/* Breadcrumbs */}
-      <nav
-        aria-label="Breadcrumb"
-        className="mb-6 text-xs font-medium text-slate-500"
-      >
+      <nav aria-label="Breadcrumb" className="mb-6 text-xs font-medium text-slate-500">
         <ol className="flex flex-wrap items-center gap-1">
-          <li>
-            <Link href="/" className="hover:text-slate-800 transition-colors">
-              Home
-            </Link>
-          </li>
+          <li><Link href="/" className="hover:text-slate-800 transition-colors">Home</Link></li>
           <li>/</li>
-          <li>
-            <Link
-              href="/authors"
-              className="hover:text-slate-800 transition-colors"
-            >
-              Authors
-            </Link>
-          </li>
+          {/* If you don't have an /authors list page, you can remove this middle link */}
+          <li><Link href="/authors" className="hover:text-slate-800 transition-colors">Authors</Link></li>
           <li>/</li>
-          <li className="text-slate-700" aria-current="page">
-            {name}
-          </li>
+          <li className="text-slate-700" aria-current="page">{name}</li>
         </ol>
       </nav>
 
       <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-12">
-        {/* MAIN */}
+        {/* MAIN CONTENT */}
         <main className="lg:pr-0">
+          
           {/* Author Card */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-slate-100">
-                {imageUrl ? (
-                  <Image
-                    src={imageUrl}
-                    alt={name}
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-xl font-extrabold text-slate-500">
-                    {name.charAt(0)}
-                  </span>
-                )}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+              <div className="relative h-24 w-24 flex-none overflow-hidden rounded-full bg-slate-100 border border-slate-100">
+                <Image
+                  src={imageUrl}
+                  alt={name}
+                  fill
+                  className="object-cover"
+                  sizes="96px"
+                  priority
+                />
               </div>
 
               <div className="flex-1">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                  {name}
-                </h1>
-                <p className="mt-1 text-sm text-slate-500">{role}</p>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">{name}</h1>
+                <div className="mt-1 flex items-center gap-3">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {role}
+                  </span>
+                </div>
+                
+                <div className="mt-4 text-base leading-relaxed text-slate-600 max-w-2xl">
+                  {bio}
+                </div>
 
-                {/* ✅ Persona Bio (important for “Human Reviewer” / E-E-A-T) */}
-                {personaBio && (
-                  <div className="mt-4 text-sm leading-relaxed text-slate-700">
-                    {personaBio}
-                  </div>
-                )}
-
-                {/* Optional: social links if present */}
-                <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                  {author.websiteUrl && (
-                    <a
-                      href={author.websiteUrl}
-                      className="font-semibold text-blue-700 hover:underline"
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      Website
-                    </a>
-                  )}
-                  {author.twitterUrl && (
-                    <a
-                      href={author.twitterUrl}
-                      className="font-semibold text-blue-700 hover:underline"
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      X (Twitter)
-                    </a>
-                  )}
-                  {author.linkedinUrl && (
+                {/* ✅ Only LinkedIn shown */}
+                {author.linkedinUrl && (
+                  <div className="mt-5 border-t border-slate-100 pt-4">
                     <a
                       href={author.linkedinUrl}
-                      className="font-semibold text-blue-700 hover:underline"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:underline"
                       rel="noopener noreferrer"
                       target="_blank"
                     >
-                      LinkedIn
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                      </svg>
+                      Connect on LinkedIn
                     </a>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </section>
 
-          {/* Articles list */}
-          <section className="mt-10">
-            <div className="mb-6 flex items-center gap-3">
-              <span className="h-6 w-1.5 rounded-full bg-red-600" />
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                Latest articles by {name}
-              </h2>
+          {/* Articles Feed */}
+          <section className="mt-12">
+            <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+              <h2 className="text-xl font-bold text-slate-900">Recent Analysis</h2>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                {articles.length}
+              </span>
             </div>
 
-            {articles.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                No published articles yet.
-              </div>
-            ) : (
-              <div className="grid gap-6 sm:grid-cols-2">
-                {articles.map((a) => (
-                  <Link
-                    key={a.id || a.slug}
-                    href={`/news/${a.slug}`}
-                    className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-300 transition-colors"
-                  >
-                    <div className="text-xs text-slate-500">
-                      {(a.tags?.[0] || "News").toString()} •{" "}
-                      {a.createdAt
-                        ? new Date(a.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "2-digit",
-                            year: "numeric",
-                          })
-                        : ""}
+            <div className="grid gap-6 sm:grid-cols-2">
+              {articles.map((article) => (
+                <Link
+                  key={article.id}
+                  href={`/news/${article.slug}`}
+                  className="group flex flex-col rounded-xl border border-slate-200 bg-white p-1 shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
+                >
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg bg-slate-100">
+                    {article.imageUrl ? (
+                      <Image
+                        src={article.imageUrl}
+                        alt={article.headline}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, 300px"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-slate-400 text-xs">No Image</div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col p-4">
+                    <div className="mb-2 text-xs font-medium text-slate-500 flex items-center gap-2">
+                        <span className="uppercase tracking-wider text-blue-700">
+                            {(article.tags?.[0] || "News").toString()}
+                        </span>
+                        <span>•</span>
+                        <span>
+                            {article.publishAt 
+                            ? new Date(article.publishAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                            : ""}
+                        </span>
                     </div>
-                    <h3 className="mt-2 line-clamp-2 text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                      {a.headline}
+                    <h3 className="line-clamp-2 text-lg font-bold text-slate-900 group-hover:text-blue-700">
+                      {article.headline}
                     </h3>
-                    <p className="mt-2 line-clamp-2 text-sm text-slate-600">
-                      {a.metaDescription || ""}
+                    <p className="mt-2 line-clamp-2 text-sm text-slate-500">
+                      {article.metaDescription}
                     </p>
-                  </Link>
-                ))}
-              </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            
+            {articles.length === 0 && (
+              <p className="text-slate-500 italic">No articles published yet.</p>
             )}
           </section>
         </main>
 
         <div className="hidden h-full w-px bg-slate-200 lg:block" />
-
-        {/* SIDEBAR */}
         <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:pl-4">
           <RightSidebar />
         </aside>

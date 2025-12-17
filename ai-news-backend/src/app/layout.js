@@ -2,7 +2,8 @@ import "./globals.css";
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 
-export const metadata = {
+export const metadata = { 
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: {
     template: '%s | CoinMarketBuzz - Crypto News & Market Updates',
     default: 'CoinMarketBuzz | Latest Cryptocurrency News, Bitcoin Prices & Ethereum Updates',

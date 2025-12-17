@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import BreakingNewsTicker from "./BreakingNewsTicker";
-
+  
 const PRIMARY_LINKS = [
   { label: "Latest News", href: "/" },
 
@@ -27,8 +27,22 @@ const SECONDARY_LINKS = [
 ];
 
 export default function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false); 
+  const [dateString, setDateString] = useState("");
+  
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const options = { month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+      setDateString(now.toLocaleDateString('en-US', options).replace(',', ' -'));
+    };
 
+    updateTime(); 
+    const timer = setInterval(updateTime, 60000); 
+
+    return () => clearInterval(timer);
+  }, []);
+  
   const toggleMenu = () => setIsMenuOpen((open) => !open);
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -40,7 +54,7 @@ export default function Header() {
         {/* Top row */}
         <div className="flex h-16 items-center border-b border-slate-200 px-6 ">
           <div className="flex-1 text-[11px] font-normal text-slate-500">
-            December 01 - 03:51 AM
+            {dateString || "Loading..."}
           </div>
 
           <div className="flex flex-none justify-center">
@@ -48,7 +62,7 @@ export default function Header() {
           </div>
 
           <div className="flex-1 text-right text-[11px] font-normal text-slate-500">
-            New York, US: 3.3°C
+           
           </div>
         </div>
 
@@ -68,16 +82,10 @@ export default function Header() {
                 </div>
               ))}
             </nav>
-
-            {/* Search circle on right */}
-            <button
-              type="button"
-              aria-label="Search"
-              className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-transparent text-white/90 transition hover:bg-white hover:text-[#d00000]"
-            >
-              <SearchIcon />
-            </button>
           </div>
+        </div> 
+        <div className="border-b border-slate-200 bg-slate-50">
+           <BreakingNewsTicker />
         </div>
       </div>
 
@@ -238,12 +246,12 @@ function LogoMobile({ color = "white" }) {
   return (
     <Link href="/" className="flex items-baseline gap-1">
       <span className={`text-2xl font-semibold tracking-tight ${textColorMain}`}>
-        news
+        CoinMarket
       </span>
       <span
         className={`text-2xl font-semibold tracking-tight ${textColorFlash}`}
       >
-        flash
+        Buzz
       </span>
     </Link>
   );

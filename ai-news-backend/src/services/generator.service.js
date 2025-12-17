@@ -15,25 +15,46 @@ const MODEL_CONFIG = {
   response_format: { type: "json_object" },
 };
 
-// 🧠 CLIENT SEO KNOWLEDGE BANK (Expanded)
 const PERSONAS = {
-  "THE_ANALYST": "You are a cold, data-driven Technical Analyst. You focus on support levels, volume, RSI divergence, and moving averages. You trust charts, not hype.",
-  "THE_INSIDER": "You are an investigative crypto journalist. You look for the 'story behind the story'. You are skeptical of official announcements, check on-chain movements, and question liquidity.",
-  "THE_MACRO": "You are a Macro-Economist. You connect crypto moves to the Fed, inflation, bond yields, and global stocks. You see the big picture.",
-  "THE_FUTURIST": "You are a forward-looking technologist. You focus on protocol upgrades, GitHub commits, developer adoption, and the long-term vision of Web3 technology."
-}; 
-
+  "THE_ANALYST": `
+    You are Neelima Kumar, a Senior Quantitative Analyst.
+    VOICE: Cold, surgical, and purely mathematical. You despise "hype."
+    VOCABULARY: Use terms like "Liquidity Grab," "Fair Value Gap (FVG)," "Order Block," "Invalidation Level," "Volume Profile," "Gamma Squeeze."
+    RULE: Never say "we think." Say "Market structure suggests..." or "On-chain data indicates..."
+    RULE: Always define a "Bullish Invalidation" and "Bearish Invalidation" level.
+  `,
+  "THE_MACRO": `
+    You are Mohit Kumar, Founder & Editor-in-Chief.
+    VOICE: Institutional, cynical, and big-picture focused.
+    VOCABULARY: Use terms like "M2 Money Supply," "Risk-on assets," "Cost of Capital," "Regulatory Arbitrage," "Yield Curve."
+    RULE: Connect this specific news to the Federal Reserve, SEC policy, or Global Liquidity Cycles.
+    RULE: Treat crypto as a distinct asset class within the broader macro environment.
+  `,
+  "THE_BUILDER": `
+    You are Oladapo Timothy Olagoke, CEO of RevoNetwork & Blockchain Executive.
+    VOICE: Critical, structural, and focused on "Unit Economics."
+    VOCABULARY: Use terms like "TVL Retention," "Protocol Revenue," "Governance Attack," "Incentive Alignment," "Ponzinomics."
+    RULE: Critique the "Business Model" behind the news. Ask: "Where does the yield come from?"
+    RULE: Focus on utility and censorship resistance over price action.
+  `,
+  "THE_INSIDER": `
+    You are the CoinMarketBuzz Editorial Desk (Automated Data Feed).
+    VOICE: Neutral, concise, and AP Style. No emotion.
+    FOCUS: Just the facts (Who, What, Where, When, Why).
+    RULE: Use short paragraphs (1-2 sentences). No speculation.
+  `
+};
 const PROMPT_VARIANTS = [
   "Style Mode: BREAKING NEWS. Short, punchy sentences. Data-first. Urgent tone. Use fragments for speed.",
   "Style Mode: DEEP DIVE. Connect cause and effect. Use transitions like 'Consequently' and 'Underlying this trend'. Focus on the 'Why'.",
   "Style Mode: MARKET CONTEXT. Focus heavily on historical comparison (e.g., 'Similar to the 2021 correction').",
   "Style Mode: SKEPTICAL ANALYSIS. Question the official narrative. Look for contradictions in the data. Use a critical voice."
 ];
-
 const FORBIDDEN_WORDS = [
   "delve", "tapestry", "landscape", "underscores", "pivotal", "crucial", "in conclusion", 
   "realm", "bustling", "burgeoning", "testament", "moreover", "furthermore", "rapidly evolving", 
-  "ever-changing", "dynamic world", "latest updates on cryptocurrency market" // Explicitly banned this spam phrase
+  "ever-changing", "dynamic world", "latest updates", "game-changer", "unleash", "harnessing", 
+  "beacon", "dive deep", "poised to", "seamlessly", "complex world of"
 ];
 
 const SEO_STRATEGY = {
@@ -135,13 +156,22 @@ const generateFallbackArticle = (data) => {
 };
 
 // 🚀 MAIN GENERATOR FUNCTION
-export const generateArticle = async (cleanedNewsData, marketData = null, recentArticles = [], selectedPersonaKey = "THE_ANALYST") => {
+export const generateArticle = async (cleanedNewsData, marketData = null, recentArticles = [], authorProfile = null) => {
   const MAX_RETRIES = 2;
 
   // 1. Prepare Persona
-  const personaDescription = PERSONAS[selectedPersonaKey] || PERSONAS["THE_ANALYST"]; 
-  const randomStyle = PROMPT_VARIANTS[Math.floor(Math.random() * PROMPT_VARIANTS.length)];
-  const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const selectedPersonaKey = authorProfile?.personaKey || "THE_ANALYST";
+  const personaDescription = PERSONAS[selectedPersonaKey] || PERSONAS["THE_ANALYST"];
+  
+  let selectedStyle = PROMPT_VARIANTS[Math.floor(Math.random() * PROMPT_VARIANTS.length)];
+  if (selectedPersonaKey === "THE_INSIDER") {
+      selectedStyle = "Style Mode: BREAKING NEWS. Short, punchy sentences. Data-first.";
+  }
+ 
+  const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }); 
+  const longTailKeywords = (SEO_STRATEGY.longTail || ["Crypto News"]).join('", "');
+  // NOTE: We mapped "synonyms" to "primary" here to fix your bug
+  const synonymKeywords = (SEO_STRATEGY.primary || ["Bitcoin News"]).join('", "');
 
   // 2. Build Internal Link Strategy
   const internalLinkInstructions = recentArticles.length > 0 
@@ -155,8 +185,8 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
   
   // 🛡️ ENHANCED SYSTEM PROMPT
   const BASE_SYSTEM_PROMPT = `
-You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier f news outlet approved by Google News.
-Your Persona: ${personaDescription} , Your Style: ${randomStyle}
+You are the Senior Chief Market Analyst at CoinMarketBuzz, a top-tier crypto news outlet approved by Google News.
+YOUR IDENTITY:${personaDescription},YOUR CURRENT STYLE MODE:${selectedStyle}
 
 Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals CoinDesk and CoinGape.
 **DO NOT** just summarize. **ANALYZE.**
@@ -220,9 +250,9 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 5. SEO REQUIREMENTS (STRICT)
 ============================================================
 - **Keywords Strategy:**
-   1. **Focus Keyword:** Select ONE relevant "Long-Tail" term (e.g., "${SEO_STRATEGY.longTail.join('", "')}") that matches the story.
+   1. **Focus Keyword:** Select ONE relevant "Long-Tail" term (e.g., "${longTailKeywords}") that matches the story.
    2. **Placement:** The Focus Keyword MUST appear in the **H1 Headline** and the **First Paragraph**.
-   3. **Synonyms:** Use at least 2 terms from this list in the body: "${SEO_STRATEGY.synonyms.join('", "')}".
+   3. **Synonyms:** Use at least 2 terms from this list in the body: "${synonymKeywords}".
 - **Meta Description:** Must start with a primary keyword like "Latest crypto news: ..." and be <155 chars.
 
 ============================================================
@@ -261,7 +291,8 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
             ${internalLinkInstructions}
 
             **TONE INSTRUCTION:** ${personaDescription}
-            
+            **STYLE MODE:** ${selectedStyle} 
+
             ### 🛡️ FINAL CHECKS:
             1. **Headline:** 60-75 chars.
             2. **Keyword:** 'focus_keywords' MUST appear VERBATIM in 'headline'.
@@ -295,7 +326,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 
       json = auditAndFixArticle(json, cleanedNewsData.sourceUrl); 
 
-      return { ...json, status: "STRONG" };
+      return { ...json, status: "STRONG", author_id: authorProfile?.id || "editorial-desk" };
     } catch (error) {
       console.error(`❌ Attempt ${attempt} Failed:`, error.message);
       if (attempt < MAX_RETRIES) {

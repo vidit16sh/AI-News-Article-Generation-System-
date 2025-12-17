@@ -7,7 +7,7 @@ import { classifyNews, getOrCreateCategory } from '../services/classifier.servic
 
 // 🛑 RATE LIMITER for Classification (Flash is fast, but let's be safe)
 const limiter = new Bottleneck({
-    minTime: 4000, // 1 request every 2 seconds
+    minTime: 4000, // 1 request every 4 seconds
     maxConcurrent: 1 
 });
 
@@ -33,16 +33,26 @@ const processJob = async (msg, channel) => {
         const categorySlug = classification.category_slug || "altcoins";
         const priorityScore = classification.priority_score || 0; 
 
-        // 2. Database: Save the clean version (but don't generate yet)
+        // 2. Database: Save (UPSERT to prevent crashes on duplicate URLs)
         const category = await getOrCreateCategory(categorySlug);
-        const finalNews = await prisma.cleanedNews.create({
-            data: {
+        
+        // ✅ FIX: Use upsert() instead of create()
+        const finalNews = await prisma.cleanedNews.upsert({
+            where: { 
+                sourceUrl: rawNews.sourceUrl // Check if this URL exists
+            },
+            update: {
+                // Dummy update to prevent crash if duplicate exists
+                title: rawNews.title 
+            },
+            create: {
+                // If new, create it
                 title: rawNews.title,
                 summary: cleanedBody.substring(0, 150) + "...",
                 content: cleanedBody,
                 sourceUrl: rawNews.sourceUrl,
                 publishedAt: rawNews.publishedAt, 
-                categoryId: category.id
+                categoryId: category.id,
             }
         });
 
@@ -73,9 +83,6 @@ const processJob = async (msg, channel) => {
         
         // Simple retry logic for rate limits
         if (err.message.includes('429') && retryCount < 3) {
-             // 🛠️ BUG FIX: Use 'await' to block the worker instead of background setTimeout
-             // This stops the worker from picking up new jobs while waiting (Cool Down)
-             // and ensures the 'ack' happens in the correct scope.
              console.log(`   ⏳ 429 Rate Limit Hit - Pausing worker for 30s...`);
              await new Promise(resolve => setTimeout(resolve, 30000));
 
@@ -83,19 +90,25 @@ const processJob = async (msg, channel) => {
              channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
              channel.ack(msg);
         } else {
+             // Acknowledge to prevent infinite loops on hard errors (like DB disconnects)
+             // Ideally you'd dead-letter queue this, but acking clears the blockage.
              channel.ack(msg);
         }
     }
 };
 
 const startWorker = async () => {
-    const channel = await connectRabbit();
-    await channel.assertQueue('generation_queue', { durable: true });
-    channel.prefetch(1); 
-    console.log("👀 Ingest Worker (VIP Filter Mode) Started...");
-    channel.consume('ingest_queue', (msg) => {
-        if (msg) processJob(msg, channel);
-    });
+    try {
+        const channel = await connectRabbit();
+        await channel.assertQueue('generation_queue', { durable: true });
+        channel.prefetch(1); 
+        console.log("👀 Ingest Worker (VIP Filter Mode) Started...");
+        channel.consume('ingest_queue', (msg) => {
+            if (msg) processJob(msg, channel);
+        });
+    } catch (error) {
+        console.error("❌ Failed to start Ingest Worker:", error.message);
+    }
 };
 
 startWorker();
