@@ -4,6 +4,7 @@ import TopStoriesSection from "../components/home/TopStoriesSection";
 import PoliticsStripSection from "../components/home/PoliticsStripSection";
 import RightSidebar from "../components/layout/RightSidebar";
 import prisma from "@/lib/prisma";
+export const dynamic = 'force-dynamic';  
 
 export default async function HomePage() {
   // ✅ 1. Direct Database Query with CORRECT nesting
