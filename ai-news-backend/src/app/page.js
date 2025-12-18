@@ -3,24 +3,38 @@ import LatestNewsSection from "../components/home/LatestNewsSection";
 import TopStoriesSection from "../components/home/TopStoriesSection";
 import PoliticsStripSection from "../components/home/PoliticsStripSection";
 import RightSidebar from "../components/layout/RightSidebar";
-import prisma from "@/lib/prisma"; // Direct Prisma import
+import prisma from "@/lib/prisma";
 
 export default async function HomePage() {
-  // ✅ Direct Database Query (No fetch call needed)
-  const articles = await prisma.generatedArticle.findMany({
+  // ✅ 1. Direct Database Query with CORRECT nesting
+  const articlesRaw = await prisma.generatedArticle.findMany({
     where: {
-      status: "PUBLISHED", // Only show live articles
+      status: "PUBLISHED",
     },
     orderBy: {
-      publishAt: "desc", // Newest first
+      publishAt: "desc",
     },
-    take: 20, // Limit to 20 for the homepage
+    take: 20,
     include: {
-      category: true, // Include category data for the UI
-      author: true,   // Include author data
+      author: true, 
+      originalNews: {
+        include: {
+          category: true, // Category lives inside originalNews
+        },
+      },
     },
   });
 
+  // ✅ 2. Data Mapping
+  // We flatten the data so 'article.category' is easy for components to read
+ const articles = articlesRaw.map((art) => ({
+    ...art,
+    // Extract the category name string or use "General" as a fallback
+    category: art.originalNews?.category?.name || "General", 
+    // Do the same for author to avoid future object errors
+    authorName: art.author?.name || "AI Writer",
+ })); 
+  
   // Separate the "Featured" (first one) from the rest
   const [featured, ...rest] = articles;
 
