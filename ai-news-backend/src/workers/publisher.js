@@ -1,13 +1,12 @@
+// src/workers/publisher.js
 import 'dotenv/config';
 import cron from 'node-cron';
 import prisma from '../lib/prisma.js';
 
-// Configuration
+// ✅ Logic: 15-minute drip feed for articles scored 45-74
 const CONFIG = {
-    URGENT_THRESHOLD: 80,      // Score needed to skip the queue
     DRIP_INTERVAL_MINS: 15,    // Standard wait time between posts
-    DRAFT_SALVAGE_MINS: 60,    // If silent for 60m, post a Draft
-    MIN_DRAFT_SCORE: 45        // Minimum quality to salvage a draft
+    MIN_SCORE: 45              // Minimum score to publish
 };
 
 // Helper: Trigger Next.js ISR Revalidation
@@ -19,7 +18,7 @@ const triggerRevalidation = async () => {
             headers: { 'x-admin-key': process.env.API_SECRET_KEY },
             body: JSON.stringify({ tag: 'articles' })
         });
-        console.log("   ✨ Cache Revalidated");
+        console.log("   ✨ Frontend Cache Revalidated");
     } catch (e) { 
         console.error("   ⚠️ Revalidate failed (Is Next.js running?)"); 
     }
@@ -33,19 +32,19 @@ const publishArticle = async (article, reason) => {
         where: { id: article.id },
         data: { 
             status: 'PUBLISHED',
-            publishAt: new Date() // Set to NOW so it appears at the top
+            publishAt: new Date() // Set to NOW so it resets the 15-min timer
         }
     });
 
     await triggerRevalidation();
 };
 
-console.log("💧 Smart Publisher Service Started (Check every 1 min)...");
+console.log("💧 15-Minute Drip Publisher Started...");
 
-// Run every minute to check for urgent items
+// Check every minute if it is time to release the next article from the queue
 cron.schedule('* * * * *', async () => {
     try {
-        // 1. Get the timestamps of the last published article
+        // 1. Find the most recently published article (regardless of score)
         const lastArticle = await prisma.generatedArticle.findFirst({
             where: { status: 'PUBLISHED' },
             orderBy: { publishAt: 'desc' }
@@ -55,63 +54,30 @@ cron.schedule('* * * * *', async () => {
         const lastPublishTime = lastArticle ? new Date(lastArticle.publishAt) : new Date(0);
         const minsSinceLast = Math.floor((now - lastPublishTime) / 60000);
 
-        console.log(`\n⏱️  Last publish: ${minsSinceLast} mins ago`);
-
-        // ============================================================
-        // 🚨 LEVEL 1: URGENT PRIORITY (Skip the Timer)
-        // ============================================================
-        // Condition: Article is QUEUED and Score is very high (>80)
-        const urgentArticle = await prisma.generatedArticle.findFirst({
-            where: { 
-                status: 'QUEUED', 
-                priorityScore: { gte: CONFIG.URGENT_THRESHOLD } 
-            },
-            orderBy: { priorityScore: 'desc' }
-        });
-
-        if (urgentArticle) {
-            await publishArticle(urgentArticle, "⚡ URGENT BREAKING NEWS");
-            return; // Done for this cycle
-        }
-
-        // ============================================================
-        // 💧 LEVEL 2: STANDARD DRIP FEED (Respect the Timer)
-        // ============================================================
-        // Condition: It has been > 15 mins since last post
+        // 2. Check if we have waited long enough (15 mins)
         if (minsSinceLast >= CONFIG.DRIP_INTERVAL_MINS) {
-            const standardArticle = await prisma.generatedArticle.findFirst({
-                where: { status: 'QUEUED' },
-                orderBy: { priorityScore: 'desc' } // Best remaining stories first
-            });
-
-            if (standardArticle) {
-                await publishArticle(standardArticle, "💧 Standard Drip Feed");
-                return;
-            }
-        }
-
-        // ============================================================
-        // ♻️ LEVEL 3: DRAFT SALVAGE (Prevent "Dead Air")
-        // ============================================================
-        // Condition: It has been > 60 mins (Site looks dead) AND we have decent drafts
-        if (minsSinceLast >= CONFIG.DRAFT_SALVAGE_MINS) {
-            const salvageArticle = await prisma.generatedArticle.findFirst({
+            // Find the best quality article waiting in the queue
+            const nextInQueue = await prisma.generatedArticle.findFirst({
                 where: { 
-                    status: 'DRAFT', 
-                    priorityScore: { gte: CONFIG.MIN_DRAFT_SCORE } 
+                    status: 'QUEUED',
+                    priorityScore: { gte: CONFIG.MIN_SCORE }
                 },
-                orderBy: { createdAt: 'desc' } // Newest drafts first
+                orderBy: { priorityScore: 'desc' } // Best story goes next
             });
 
-            if (salvageArticle) {
-                await publishArticle(salvageArticle, "♻️ Salvaging Draft (Keep Alive)");
-                return;
+            if (nextInQueue) {
+                console.log(`\n⏰ Drip Timer Triggered (${minsSinceLast}m passed).`);
+                await publishArticle(nextInQueue, "Staggered Drip Release");
+            } else {
+                process.stdout.write(`\r💤 Queue Empty. Waiting for new scraper data...`);
             }
+        } else {
+            // Keep the user informed in the PM2 logs
+            const remaining = CONFIG.DRIP_INTERVAL_MINS - minsSinceLast;
+            process.stdout.write(`\r⏱️  Drip cycle active. Next possible post in: ${remaining} mins.`);
         }
-
-        console.log("   zzz No actions needed.");
 
     } catch (err) {
-        console.error("❌ Publisher Logic Error:", err);
+        console.error("❌ Publisher Error:", err);
     }
 });

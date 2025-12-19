@@ -5,7 +5,7 @@ import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
 import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js'; 
 
-// 🛑 RATE LIMITER for Classification (Flash is fast, but let's be safe)
+// 🛑 RATE LIMITER for Classification
 const limiter = new Bottleneck({
     minTime: 4000, // 1 request every 4 seconds
     maxConcurrent: 1 
@@ -17,44 +17,51 @@ const processJob = async (msg, channel) => {
 
     try {
         const rawNews = await prisma.rawNews.findUnique({ where: { id: rawNewsId } });
-
+        
         if (!rawNews || rawNews.processed) {
             channel.ack(msg);
             return;
         }
-
+        
+        // 🛡️ 1. URL GUARD: Reject Google Consent or Redirect pages
+        const junkPatterns = ['consent.google.com', 'news.google.com/url', 'google.com/url'];
+        if (junkPatterns.some(pattern => rawNews.sourceUrl.includes(pattern))) {
+            console.log(`   🛑 Skipping Junk Source: ${rawNews.sourceUrl}`);
+            await prisma.rawNews.update({ where: { id: rawNewsId }, data: { processed: true } });
+            channel.ack(msg);
+            return;
+        }
+        
         const cleanedBody = cleanText(rawNews.rawBody);
 
-        // 🧠 1. CLASSIFY with Gemini Flash (Cheap/Free)
+        // 🧠 2. CLASSIFY & SLUG MAPPING
         const classification = await limiter.schedule(() => 
             classifyNews(cleanedBody, rawNews.title)
         ); 
 
-        const categorySlug = classification.category_slug || "altcoins";
+        // SYNC: Map backend 'altcoins' slug to your frontend 'crypto' link
+        let categorySlug = classification.category_slug || "crypto";
+        if (categorySlug === 'altcoins') categorySlug = 'crypto';
+        
         const priorityScore = classification.priority_score || 0; 
-
-        // 2. Database: Save (UPSERT to prevent crashes on duplicate URLs)
         const category = await getOrCreateCategory(categorySlug);
+
+        // 🔗 3. URL CLEANING
         const urlObj = new URL(rawNews.sourceUrl);
         const cleanUrl = urlObj.origin + urlObj.pathname;
-        // ✅ FIX: Use upsert() instead of create()
         
+        // 💾 4. UPSERT CleanedNews (FIXED: 'tags' removed because it's not in this table)
         const finalNews = await prisma.cleanedNews.upsert({
-            where: { 
-                sourceUrl: cleanUrl
-            },
-            update: {
-                // Dummy update to prevent crash if duplicate exists
-                title: rawNews.title 
-            },
+            where: { sourceUrl: cleanUrl },
+            update: { title: rawNews.title },
             create: {
-                // If new, create it
                 title: rawNews.title,
                 summary: cleanedBody.substring(0, 150) + "...",
                 content: cleanedBody,
                 sourceUrl: cleanUrl,
                 publishedAt: rawNews.publishedAt, 
                 categoryId: category.id,
+                // Note: No 'tags' here because CleanedNews model lacks that field
             }
         });
 
@@ -63,15 +70,15 @@ const processJob = async (msg, channel) => {
             data: { processed: true }
         });
 
-        // 💎 3. THE VIP FILTER (Quality Control)
-        // Only send to Generator if Score is >= 45
-        if (priorityScore >= 45){
-            console.log(`   🚀 APPROVED (${priorityScore}/100): "${rawNews.title.substring(0, 40)}..."`);
-            console.log(`      Reason: ${classification.reasoning}`);
+        // 💎 5. VIP FILTER & HANDOVER
+        if (priorityScore >= 45) {
+            console.log(`   🚀 APPROVED (${priorityScore}/100) -> [${categorySlug}]: "${rawNews.title.substring(0, 40)}..."`);
             
             const payload = { 
                 newsId: finalNews.id,
-                priorityScore: priorityScore
+                priorityScore: priorityScore,
+                // ✅ PASS THE TAG FORWARD so the Generator can save it to GeneratedArticle
+                categoryTag: categorySlug 
             };
             channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
         } else {
@@ -82,20 +89,12 @@ const processJob = async (msg, channel) => {
 
     } catch (err) {
         console.error(`   ❌ Ingest Error: ${err.message}`);
-        
-        // Simple retry logic for rate limits
         if (err.message.includes('429') && retryCount < 3) {
-             console.log(`   ⏳ 429 Rate Limit Hit - Pausing worker for 30s...`);
+             console.log(`   ⏳ Rate Limit Hit - Retrying in 30s...`);
              await new Promise(resolve => setTimeout(resolve, 30000));
-
-             const newContent = { ...content, retryCount: retryCount + 1 };
-             channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(newContent)));
-             channel.ack(msg);
-        } else {
-             // Acknowledge to prevent infinite loops on hard errors (like DB disconnects)
-             // Ideally you'd dead-letter queue this, but acking clears the blockage.
-             channel.ack(msg);
+             channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ ...content, retryCount: retryCount + 1 })));
         }
+        channel.ack(msg);
     }
 };
 
@@ -104,7 +103,7 @@ const startWorker = async () => {
         const channel = await connectRabbit();
         await channel.assertQueue('generation_queue', { durable: true });
         channel.prefetch(1); 
-        console.log("👀 Ingest Worker (VIP Filter Mode) Started...");
+        console.log("👀 Ingest Worker (Corrected Tags Mode) Started...");
         channel.consume('ingest_queue', (msg) => {
             if (msg) processJob(msg, channel);
         });

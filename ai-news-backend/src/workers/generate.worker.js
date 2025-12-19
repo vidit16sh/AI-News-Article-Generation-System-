@@ -110,7 +110,7 @@ const getRecentArticlesForLinking = async (currentNewsId) => {
 
 const processGenerationJob = async (msg, channel) => {
   const content = JSON.parse(msg.content.toString());
-  const { newsId, priorityScore = 50 } = content;
+  const { newsId, priorityScore = 50, categoryTag } = content;
 
   console.log(`\n📝 [Gen-Worker] Processing Job: ${newsId}`);
 
@@ -174,10 +174,9 @@ const processGenerationJob = async (msg, channel) => {
     }
 
     // 🛑 FILTER 2: Determine Status based on Priority Score
-    let finalStatus = "DRAFT";
+    let finalStatus = "QUEUED";
     if (priorityScore > 80) finalStatus = "PUBLISHED";
-    else if (priorityScore >= 60) finalStatus = "QUEUED";
-    else if (priorityScore >= 45) finalStatus = "DRAFT";
+    else if (priorityScore >= 45) finalStatus = "QUEUED";
     else {
       console.warn(`   🗑️ Discarding LOW SCORE: ${priorityScore}`);
       channel.ack(msg);
@@ -261,7 +260,7 @@ const processGenerationJob = async (msg, channel) => {
         slug: aiOutput.slug,
         metaDescription: aiOutput.meta_description,
         articleHtml: aiOutput.article_html,
-        tags: aiOutput.tags || [],
+        tags: categoryTag ? [categoryTag] : (aiOutput.tags || []),
         keywords: aiOutput.keywords || [],
         imageUrl: finalImageUrl,
         newsJsonLd,

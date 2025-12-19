@@ -3,16 +3,17 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 const PRIMARY_LINKS = [
   { label: "Latest News", href: "/" },
-  { label: "Crypto News", href: "/category/crypto" },
-  { label: "Bitcoin", href: "/category/bitcoin" },
-  { label: "Ethereum", href: "/category/ethereum" },
-  { label: "Finance News", href: "/category/finance" },
-  { label: "Forex News", href: "/category/defi" },
-  { label: "Regulation", href: "/category/regulation" },
-];
+  { label: "Crypto News", href: "/category/crypto" }, // Matches 'crypto' tag
+  { label: "Bitcoin", href: "/category/bitcoin" },   // Matches 'bitcoin' tag
+  { label: "Ethereum", href: "/category/ethereum" }, // Matches 'ethereum' tag
+  { label: "Finance News", href: "/category/finance" }, // Matches 'finance' tag
+  { label: "Forex News", href: "/category/defi" },      // Matches 'defi' tag
+  { label: "Regulation", href: "/category/regulation" }, // Matches 'regulation' tag
+]; 
 
 const SECONDARY_LINKS = [
   { label: "About", href: "/about" },
@@ -22,7 +23,8 @@ const SECONDARY_LINKS = [
   { label: "Contact", href: "/contact" },
 ];
 
-export default function Header() {
+export default function Header() { 
+  const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [dateString, setDateString] = useState("");
 
