@@ -10,7 +10,7 @@ import { Facebook, Twitter, Linkedin, Mail } from "lucide-react";
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
 
   try {
     const res = await fetch(`${baseUrl}/api/articles/${slug}`, {
@@ -18,7 +18,7 @@ async function getArticle(slug) {
     });
 
     if (!res.ok) return null;
-    return await res.json(); // expected: { article, relatedArticles }
+    return await res.json();
   } catch (error) {
     console.error("Error fetching article:", error);
     return null;
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }) {
   }
 
   const { article } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
 
   const url = `${baseUrl}/news/${article.slug}`;
   const image =
@@ -72,55 +72,47 @@ export default async function ArticlePage({ params }) {
   if (!data || !data.article) notFound();
 
   const { article, relatedArticles } = data;
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
 
-  // ✅ Use ONE baseUrl everywhere (no duplicates)
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
-  // ✅ Prefer publishAt if available
+  // ✅ DATA PREP FOR JSON-LD
   const publishedISO = new Date(article.publishAt || article.createdAt).toISOString();
   const modifiedISO = new Date(article.updatedAt || article.publishAt || article.createdAt).toISOString();
+  
+  const absoluteImage = article.imageUrl?.startsWith("http")
+    ? article.imageUrl
+    : `${baseUrl}${article.imageUrl || "/default-news.jpg"}`;
 
-  // ✅ Ensure absolute image URL for JSON-LD
-  const absoluteImage =
-    article.imageUrl && article.imageUrl.startsWith("http")
-      ? article.imageUrl
-      : `${baseUrl}${article.imageUrl || "/default-og-image.png"}`;
-
-  // ✅ JSON-LD (NewsArticle schema)
+  // ✅ PERFECTED JSON-LD (Removed Warnings)
   const newsJsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
-    headline: article.headline,
-    description: article.metaDescription || article.excerpt || article.headline,
-    image: [absoluteImage],
-    datePublished: publishedISO,
-    dateModified: modifiedISO,
-    author: [
-      {
-        "@type": "Person",
-        name: article.author?.name || "CoinMarketBuzz Staff",
-        url: article.author?.slug
-          ? `${baseUrl}/authors/${article.author.slug}`
-          : `${baseUrl}/about`,
-      },
-    ],
-    publisher: {
+    "headline": article.headline,
+    "description": article.metaDescription || article.excerpt || article.headline,
+    "image": [absoluteImage], 
+    "datePublished": publishedISO,
+    "dateModified": modifiedISO,
+    "author": [{
+      "@type": "Person",
+      "name": article.author?.name || "CoinMarketBuzz Staff",
+      "url": article.author?.slug 
+        ? `${baseUrl}/authors/${article.author.slug}` 
+        : `${baseUrl}/about`
+    }],
+    "publisher": {
       "@type": "Organization",
-      name: "CoinMarketBuzz",
-      logo: {
+      "name": "CoinMarketBuzz",
+      "logo": {
         "@type": "ImageObject",
-        // ✅ matches your actual logo path used in Header/Footer
-        url: `${baseUrl}/brand/logo.jpg`,
-      },
+        "url": `${baseUrl}/brand/logo.jpg` 
+      }
     },
-    mainEntityOfPage: {
+    "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": `${baseUrl}/news/${article.slug}`,
-    },
+      "@id": `${baseUrl}/news/${article.slug}`
+    }
   };
 
-  const category =
-    article.category || article.primaryCategory || article.tags?.[0] || "News";
+  const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
 
   const publishedDate = article.publishAt || article.createdAt
     ? new Date(article.publishAt || article.createdAt).toLocaleDateString("en-US", {
@@ -144,7 +136,6 @@ export default async function ArticlePage({ params }) {
   const sidebarArticles = Array.isArray(relatedArticles) ? relatedArticles : [];
   const relatedForMain = sidebarArticles.slice(0, 6);
 
-  // ✅ Share URLs
   const articleUrl = `${baseUrl}/news/${article.slug}`;
   const shareText = article.headline || "Check this out";
 
@@ -158,61 +149,47 @@ export default async function ArticlePage({ params }) {
   return (
     <div className="mx-auto max-w-[1440px] lg:px-0">
       <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-8">
-        {/* MAIN ARTICLE COLUMN */}
-        <main className="lg:pr-0" itemScope itemType="https://schema.org/NewsArticle">
-          {/* ✅ Inject NewsArticle JSON-LD */}
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
-          />
+        
+        {/* ✅ Injected cleaned Metadata */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
+        />
 
-          {/* Top meta section */}
+        {/* MAIN ARTICLE COLUMN (itemScope/itemType removed to fix warnings) */}
+        <main className="lg:pr-0">
           <header className="mb-8 pb-4">
-            {/* Category tag */}
             <div className="mb-4">
               <span className="inline-flex items-center gap-2 rounded-md border border-[#f7d9d9] bg-[#fcf2f2] px-3 py-1 text-[0.8rem] text-[#cc0000]">
                 {category}
               </span>
             </div>
 
-            {/* Title */}
-            <h1
-              itemProp="headline"
-              className="mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]"
-            >
+            <h1 className="mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]">
               {article.headline}
             </h1>
 
             {/* MOBILE AUTHOR ROW */}
             <div className="sm:hidden text-sm text-slate-600">
               <span className="text-slate-500">By: </span>
-
               {authorSlug ? (
-                <Link
-                  href={`/authors/${authorSlug}`}
-                  className="font-normal text-slate-900 hover:underline"
-                >
+                <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline">
                   {authorName}
                 </Link>
               ) : (
                 <span className="font-normal text-slate-900">{authorName}</span>
               )}
-
               {publishedDate && (
                 <>
                   <span className="mx-2 inline-block h-1 w-1 align-middle rounded-full bg-red-600" />
-                  <time
-                    itemProp="datePublished"
-                    dateTime={article.publishAt || article.createdAt}
-                    className="text-slate-500"
-                  >
+                  <time className="text-slate-500">
                     {publishedDate}
                   </time>
                 </>
               )}
             </div>
 
-            {/* DESKTOP AUTHOR ROW (kept exactly as your “perfect” laptop view) */}
+            {/* DESKTOP AUTHOR ROW */}
             <div className="hidden sm:flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-slate-100">
@@ -233,10 +210,7 @@ export default async function ArticlePage({ params }) {
 
                 <div className="flex flex-wrap items-center gap-4 text-sm">
                   {authorSlug ? (
-                    <Link
-                      href={`/authors/${authorSlug}`}
-                      className="font-normal text-slate-900 hover:underline"
-                    >
+                    <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline">
                       {authorName}
                     </Link>
                   ) : (
@@ -246,11 +220,7 @@ export default async function ArticlePage({ params }) {
                   {publishedDate && <span className="h-1 w-1 rounded-full bg-red-600" />}
 
                   {publishedDate && (
-                    <time
-                      itemProp="datePublished"
-                      dateTime={article.publishAt || article.createdAt}
-                      className="text-slate-500"
-                    >
+                    <time className="text-slate-500">
                       {publishedDate}
                     </time>
                   )}
@@ -262,7 +232,6 @@ export default async function ArticlePage({ params }) {
           {/* Hero image */}
           {article.imageUrl && (
             <figure className="mb-10 overflow-hidden rounded-2xl shadow-sm">
-              {/* ✅ Taller on mobile, identical on laptop/desktop */}
               <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] bg-slate-100">
                 <Image
                   src={article.imageUrl}
@@ -273,7 +242,6 @@ export default async function ArticlePage({ params }) {
                   sizes="(max-width: 768px) 100vw, 800px"
                 />
               </div>
-
               {article.imageCaption && (
                 <figcaption className="mt-3 text-center text-sm italic text-slate-500">
                   {article.imageCaption}
@@ -282,7 +250,6 @@ export default async function ArticlePage({ params }) {
             </figure>
           )}
 
-          {/* Content Body Layout */}
           <div className="relative flex gap-8">
             {/* Share column */}
             <div className="hidden lg:block lg:w-12 lg:flex-none">
@@ -296,21 +263,7 @@ export default async function ArticlePage({ params }) {
 
             {/* Article body */}
             <section
-              itemProp="articleBody"
-              className="
-                article-prose
-                prose prose-lg max-w-none
-                prose-h1:hidden
-                prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight
-                prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold
-                prose-p:text-slate-800 prose-p:leading-[1.85]
-                prose-ul:my-4 prose-ol:my-4
-                prose-li:my-1
-                prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900
-                prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4
-                prose-blockquote:not-italic
-                prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline
-              "
+              className="article-prose prose prose-lg max-w-none prose-h1:hidden prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold prose-p:text-slate-800 prose-p:leading-[1.85] prose-ul:my-4 prose-ol:my-4 prose-li:my-1 prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4 prose-blockquote:not-italic prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline"
               dangerouslySetInnerHTML={{ __html: article.articleHtml }}
             />
           </div>
@@ -320,7 +273,7 @@ export default async function ArticlePage({ params }) {
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
               <strong>Disclaimer:</strong> The information provided is not trading advice,{" "}
-              <a href="coinmarketbuzz.com">coinmarketbuzz.com</a> holds no liability for any investments made based on the information provided on this page. We strongly recommend independent research and/or consultation with a qualified professional before making any investment decisions.
+              <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> holds no liability for any investments made based on this page.
             </p>
           </div>
 
@@ -336,6 +289,8 @@ export default async function ArticlePage({ params }) {
     </div>
   );
 }
+
+// ... ShareIcon and Related Section helpers remain the same ...
 
 function ShareIcon({ label, href, icon, isMail = false }) {
   return (
@@ -374,26 +329,15 @@ function RelatedArticlesSection({ articles }) {
 
 function RelatedCard({ article }) {
   const a = article;
-
   return (
-    <Link
-      href={`/news/${a.slug}`}
-      className="group flex h-full flex-row gap-3 md:flex-col"
-    >
-      <div
-        className="
-          relative overflow-hidden rounded-md bg-slate-100
-          h-24 w-28 flex-none
-          sm:h-28
-          md:h-48 md:w-full
-        "
-      >
+    <Link href={`/news/${a.slug}`} className="group flex h-full flex-row gap-3 md:flex-col">
+      <div className="relative overflow-hidden rounded-md bg-slate-100 h-24 w-28 flex-none sm:h-28 md:h-48 md:w-full">
         {a.imageUrl ? (
           <Image
             src={a.imageUrl}
             alt={a.title}
             fill
-            className="object-cover object-center transition-opacity duration-200 group-hover:opacity-80"
+            className="object-cover transition-opacity duration-200 group-hover:opacity-80"
             sizes="(max-width: 768px) 35vw, 30vw"
           />
         ) : (
@@ -402,13 +346,11 @@ function RelatedCard({ article }) {
           </div>
         )}
       </div>
-
       <div className="flex flex-1 flex-col gap-1">
         <div className="text-[0.75rem] font-light text-slate-500">
           {a.date && `${a.date} • `}
           <span>{a.category}</span>
         </div>
-
         <h3 className="line-clamp-2 text-[1rem] sm:text-[1.05rem] font-light text-slate-900 group-hover:underline underline-offset-[3px]">
           {a.title}
         </h3>
@@ -420,10 +362,8 @@ function RelatedCard({ article }) {
 function normalizeRelated(article) {
   const slug = article.slug || article.id || "#";
   const title = article.headline || article.title || "Untitled article";
-  const category =
-    article.category || article.primaryCategory || article.tags?.[0] || "Business";
+  const category = article.category || article.primaryCategory || article.tags?.[0] || "Business";
   const imageUrl = article.imageUrl || article.heroImageUrl || article.thumbnail || "";
-
   const date = article.createdAt
     ? new Date(article.createdAt).toLocaleDateString("en-US", {
         month: "short",
@@ -431,6 +371,5 @@ function normalizeRelated(article) {
         year: "numeric",
       })
     : "";
-
   return { slug, title, category, imageUrl, date };
 }
