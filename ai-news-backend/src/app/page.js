@@ -7,7 +7,8 @@ import AutoRefresh from "../components/common/AutoRefresh";
 import prisma from "@/lib/prisma";
 
 // ✅ ISR: refresh the cached homepage at most every 60 seconds
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage() {
   // ✅ 1. Direct Database Query
