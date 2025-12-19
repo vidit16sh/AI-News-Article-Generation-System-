@@ -35,11 +35,13 @@ const processJob = async (msg, channel) => {
 
         // 2. Database: Save (UPSERT to prevent crashes on duplicate URLs)
         const category = await getOrCreateCategory(categorySlug);
-        
+        const urlObj = new URL(rawNews.sourceUrl);
+        const cleanUrl = urlObj.origin + urlObj.pathname;
         // ✅ FIX: Use upsert() instead of create()
+        
         const finalNews = await prisma.cleanedNews.upsert({
             where: { 
-                sourceUrl: rawNews.sourceUrl // Check if this URL exists
+                sourceUrl: cleanUrl
             },
             update: {
                 // Dummy update to prevent crash if duplicate exists
@@ -50,7 +52,7 @@ const processJob = async (msg, channel) => {
                 title: rawNews.title,
                 summary: cleanedBody.substring(0, 150) + "...",
                 content: cleanedBody,
-                sourceUrl: rawNews.sourceUrl,
+                sourceUrl: cleanUrl,
                 publishedAt: rawNews.publishedAt, 
                 categoryId: category.id,
             }

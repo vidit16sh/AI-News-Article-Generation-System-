@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import BreakingNewsTicker from "./BreakingNewsTicker";
-  
+
 const PRIMARY_LINKS = [
   { label: "Latest News", href: "/" },
 
@@ -85,7 +84,6 @@ export default function Header() {
           </div>
         </div> 
         <div className="border-b border-slate-200 bg-slate-50">
-           <BreakingNewsTicker />
         </div>
       </div>
 

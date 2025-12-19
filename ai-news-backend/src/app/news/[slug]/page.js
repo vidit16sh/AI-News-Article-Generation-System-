@@ -69,20 +69,39 @@ export default async function ArticlePage({ params }) {
   if (!data || !data.article) notFound();
 
   const { article, relatedArticles } = data;
-
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
   // ✅ JSON-LD (NewsArticle schema) from API
-  const newsJsonLdRaw = article?.newsJsonLd;
-  let newsJsonLd = null;
-
-  try {
-    newsJsonLd =
-      typeof newsJsonLdRaw === "string"
-        ? JSON.parse(newsJsonLdRaw)
-        : newsJsonLdRaw;
-  } catch (e) {
-    console.warn("Invalid newsJsonLd JSON:", e);
-    newsJsonLd = null;
-  }
+  const newsJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": article.headline,
+    "description": article.metaDescription || article.excerpt,
+    // FIX: Ensure absolute URL for image
+    "image": [
+      article.imageUrl?.startsWith('http') 
+        ? article.imageUrl 
+        : `${baseUrl}${article.imageUrl || '/default-og-image.png'}`
+    ],
+    "datePublished": new Date(article.publishAt || article.createdAt).toISOString(),
+    "dateModified": new Date(article.updatedAt || article.publishAt).toISOString(),
+    "author": [{
+      "@type": "Person",
+      "name": article.author?.name || "CoinMarketBuzz Staff",
+      "url": `${baseUrl}/authors/${article.author?.slug || 'staff'}`
+    }],
+    "publisher": {
+      "@type": "Organization",
+      "name": "CoinMarketBuzz",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${baseUrl}/logo.png` // MUST exist in public/logo.png
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `${baseUrl}/news/${article.slug}`
+    }
+  };
 
   const category =
     article.category || article.primaryCategory || article.tags?.[0] || "News";

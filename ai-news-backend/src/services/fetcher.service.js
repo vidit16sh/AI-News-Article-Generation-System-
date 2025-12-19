@@ -1,3 +1,4 @@
+// src/services/fetcher.service.js - PRODUCTION GRADE
 import Parser from 'rss-parser';
 import axios from 'axios';
 import redis from '../config/redis.js';
@@ -8,157 +9,153 @@ import { scrapeArticle } from './scraper.service.js';
 const parser = new Parser({
     customFields: {
         item: [['content:encoded', 'fullContent'], ['content', 'normalContent']],
-    }
+    },
+    timeout: 15000,
 });
 
-const randomSleep = () => {
-    const ms = Math.floor(Math.random() * 4000) + 3000; 
-    return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * Normalizes URLs by removing tracking parameters and fragments.
+ * This is the #1 way to prevent duplicate articles.
+ */
+const normalizeUrl = (url) => {
+    try {
+        const u = new URL(url);
+        // Remove tracking params and specific junk folders
+        u.search = ""; 
+        u.hash = "";
+        return u.toString().toLowerCase().replace(/\/$/, ""); // Remove trailing slash
+    } catch (e) {
+        return url.toLowerCase();
+    }
 };
 
-// 1. COINNESS FETCHER (Unchanged - Works Great)
+const randomSleep = (min = 2000, max = 5000) => {
+    return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min)) + min));
+};
+
+// 1. COINNESS FETCHER
 export const fetchCoinNess = async () => {
     const apiUrl = process.env.COINNESS_API_URL || "https://api.coinness.com/feed/v1/breaking-news?languageCode=en";
-    console.log(`\n🔍 Fetching CoinNess...`);
+    console.log(`\n🔍 [Fetcher] Checking CoinNess...`);
     const channel = await connectRabbit();
 
     try {
-        const config = {};
-        if (process.env.COINNESS_API_KEY) {
-            config.headers = { 'Authorization': `Bearer ${process.env.COINNESS_API_KEY}` };
-        }
-
+        const config = process.env.COINNESS_API_KEY ? { headers: { 'Authorization': `Bearer ${process.env.COINNESS_API_KEY}` } } : {};
         const response = await axios.get(apiUrl, config);
-        const items = response.data.list || response.data || []; 
+        const items = response.data.list || response.data || [];
 
         let newCount = 0;
         for (const item of items) {
-            const uniqueId = `coinness:${item.id}`;
-            const isCached = await redis.get(uniqueId);
-            if (isCached) continue;
+            const rawUrl = item.shareUrl || `https://coinness.com/news/${item.id}`;
+            const cleanUrl = normalizeUrl(rawUrl);
+            const cacheKey = `news:coinness:${cleanUrl}`;
 
-            const content = item.content || item.title; 
-            const sourceUrl = item.shareUrl || `https://coinness.com/news/${item.id}`;
+            // Check Cache & DB
+            if (await redis.get(cacheKey)) continue;
+            const existing = await prisma.rawNews.findUnique({ where: { sourceUrl: cleanUrl } });
+            if (existing) {
+                await redis.set(cacheKey, '1', 'EX', 86400);
+                continue;
+            }
 
             try {
                 const raw = await prisma.rawNews.create({
                     data: {
-                        sourceUrl,
-                        title: item.title || content.substring(0, 50),
-                        rawBody: content,
+                        sourceUrl: cleanUrl,
+                        title: item.title || (item.content ? item.content.substring(0, 100) : "Untitled"),
+                        rawBody: item.content || item.title,
                         publishedAt: new Date(),
                         processed: false
                     }
                 });
 
-                const payload = { rawNewsId: raw.id };
-                channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(payload)));
-                console.log(`   ⚡ CoinNess: ${item.title.substring(0, 30)}...`);
+                channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+                await redis.set(cacheKey, '1', 'EX', 86400);
                 newCount++;
-            } catch (dbError) {
-                if (dbError.code !== 'P2002') console.error(`   ⚠️ DB Error: ${dbError.message}`);
+            } catch (e) {
+                if (e.code !== 'P2002') console.error(`   ⚠️ CoinNess DB Error: ${e.message}`);
             }
-            await redis.set(uniqueId, '1', 'EX', 86400);
         }
-        if (newCount > 0) console.log(`✅ CoinNess: ${newCount} new items.`);
+        if (newCount > 0) console.log(`   ✅ CoinNess: Added ${newCount} items.`);
     } catch (err) {
         console.error(`❌ CoinNess Error: ${err.message}`);
     }
 };
 
-// 2. RSS FETCHER (UPDATED: Handles Google News Redirects)
+// 2. RSS FETCHER (Optimized for variety and accuracy)
 export const fetchRSS = async (url) => {
-    console.log(`\n🔍 Fetching RSS: ${url}`);
+    console.log(`\n🔍 [Fetcher] Checking RSS: ${url}`);
     const channel = await connectRabbit();
     
     try {
-        // Fallback: If parser fails (403), we just log and skip (Cron handles the bridge)
         const feed = await parser.parseURL(url);
         let newCount = 0;
 
         for (const item of feed.items) {
-            // Check Redis First (Fastest)
-            // Use item.guid if available, else link
-            const cacheKey = `news:${item.guid || item.link}`;
-            const isCached = await redis.get(cacheKey);
-            if (isCached) { process.stdout.write("."); continue; }
+            // STEP 1: Normalize initial link
+            const initialUrl = normalizeUrl(item.link);
+            const cacheKey = `news:rss:${initialUrl}`;
 
-            // 1. Resolve & Scrape
-            // We behave as if we need to scrape everything (especially for Google News links)
-            await randomSleep(); 
-            
-            let bestContent = "";
-            let finalUrl = item.link; // Start with RSS link
-
-            try {
-                // If this is a Google News link, scrapeArticle (using Puppeteer) 
-                // will follow the redirect and give us the REAL url.
-                const scrapedData = await scrapeArticle(item.link);
-                
-                if (scrapedData) {
-                    // Handle object return { content, url }
-                    if (typeof scrapedData === 'object' && scrapedData.content) {
-                        bestContent = scrapedData.content;
-                        if (scrapedData.url) finalUrl = scrapedData.url; // ✅ CAPTURE REAL URL
-                    } 
-                    // Handle string return (old scraper compatibility)
-                    else if (typeof scrapedData === 'string') {
-                        bestContent = scrapedData;
-                    }
-                    console.log(`   📝 Scraped ${bestContent.length} chars | Real URL: ${finalUrl.substring(0,25)}...`);
-                }
-            } catch (scrapeErr) {
-                console.warn(`   ⚠️ Scraping failed for ${item.link.substring(0,30)}...`);
-            }
-
-            // Fallback content
-            if (!bestContent || bestContent.length < 200) {
-                bestContent = item.fullContent || item.normalContent || item.contentSnippet || "";
-            }
-
-            // Quality Gate
-            if (bestContent.length < 100) {
-                // Too short, skip but cache briefly so we don't hammer it
-                await redis.set(cacheKey, '1', 'EX', 3600);
+            // STEP 2: Pre-check DB to avoid wasting Scraper time/proxy credits
+            if (await redis.get(cacheKey)) { process.stdout.write("."); continue; }
+            const exists = await prisma.rawNews.findUnique({ where: { sourceUrl: initialUrl } });
+            if (exists) {
+                await redis.set(cacheKey, '1', 'EX', 86400);
                 continue;
             }
 
-            // 2. DB Check (Smart)
-            // Check if the RESOLVED URL already exists (prevents duplicates from different feeds)
-            if (finalUrl !== item.link) {
-                const existingReal = await prisma.rawNews.findUnique({ where: { sourceUrl: finalUrl } });
-                if (existingReal) {
-                    await redis.set(cacheKey, '1', 'EX', 86400); 
-                    continue;
-                }
+            // STEP 3: Scrape (Handles Google Redirects)
+            await randomSleep(3000, 6000); 
+            console.log(`\n   🕷️ Scraping: ${item.title.substring(0, 40)}...`);
+            
+            const scrapedData = await scrapeArticle(item.link);
+            if (!scrapedData || !scrapedData.content || scrapedData.content.length < 400) {
+                console.log(`     ⚠️  Skipping: Content too thin or blocked.`);
+                await redis.set(cacheKey, '1', 'EX', 3600); // Block for 1 hour to retry later
+                continue;
             }
 
+            // STEP 4: Secondary URL Validation (Post-Redirect)
+            const finalUrl = normalizeUrl(scrapedData.url);
+            
+            // CRITICAL JUNK FILTER: Skip price converters or non-article pages
+            const junkPatterns = ['/price-converter/', '/tag/', '/author/', '/category/', '/login', '/signup'];
+            if (junkPatterns.some(pattern => finalUrl.includes(pattern))) {
+                console.log(`     🗑️  Junk page detected: ${finalUrl}`);
+                await redis.set(cacheKey, '1', 'EX', 86400);
+                continue;
+            }
+
+            // Check if another RSS feed already saved this specific final URL
+            const finalExists = await prisma.rawNews.findUnique({ where: { sourceUrl: finalUrl } });
+            if (finalExists) {
+                await redis.set(cacheKey, '1', 'EX', 86400);
+                continue;
+            }
+
+            // STEP 5: Save & Queue
             try {
                 const raw = await prisma.rawNews.create({
                     data: {
-                        sourceUrl: finalUrl, // ✅ Save the Real URL (e.g., theblock.co)
+                        sourceUrl: finalUrl,
                         title: item.title,
-                        rawBody: bestContent, 
+                        rawBody: scrapedData.content, 
                         publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
                         processed: false 
                     }
                 });
 
-                const payload = { rawNewsId: raw.id };
-                channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(payload)));
-                console.log(`   ➡️  Queued: ${raw.title.substring(0, 30)}...`);
+                channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+                console.log(`     🚀 Queued: ${finalUrl.substring(0, 50)}...`);
                 newCount++;
-
             } catch (dbError) {
-                if (dbError.code === 'P2002') {
-                    process.stdout.write("s"); 
-                } else {
-                    console.error(`   ⚠️ DB Insert Error: ${dbError.message}`);
-                }
+                if (dbError.code === 'P2002') await redis.set(cacheKey, '1', 'EX', 86400);
             }
+            
             await redis.set(cacheKey, '1', 'EX', 86400);
         }
-        console.log(`\n✅ Saved ${newCount} NEW articles.`);
+        
+        if (newCount > 0) console.log(`\n✅ Saved ${newCount} new articles from this source.`);
         return newCount;
 
     } catch (err) {
