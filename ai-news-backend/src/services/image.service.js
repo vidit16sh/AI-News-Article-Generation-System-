@@ -9,122 +9,145 @@ fal.config({
   credentials: process.env.FAL_KEY,
 });
 
-// 🎨 STYLE 1: HIGH-END TECH EDITORIAL (The Verge / Polygon Style)
-// Best for: Market Analysis, Protocol Updates, Defi, Tech deep dives
+/**
+ * 🎨 STYLE 1: MEME MASTERPIECE VARIANTS
+ * Parodies of internet culture and crypto lore.
+ */
 const MEME_VARIANTS = [
-  // Style A: The 3D Character (Pixar/Fortnite vibe)
-  `Style: High-quality 3D Render, Pixar-style character art.
-   Visuals: A cute 3D character (Shiba Inu or Pepe) wearing a suit, holding a rocket, shocked expression, colorful background.
-   Mood: Fun, Hype, Cartoonish.`,
+  // Parody: "This is Fine"
+  `Style: Webcomic parody, thick outlines, flat colors.
+   Visuals: A Shiba Inu sitting calmly in a burning room full of "Bitcoin $1" signs, drinking coffee. 
+   Mood: Absurd, Humorous, Resigned.`,
 
-  // Style B: The Retro Game (Pixel Art)
-  `Style: 8-bit Pixel Art, Retro Video Game aesthetic.
-   Visuals: A pixelated "To The Moon" rocket ship, green candles, coins collecting, arcade UI overlay.
-   Mood: Nostalgic, Gamified, Fun.`,
+  // Parody: Wojak / Pink Bogal
+  `Style: MS Paint style illustration, "Feels Good Man" aesthetic.
+   Visuals: A green Pepe character with a giant brain or a crying pink Wojak character staring at a green candle price chart.
+   Mood: Chaotic, Hyper-active, Internet-native.`,
 
-  // Style C: The Vaporwave Trip
-  `Style: Vaporwave, Synthwave, 80s Retro Futurism.
-   Visuals: Neon grid landscape, greek statues wearing VR headsets, floating coins, pink and purple lasers.
-   Mood: Trippy, Chill, Internet Culture.`,
-   
-  // Style D: The Comic Book
-  `Style: Pop Art Comic Book illustration, Ben-Day dots.
-   Visuals: Dramatic comic panel, character screaming "BUY!", speech bubbles, dynamic action lines.
-   Mood: Energetic, Expressive.`
+  // Style: Surreal Corporate Memphis
+  `Style: Absurd Corporate Memphis, flat vector art but with weird proportions.
+   Visuals: A giant business suit with a Dogecoin for a head, walking a tiny moon on a leash like a dog.
+   Mood: Quirky, Modern, Silly.`,
+
+  // Style: GigaChad 3D
+  `Style: Hyper-realistic 3D Unreal Engine 5.
+   Visuals: A muscular, heroic Shiba Inu character wearing gold chains and diamond sunglasses, standing in front of a bank vault.
+   Mood: Hype, Confident, Funny.`
 ];
 
+/**
+ * 🎨 STYLE 2: DYNAMIC EDITORIAL
+ * High-end magazine styles for market and tech news.
+ */
 const EDITORIAL_VARIANTS = [
-  // Style A: Abstract Tech
-  `Style: Abstract 3D Data Visualization, Glassmorphism.
-   Visuals: Floating glass charts, glowing fiber optics, depth of field, minimalist geometry.
-   Colors: Deep Navy & Electric Cyan.`,
+  // Style: Isometric Tech City
+  `Style: Low-poly Isometric 3D Illustration.
+   Visuals: A miniature digital city on a microchip, glowing paths of data, tiny trees, floating coins.
+   Colors: Pastel Blues, Mint Green, and Soft Gold.`,
 
-  // Style B: The Blueprint
-  `Style: Architectural Blueprint, Technical Drawing.
-   Visuals: White wireframe schematics on blue background, grid lines, technical annotations of a crypto coin.
-   Colors: Blueprint Blue & White.`,
+  // Style: The "Hand-Drawn" Digital
+  `Style: Rough Hand-Drawn Digital Sketch, Copic marker texture.
+   Visuals: An artistic sketch of a hand holding a glowing digital phone, loose ink lines, watercolor splashes.
+   Mood: Human, Artistic, Modern.`,
 
-  // Style C: The Double Exposure
-  `Style: Artistic Double Exposure Photography.
-   Visuals: Silhouette of a businessman merged with a digital city skyline, glowing nodes.
-   Mood: Sophisticated, Thought-provoking.`
+  // Style: Glassmorphism
+  `Style: Modern Glassmorphism, blurred background, translucent layers.
+   Visuals: Floating frosted glass cards with 3D crypto logos, refraction effects, soft studio lighting.
+   Mood: Premium, Clean, Tech-forward.`,
+
+  // Style: Double Exposure Portrait
+  `Style: Surreal Double Exposure Photography.
+   Visuals: A silhouette of a visionary thinker merged with a chaotic digital code rain or a circuit board.
+   Colors: Monochrome with one neon accent color.`,
+
+  // Style: Paper-Cut Art
+  `Style: Layered Paper-cut art, shadow depth.
+   Visuals: 3D paper layers forming a mountain of coins or a digital landscape, clean edges, physical texture.
+   Mood: Tangible, Unique, Crafty.`
 ];
 
+/**
+ * 🎨 STYLE 3: DRAMATIC SERIOUS
+ * Gritty and symbolic styles for regulation, hacks, and crashes.
+ */
 const SERIOUS_VARIANTS = [
-  // Style A: Cinematic Noir
-  `Style: Neo-Noir Cinematic Shot, Dramatic Lighting.
-   Visuals: A gavel on a desk, shadows of prison bars, rain on a window, moody atmosphere.
-   Colors: Steel Grey, Black, Muted Blue.`,
+  // Style: Cyber-Security Glitch
+  `Style: Raw Glitch Art, CRT monitor distortion.
+   Visuals: A shattered digital shield, red "ERROR" warnings in the code, distorted static, hooded silhouette.
+   Colors: Acid Green, Black, and Warning Red.`,
 
-  // Style B: The Glitch
-  `Style: Dark Glitch Art, Cyber-security warning.
-   Visuals: Red warning screens, corrupted digital data, hooded hacker silhouette, shattered screen effect.
-   Colors: Black & Red.`
+  // Style: Cinematic Noir
+  `Style: Hyper-realistic Cinematic Noir, high contrast, film grain.
+   Visuals: A close-up of a judge's gavel hitting a table, wood splinters flying, dramatic spotlight, thick shadows.
+   Mood: Intense, Authoritative, Gritty.`,
+
+  // Style: Minimalist Symbolism
+  `Style: High-concept Minimalist Still Life.
+   Visuals: A single golden coin trapped in a heavy iron birdcage, or a coin sinking into dark black water.
+   Colors: Stark White, Pitch Black, and Deep Gold.`,
+
+  // Style: Macro Photography
+  `Style: Extreme Macro Photography, bokeh background.
+   Visuals: Close-up of a circuit board with a tiny "leak" of digital liquid, or the eye of a person reflecting a red candlestick chart.
+   Mood: Investigative, Tense, Micro-focused.`,
+
+  // Style: The Blueprint
+  `Style: Technical Blueprint, cyanotype aesthetic.
+   Visuals: White wireframe lines of a broken chain-link on a deep blue background, handwritten technical notes.
+   Mood: Structural, Analytical, Cold.`
 ]; 
 
-const getRandomStyle = (variants) => {
-  return variants[Math.floor(Math.random() * variants.length)];
-};
+const getRandomStyle = (variants) => variants[Math.floor(Math.random() * variants.length)];
 
 export const generateImage = async (headline, category = "EDITORIAL") => {
   if (!process.env.FAL_KEY) return null;
 
   try {
-    // 1. Clean the headline
     const cleanSubject = headline.replace(/[:"()]/g, "").trim();
     const lowerHead = cleanSubject.toLowerCase();
 
-    // 2. Smart Category & Variant Selection
-    let selectedVariant = getRandomStyle(EDITORIAL_VARIANTS); // Default
+    // 1. Smart Category & Variant Selection
+    let selectedVariant = getRandomStyle(EDITORIAL_VARIANTS); 
+    let humorPrompt = "";
 
     // A. Detect MEME Context
-    if (
-        lowerHead.includes('doge') || 
-        lowerHead.includes('pepe') || 
-        lowerHead.includes('shib') || 
-        lowerHead.includes('bonk') || 
-        lowerHead.includes('wif') || 
-        lowerHead.includes('meme') ||
-        lowerHead.includes('moon') ||
-        lowerHead.includes('rally') || 
-        lowerHead.includes('surge')
-    ) {
+    const memeTriggers = ['doge', 'pepe', 'shib', 'bonk', 'wif', 'meme', 'moon', 'rally', 'surge', 'pump', 'dump', 'hodl', 'whale'];
+    if (memeTriggers.some(word => lowerHead.includes(word))) {
         selectedVariant = getRandomStyle(MEME_VARIANTS);
         category = "MEME";
+        humorPrompt = "Add a specific humorous detail like a 'HODL' sign in the background or a character with an exaggerated bug-eyed expression of shock.";
     } 
     // B. Detect SERIOUS Context
     else if (
-        lowerHead.includes('sec') || 
-        lowerHead.includes('sue') || 
-        lowerHead.includes('ban') || 
-        lowerHead.includes('hack') || 
-        lowerHead.includes('jail') || 
-        lowerHead.includes('law') || 
-        lowerHead.includes('fraud') ||
-        lowerHead.includes('collapse')
+        lowerHead.includes('sec') || lowerHead.includes('sue') || 
+        lowerHead.includes('ban') || lowerHead.includes('hack') || 
+        lowerHead.includes('jail') || lowerHead.includes('law') || 
+        lowerHead.includes('fraud') || lowerHead.includes('collapse')
     ) {
         selectedVariant = getRandomStyle(SERIOUS_VARIANTS);
         category = "SERIOUS";
+        humorPrompt = "Ensure high-contrast dramatic lighting with a heavy cinematic noir atmosphere.";
     }
 
     console.log(`   🎨 Generating [${category}] Art for: "${cleanSubject.substring(0, 30)}..."`);
 
-    // 3. Construct the Engineering Prompt
+    // 2. Construct the Engineering Prompt
     const fullPrompt = `
-    ${selectedVariant}
-    
-    SUBJECT DIRECTIVE: Create an image representing: "${cleanSubject}".
-    
-    SCENE RULES:
-    - If "Bitcoin" is mentioned, show a glowing Orange Gold coin.
-    - If "Ethereum" is mentioned, show a glowing Blue Crystal.
-    - If "Bull", show green arrows pointing up.
-    - If "Bear", show red arrows pointing down.
-    - NO TEXT: Do not attempt to spell words.
-    - QUALITY: Masterpiece, 4k, sharp focus.
+      ${selectedVariant}
+      
+      SUBJECT: Create a conceptual image representing: "${cleanSubject}".
+      CREATIVE DIRECTIVE: ${humorPrompt}
+      
+      SCENE RULES:
+      - If "Bitcoin" is mentioned, show a glowing Orange Gold coin.
+      - If "Ethereum" is mentioned, show a glowing Blue Crystal diamond.
+      - If "Bull", show green arrows pointing up.
+      - If "Bear", show red arrows pointing down.
+      - NO TEXT: Do not attempt to render letters, names, or words.
+      - QUALITY: 8k resolution, cinematic composition, masterpiece.
     `;
 
-    // 4. Call Flux (Schnell)
+    // 3. Call Flux (Schnell)
     const result = await fal.subscribe("fal-ai/flux/schnell", {
       input: {
         prompt: fullPrompt,
@@ -132,23 +155,15 @@ export const generateImage = async (headline, category = "EDITORIAL") => {
         num_inference_steps: 4, 
         seed: Math.floor(Math.random() * 1000000), 
         enable_safety_checker: false, 
-        // ⚠️ CRITICAL: Low guidance allows Flux to be "creative" with styles
-        // High guidance (7+) forces it to ignore the style prompts and look generic.
-        guidance_scale: 2.5, 
+        // ⚠️ GUIDANCE 2.0: Lower guidance allows more artistic creativity
+        guidance_scale: 2.0, 
         sync_mode: true
       },
       logs: false, 
     });
 
-    // 5. Extract URL safely
     const images = result.images || (result.data && result.data.images);
-
-    if (images && images.length > 0) {
-      return images[0].url;
-    }
-    
-    console.warn("   ⚠️ Fal.ai returned no images.");
-    return null;
+    return images && images.length > 0 ? images[0].url : null;
 
   } catch (error) {
     console.error("   ❌ Image Gen Error:", error.message);

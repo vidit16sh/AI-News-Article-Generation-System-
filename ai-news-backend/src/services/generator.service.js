@@ -202,6 +202,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 - **Citations:** Include EXACTLY ONE HTML link to the Source URL provided in the text.
 - **Link Hierarchy:** You MUST include the Source URL citation. Additionally, if the prompt provides "Internal Links," you MUST weave them naturally into the text.
 - **Data Integrity:** If the input text is short, DO NOT invent quotes or specific event details to fill space. Instead, expand deeply on "Market Context" and "Why It Matters" using general knowledge.
+- ** You must mention a specific technical detail (e.g., "EIP-4844," "Fed Funds Rate," or "Fibonacci Support at $82k") that was NOT in the source text.
 ============================================================
 2. ARTICLE STRUCTURE (HTML Tags Only)
 ============================================================
@@ -218,13 +219,12 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 **Phase 3: The Data Snapshot (NEW)**
 7. <h2>By The Numbers</h2> 
    (Create a simple HTML <table> with 2 columns: 'Metric' and 'Value'. Fill it with 4-5 key data points from the story/market data.) 
-  - RULE: You must mention a specific technical detail (e.g., "EIP-4844," "Fed Funds Rate," or "Fibonacci Support at $82k") that was NOT in the source text.
 
 **Phase 4: The Impact**
 8. <h2>Why It Matters</h2> (Institutional impact vs. Retail impact.)
 9. <h3>Community Sentiment</h3> (Synthesize what industry leaders are saying on X/Twitter. Use quotes.)
 
-**Phase 5: The Forecast**
+**Phase 5: The Forecast** 
 10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.)
 11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.)
 
@@ -246,7 +246,8 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 - **Sentence Variance:** Mix short punchy sentences with complex analytical sentences.
 - **Formatting:** Use <strong> for every single dollar amount or percentage (e.g., <strong>$92,000</strong>).
 - **No Financial Advice:** Never say "You should buy." Say "Analysts suggest..." or "Historical patterns indicate..."
-- **Time Sensitivity:** Never use phrases like "In recent news" or "Recently." Be specific: "On Tuesday," "This week," or "Following the announcement."
+- **Time Sensitivity:** Never use phrases like "In recent news" or "Recently." Be specific: "On Tuesday," "This week," or "Following the announcement."   
+- **Insert one context-appropriate link to a high-authority site (e.g., SEC.gov, FederalReserve.gov, or Ethereum.org) to support your claims.
 ============================================================
 5. SEO REQUIREMENTS (STRICT)
 ============================================================
@@ -298,8 +299,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
             1. **Headline:** 60-75 chars.
             2. **Keyword:** 'focus_keywords' MUST appear VERBATIM in 'headline'.
             3. **Dateline:** Start with <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
-            4. **Table:** Did you include the HTML Table for 'By The Numbers'?  
-            5. **Insert one context-appropriate link to a high-authority site (e.g., SEC.gov, FederalReserve.gov, or Ethereum.org) to support your claims.**
+            4. **Table:** Did you include the HTML Table for 'By The Numbers'?
             `;
 
       const completion = await openai.chat.completions.create({

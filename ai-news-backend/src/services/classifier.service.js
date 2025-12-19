@@ -67,14 +67,18 @@ export const classifyNews = async (text, title) => {
             Act as a Senior News Editor for a Financial Terminal.
             Assign a Priority Score (0-100) and the Correct Category Slug.
             ALLOWED SLUGS: [${validSlugs}]
-            SCORING: 85+ (Breaking/Critical), 70-84 (High), 40-69 (Standard), <40 (Spam).
+            SCORING: 85+ (Breaking/Critical), 70-84 (High), 40-69 (Standard), <40 (Spam).  
+
+            ### OUTPUT FORMAT:
+            You must return the response as a json object.
         `;
 
         const userPrompt = `
             ### INPUT DATA
             **Headline:** "${title}"
             **Snippet:** "${text.substring(0, 600)}..."
-            **Local Keyword Hint:** ${localHintSlug}
+            **Local Keyword Hint:** ${localHintSlug} 
+            Return the result in json format.
         `;
 
         const completion = await openai.chat.completions.create({
