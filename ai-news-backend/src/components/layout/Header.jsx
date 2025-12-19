@@ -9,10 +9,7 @@ const PRIMARY_LINKS = [
   { label: "Crypto News", href: "/category/crypto" },
   { label: "Bitcoin", href: "/category/bitcoin" },
   { label: "Ethereum", href: "/category/ethereum" },
-
-  // ✅ FIXED: unique href (was duplicating /category/ethereum)
   { label: "Finance News", href: "/category/finance" },
-
   { label: "Forex News", href: "/category/defi" },
   { label: "Regulation", href: "/category/regulation" },
 ];

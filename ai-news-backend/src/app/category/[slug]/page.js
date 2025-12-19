@@ -10,7 +10,7 @@ async function fetchCategoryArticles(slug) {
   try {
     const res = await fetch(
       `${baseUrl}/api/articles?category=${encodeURIComponent(slug)}&limit=20`,
-      { next: { revalidate: 60 } }
+      { cache: 'no-store' }
     );
 
     if (!res.ok) {

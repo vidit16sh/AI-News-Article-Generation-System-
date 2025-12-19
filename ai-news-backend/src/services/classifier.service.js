@@ -8,51 +8,33 @@ const openai = new OpenAI({
 });
 
 // 1. 🏷️ STRICT TAXONOMY (The Source of Truth)
-// This maps Keywords -> Database Slugs. 
-// Google News prefers specific sections over generic ones.
+
 const TAXONOMY = {
-    // 🟡 COINS & TOKENS
     bitcoin: {
         name: 'Bitcoin',
-        keywords: ['bitcoin', 'btc', 'satoshi', 'halving', 'pow', 'digital gold', 'ordinals']
+        keywords: ['bitcoin', 'btc', 'satoshi', 'halving']
     },
     ethereum: {
         name: 'Ethereum',
-        keywords: ['ethereum', 'eth', 'vitalik', 'erc-20', 'gas fees', 'layer 2', 'arbitrum', 'optimism', 'base chain', 'consensys']
+        keywords: ['ethereum', 'eth', 'vitalik', 'erc-20']
     },
-    altcoins: {
-        name: 'Altcoins',
-        keywords: ['solana', 'cardano', 'xrp', 'ripple', 'doge', 'pepe', 'meme coin', 'shiba', 'avalanche', 'polkadot']
+    // ✅ CHANGED: slug 'altcoins' to 'crypto' to match Header
+    crypto: {
+        name: 'Crypto News',
+        keywords: ['solana', 'cardano', 'xrp', 'altcoin', 'doge', 'pepe']
     },
-    
-    // 🟣 SECTORS
+    // ✅ ADDED: 'defi' to match Header
     defi: {
-        name: 'DeFi',
-        keywords: ['defi', 'dex', 'uniswap', 'aave', 'lending', 'staking', 'yield', 'tvl', 'makerdao', 'curve', 'stablecoin', 'usdt', 'usdc']
+        name: 'DeFi & Forex', // Combined logic
+        keywords: ['defi', 'dex', 'uniswap', 'forex', 'fx', 'trading']
     },
-    nfts: {
-        name: 'NFTs & Metaverse',
-        keywords: ['nft', 'nfts', 'metaverse', 'digital art', 'opensea', 'blur', 'bored ape', 'yuga', 'sandbox', 'gaming', 'web3 game']
-    },
-    
-    // 🔴 MACRO & LEGAL (High Authority)
     regulation: {
         name: 'Regulation',
-        keywords: ['sec', 'gensler', 'regulation', 'lawsuit', 'sue', 'court', 'ban', 'tax', 'legal', 'congress', 'white house', 'compliance', 'fca', 'mica']
+        keywords: ['sec', 'gensler', 'lawsuit', 'legal', 'compliance']
     },
-    security: {
-        name: 'Security',
-        keywords: ['hack', 'hacked', 'exploit', 'scam', 'drainer', 'phishing', 'breach', 'stolen', 'lazarus', 'private key']
-    },
-    analysis: {
-        name: 'Market Analysis',
-        keywords: ['price prediction', 'technical analysis', 'chart', 'bull run', 'bear market', 'correction', 'rally', 'support level', 'resistance', 'analyst']
-    },
-    
-    // 🔵 TRADFI (Context)
     finance: {
         name: 'Finance',
-        keywords: ['fed', 'fomc', 'powell', 'interest rate', 'inflation', 'cpi', 'stocks', 'nasdaq', 'sp500', 'etf', 'blackrock']
+        keywords: ['fed', 'interest rate', 'inflation', 'stocks', 'etf']
     }
 };
 
