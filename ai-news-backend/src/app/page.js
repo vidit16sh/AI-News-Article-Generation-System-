@@ -3,39 +3,35 @@ import LatestNewsSection from "../components/home/LatestNewsSection";
 import TopStoriesSection from "../components/home/TopStoriesSection";
 import PoliticsStripSection from "../components/home/PoliticsStripSection";
 import RightSidebar from "../components/layout/RightSidebar";
+import AutoRefresh from "../components/common/AutoRefresh";
 import prisma from "@/lib/prisma";
-export const dynamic = 'force-dynamic';  
+
+// ✅ ISR: refresh the cached homepage at most every 60 seconds
+export const revalidate = 60;
 
 export default async function HomePage() {
-  // ✅ 1. Direct Database Query with CORRECT nesting
+  // ✅ 1. Direct Database Query
   const articlesRaw = await prisma.generatedArticle.findMany({
-    where: {
-      status: "PUBLISHED",
-    },
-    orderBy: {
-      publishAt: "desc",
-    },
+    where: { status: "PUBLISHED" },
+    orderBy: { publishAt: "desc" },
     take: 20,
     include: {
-      author: true, 
+      author: true,
       originalNews: {
         include: {
-          category: true, // Category lives inside originalNews
+          category: true,
         },
       },
     },
   });
 
   // ✅ 2. Data Mapping
-  // We flatten the data so 'article.category' is easy for components to read
- const articles = articlesRaw.map((art) => ({
+  const articles = articlesRaw.map((art) => ({
     ...art,
-    // Extract the category name string or use "General" as a fallback
-    category: art.originalNews?.category?.name || "General", 
-    // Do the same for author to avoid future object errors
+    category: art.originalNews?.category?.name || "General",
     authorName: art.author?.name || "AI Writer",
- })); 
-  
+  }));
+
   // Separate the "Featured" (first one) from the rest
   const [featured, ...rest] = articles;
 
@@ -49,20 +45,28 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-10">
+      {/* ✅ Auto refresh while the page is OPEN */}
+      <AutoRefresh intervalMs={60000} />
+
       <div className="lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:gap-0">
         <div className="space-y-6 lg:pr-8">
           <HeroSection featured={featured || rest[0]} />
-          <LatestNewsSection articles={latestNews.length ? latestNews : rest.slice(0, 3)} />
+          <LatestNewsSection
+            articles={latestNews.length ? latestNews : rest.slice(0, 3)}
+          />
           <TopStoriesSection
             mainArticle={topStoriesMain}
             listArticles={topStoriesList.length ? topStoriesList : rest.slice(0, 4)}
           />
         </div>
+
         <div className="hidden lg:block bg-slate-200" />
+
         <aside className="mt-8 space-y-6 lg:mt-0 lg:pl-8">
           <RightSidebar />
         </aside>
       </div>
+
       <PoliticsStripSection articles={politicsForStrip} />
     </div>
   );
