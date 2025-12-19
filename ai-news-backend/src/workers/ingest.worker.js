@@ -11,6 +11,25 @@ const limiter = new Bottleneck({
     maxConcurrent: 1 
 });
 
+/**
+ * 🔗 URL RESOLVER: Extracts the real news link from Google redirects.
+ * Essential for Google News trust and avoiding "consent.google.com" links.
+ */
+const resolveRealUrl = (url) => {
+    try {
+        const urlObj = new URL(url);
+        // Extract actual URL from Google News redirect parameters
+        if (urlObj.hostname.includes('google.com')) {
+            const realUrl = urlObj.searchParams.get('q') || urlObj.searchParams.get('url');
+            return realUrl || url;
+        }
+        // Basic cleanup: remove tracking parameters
+        return urlObj.origin + urlObj.pathname;
+    } catch (e) {
+        return url;
+    }
+};
+
 const processJob = async (msg, channel) => {
     const content = JSON.parse(msg.content.toString());
     const { rawNewsId, retryCount = 0 } = content;
@@ -23,7 +42,7 @@ const processJob = async (msg, channel) => {
             return;
         }
         
-        // 🛡️ 1. URL GUARD: Reject Google Consent or Redirect pages
+        // 🛡️ 1. URL GUARD: Reject Junk/Redirect sources before processing
         const junkPatterns = ['consent.google.com', 'news.google.com/url', 'google.com/url'];
         if (junkPatterns.some(pattern => rawNews.sourceUrl.includes(pattern))) {
             console.log(`   🛑 Skipping Junk Source: ${rawNews.sourceUrl}`);
@@ -46,11 +65,10 @@ const processJob = async (msg, channel) => {
         const priorityScore = classification.priority_score || 0; 
         const category = await getOrCreateCategory(categorySlug);
 
-        // 🔗 3. URL CLEANING
-        const urlObj = new URL(rawNews.sourceUrl);
-        const cleanUrl = urlObj.origin + urlObj.pathname;
+        // 🔗 3. ADVANCED URL CLEANING (Google Redirect Fix)
+        const cleanUrl = resolveRealUrl(rawNews.sourceUrl);
         
-        // 💾 4. UPSERT CleanedNews (FIXED: 'tags' removed because it's not in this table)
+        // 💾 4. UPSERT CleanedNews
         const finalNews = await prisma.cleanedNews.upsert({
             where: { sourceUrl: cleanUrl },
             update: { title: rawNews.title },
@@ -61,7 +79,6 @@ const processJob = async (msg, channel) => {
                 sourceUrl: cleanUrl,
                 publishedAt: rawNews.publishedAt, 
                 categoryId: category.id,
-                // Note: No 'tags' here because CleanedNews model lacks that field
             }
         });
 
@@ -103,7 +120,7 @@ const startWorker = async () => {
         const channel = await connectRabbit();
         await channel.assertQueue('generation_queue', { durable: true });
         channel.prefetch(1); 
-        console.log("👀 Ingest Worker (Corrected Tags Mode) Started...");
+        console.log("👀 Ingest Worker (Redirect-Fix Mode) Started...");
         channel.consume('ingest_queue', (msg) => {
             if (msg) processJob(msg, channel);
         });

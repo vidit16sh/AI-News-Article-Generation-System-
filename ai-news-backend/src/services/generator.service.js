@@ -217,7 +217,8 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 
 **Phase 3: The Data Snapshot (NEW)**
 7. <h2>By The Numbers</h2> 
-   (Create a simple HTML <table> with 2 columns: 'Metric' and 'Value'. Fill it with 4-5 key data points from the story/market data.)
+   (Create a simple HTML <table> with 2 columns: 'Metric' and 'Value'. Fill it with 4-5 key data points from the story/market data.) 
+  - RULE: You must mention a specific technical detail (e.g., "EIP-4844," "Fed Funds Rate," or "Fibonacci Support at $82k") that was NOT in the source text.
 
 **Phase 4: The Impact**
 8. <h2>Why It Matters</h2> (Institutional impact vs. Retail impact.)
@@ -297,7 +298,8 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
             1. **Headline:** 60-75 chars.
             2. **Keyword:** 'focus_keywords' MUST appear VERBATIM in 'headline'.
             3. **Dateline:** Start with <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
-            4. **Table:** Did you include the HTML Table for 'By The Numbers'?
+            4. **Table:** Did you include the HTML Table for 'By The Numbers'?  
+            5. **Insert one context-appropriate link to a high-authority site (e.g., SEC.gov, FederalReserve.gov, or Ethereum.org) to support your claims.**
             `;
 
       const completion = await openai.chat.completions.create({
