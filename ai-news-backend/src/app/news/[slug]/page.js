@@ -1,8 +1,12 @@
+// src/app/news/[slug]/page.js
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import RightSidebar from "../../../components/layout/RightSidebar";
 import AuthorBioBox from "../../../components/article/AuthorBioBox";
+
+// ✅ Icons (lucide-react)
+import { Facebook, Twitter, Linkedin, Mail } from "lucide-react";
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
@@ -39,9 +43,7 @@ export async function generateMetadata({ params }) {
   return {
     title: article.headline,
     description: article.metaDescription || article.excerpt || article.headline,
-    alternates: {
-      canonical: url,
-    },
+    alternates: { canonical: url },
     openGraph: {
       title: article.headline,
       description: article.metaDescription || article.excerpt || article.headline,
@@ -64,9 +66,7 @@ export default async function ArticlePage({ params }) {
   const { slug } = await params;
   const data = await getArticle(slug);
 
-  if (!data || !data.article) {
-    notFound();
-  }
+  if (!data || !data.article) notFound();
 
   const { article, relatedArticles } = data;
 
@@ -105,46 +105,35 @@ export default async function ArticlePage({ params }) {
 
   const authorName = author?.name || "Editorial Team";
   const authorSlug = author?.slug || null;
-  const readingTime = article.readingTime || "3";
 
   const sidebarArticles = Array.isArray(relatedArticles)
     ? relatedArticles
     : [];
   const relatedForMain = sidebarArticles.slice(0, 6);
 
-  return (
-    <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-0">
-      {/* Breadcrumbs */}
-      <nav
-        aria-label="Breadcrumb"
-        className="mb-6 text-xs font-medium text-slate-500"
-      >
-        <ol className="flex flex-wrap items-center gap-1">
-          <li>
-            <Link href="/" className="hover:text-slate-800 transition-colors">
-              Home
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link
-              href="/news"
-              className="hover:text-slate-800 transition-colors"
-            >
-              News
-            </Link>
-          </li>
-          <li>/</li>
-          <li
-            className="truncate max-w-[55vw] text-slate-700 lg:max-w-xs"
-            aria-current="page"
-          >
-            {article.headline}
-          </li>
-        </ol>
-      </nav>
+  // ✅ Share URLs (works without client JS)
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const articleUrl = `${baseUrl}/news/${article.slug}`;
+  const shareText = article.headline || "Check this out";
 
-      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-12">
+  const shareLinks = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+      articleUrl
+    )}`,
+    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+      articleUrl
+    )}&text=${encodeURIComponent(shareText)}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+      articleUrl
+    )}`,
+    email: `mailto:?subject=${encodeURIComponent(
+      shareText
+    )}&body=${encodeURIComponent(articleUrl)}`,
+  };
+
+  return (
+    <div className="mx-auto max-w-[1440px] lg:px-0">
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-8">
         {/* MAIN ARTICLE COLUMN */}
         <main
           className="lg:pr-0"
@@ -160,74 +149,106 @@ export default async function ArticlePage({ params }) {
           )}
 
           {/* Top meta section */}
-          <header className="mb-8 border-b border-slate-200 pb-8">
+          {/* ✅ CHANGED: removed border-b (this was the line BELOW author) and reduced padding-bottom */}
+          <header className="mb-8 pb-4">
+            {/* ✅ Category tag */}
             <div className="mb-4">
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">
+              <span className="inline-flex items-center gap-2 rounded-md border border-[#f7d9d9] bg-[#fcf2f2] px-3 py-1 text-[0.8rem] text-[#cc0000]">
                 {category}
               </span>
             </div>
 
+            {/* ✅ Title */}
             <h1
               itemProp="headline"
-              className="mb-6 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-[2.75rem]"
+              className="mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]"
             >
               {article.headline}
             </h1>
 
-            {/* Author row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
+            {/* ================= MOBILE AUTHOR ROW ================= */}
+            <div className="sm:hidden text-sm text-slate-600">
+              <span className="text-slate-500">By: </span>
+
+              {authorSlug ? (
+                <Link
+                  href={`/authors/${authorSlug}`}
+                  className="font-normal text-slate-900 hover:underline"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <span className="font-normal text-slate-900">{authorName}</span>
+              )}
+
+              {publishedDate && (
+                <>
+                  <span className="mx-2 h-1 w-1 rounded-full bg-red-600 inline-block align-middle" />
+                  <time
+                    itemProp="datePublished"
+                    dateTime={article.createdAt}
+                    className="text-slate-500"
+                  >
+                    {publishedDate}
+                  </time>
+                </>
+              )}
+            </div>
+
+            {/* ================= DESKTOP / LARGE SCREEN AUTHOR ROW ================= */}
+            <div className="hidden sm:flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-slate-100">
                   {author.imageUrl ? (
                     <Image
                       src={author.imageUrl}
                       alt={authorName}
-                      width={40}
-                      height={40}
+                      width={36}
+                      height={36}
                       className="object-cover"
                     />
                   ) : (
-                    <span className="text-sm font-bold text-slate-500">
+                    <span className="text-sm font-extralight text-slate-500">
                       {authorName.charAt(0)}
                     </span>
                   )}
                 </div>
 
-                <div className="flex flex-col text-sm">
+                <div className="flex flex-wrap items-center gap-4 text-sm">
                   {authorSlug ? (
                     <Link
                       href={`/authors/${authorSlug}`}
-                      className="font-semibold text-slate-900 hover:underline"
+                      className="font-normal text-slate-900 hover:underline"
                     >
                       {authorName}
                     </Link>
                   ) : (
-                    <span className="font-semibold text-slate-900">
-                      {authorName}
-                    </span>
+                    <span className="font-medium text-slate-900">{authorName}</span>
                   )}
-                  <span className="text-slate-500">
-                    {author.role || "Contributor"}
-                  </span>
+
+                  {publishedDate && (
+                    <span className="h-1 w-1 rounded-full bg-red-600" />
+                  )}
+
+                  {publishedDate && (
+                    <time
+                      itemProp="datePublished"
+                      dateTime={article.createdAt}
+                      className="text-slate-500"
+                    >
+                      {publishedDate}
+                    </time>
+                  )}
                 </div>
               </div>
-
-              <div className="flex items-center gap-4 text-sm text-slate-500">
-                {publishedDate && (
-                  <time itemProp="datePublished" dateTime={article.createdAt}>
-                    {publishedDate}
-                  </time>
-                )}
-                <span>·</span>
-                <span>{readingTime} min read</span>
-              </div>
             </div>
+
           </header>
 
           {/* Hero image */}
           {article.imageUrl && (
             <figure className="mb-10 overflow-hidden rounded-2xl shadow-sm">
-              <div className="relative aspect-[16/9] w-full bg-slate-100">
+              <div className="relative w-full aspect-[16/9] bg-slate-100">
                 <Image
                   src={article.imageUrl}
                   alt={article.headline}
@@ -237,6 +258,7 @@ export default async function ArticlePage({ params }) {
                   sizes="(max-width: 768px) 100vw, 800px"
                 />
               </div>
+
               {article.imageCaption && (
                 <figcaption className="mt-3 text-center text-sm italic text-slate-500">
                   {article.imageCaption}
@@ -245,27 +267,43 @@ export default async function ArticlePage({ params }) {
             </figure>
           )}
 
+
           {/* Content Body Layout */}
           <div className="relative flex gap-8">
-            {/* Share column */}
             <div className="hidden lg:block lg:w-12 lg:flex-none">
-              <div className="sticky top-32 flex flex-col gap-4">
-                <ShareIcon label="Facebook" abbr="F" />
-                <ShareIcon label="Twitter" abbr="T" />
-                <ShareIcon label="LinkedIn" abbr="L" />
-                <ShareIcon label="Email" abbr="@" />
+              <div className="sticky top-32 flex flex-col gap-3">
+                <ShareIcon
+                  label="Facebook"
+                  href={shareLinks.facebook}
+                  icon={<Facebook className="h-4 w-4" />}
+                />
+                <ShareIcon
+                  label="Twitter"
+                  href={shareLinks.twitter}
+                  icon={<Twitter className="h-4 w-4" />}
+                />
+                <ShareIcon
+                  label="LinkedIn"
+                  href={shareLinks.linkedin}
+                  icon={<Linkedin className="h-4 w-4" />}
+                />
+                <ShareIcon
+                  label="Email"
+                  href={shareLinks.email}
+                  icon={<Mail className="h-4 w-4" />}
+                  isMail
+                />
               </div>
             </div>
 
-            {/* ✅ Article body (ONLY ONCE) */}
             <section
               itemProp="articleBody"
               className="
                 article-prose
                 prose prose-lg max-w-none
                 prose-h1:hidden
-                prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.75rem] prose-h2:font-semibold prose-h2:tracking-tight
-                prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.35rem] prose-h3:font-semibold
+                prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight
+                prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold
                 prose-p:text-slate-800 prose-p:leading-[1.85]
                 prose-ul:my-4 prose-ol:my-4
                 prose-li:my-1
@@ -278,18 +316,20 @@ export default async function ArticlePage({ params }) {
             />
           </div>
 
-          {/* ✅ Author Bio Box (after content) */}
           <AuthorBioBox author={article.author} />
 
-          {/* Disclaimer */}
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
-              <strong>Disclaimer:</strong> The information provided is not trading
-              advice. CoinMarketBuzz holds no liability for investment decisions.
+              <strong>Disclaimer:</strong> The information provided is not
+              trading advice,{" "}
+              <a href="coinmarketbuzz.com">coinmarketbuzz.com</a> holds no
+              liability for any investments made based on the information
+              provided on this page. We strongly recommend independent research
+              and/or consultation with a qualified professional before making
+              any investment decisions.
             </p>
           </div>
 
-          {/* RELATED ARTICLES */}
           {relatedForMain.length > 0 && (
             <RelatedArticlesSection articles={relatedForMain} />
           )}
@@ -297,7 +337,7 @@ export default async function ArticlePage({ params }) {
 
         <div className="hidden h-full w-px bg-slate-200 lg:block" />
 
-        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0 lg:pl-4">
+        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0">
           <RightSidebar />
         </aside>
       </div>
@@ -305,21 +345,19 @@ export default async function ArticlePage({ params }) {
   );
 }
 
-/* --------- Share Icon --------- */
-
-function ShareIcon({ label, abbr }) {
+function ShareIcon({ label, href, icon, isMail = false }) {
   return (
-    <button
-      type="button"
+    <a
+      href={href}
       aria-label={`Share on ${label}`}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-[0.7rem] font-semibold uppercase text-slate-500 hover:border-red-500 hover:text-red-600 hover:bg-slate-50 transition-colors"
+      target={isMail ? undefined : "_blank"}
+      rel={isMail ? undefined : "noreferrer noopener"}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:border-red-500 hover:text-red-600 hover:bg-slate-50 transition-colors"
     >
-      {abbr}
-    </button>
+      {icon}
+    </a>
   );
 }
-
-/* --------- Related Articles Section --------- */
 
 function RelatedArticlesSection({ articles }) {
   const normalized = articles.map((a) => normalizeRelated(a));
@@ -327,7 +365,7 @@ function RelatedArticlesSection({ articles }) {
   return (
     <section className="mt-16 border-t border-slate-200 pt-10">
       <div className="mb-6 flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full bg-red-600" />
+        <span className="h-6 w-1 rounded-full bg-red-600" />
         <h2 className="text-xl font-bold tracking-tight text-slate-900">
           Related Articles
         </h2>
@@ -335,14 +373,55 @@ function RelatedArticlesSection({ articles }) {
 
       <div className="grid gap-8 md:grid-cols-3 sm:grid-cols-2">
         {normalized.map((a) => (
-          <Link key={a.slug} href={`/news/${a.slug}`} className="group block">
-            <h3 className="text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-700 transition-colors">
-              {a.title}
-            </h3>
-          </Link>
+          <RelatedCard key={a.slug} article={a} />
         ))}
       </div>
     </section>
+  );
+}
+
+function RelatedCard({ article }) {
+  const a = article;
+
+  return (
+    <Link
+      href={`/news/${a.slug}`}
+      className="group flex h-full flex-row gap-3 md:flex-col"
+    >
+      <div
+        className="
+          relative overflow-hidden rounded-md bg-slate-100
+          h-24 w-28 flex-none
+          sm:h-28
+          md:h-48 md:w-full
+        "
+      >
+        {a.imageUrl ? (
+          <Image
+            src={a.imageUrl}
+            alt={a.title}
+            fill
+            className="object-cover object-center transition-opacity duration-200 group-hover:opacity-80"
+            sizes="(max-width: 768px) 35vw, 30vw"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-slate-300">
+            <span className="text-3xl">📰</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="text-[0.75rem] font-light text-slate-500">
+          {a.date && `${a.date} • `}
+          <span>{a.category}</span>
+        </div>
+
+        <h3 className="line-clamp-2 text-[1rem] sm:text-[1.05rem] font-light text-slate-900 group-hover:underline underline-offset-[3px]">
+          {a.title}
+        </h3>
+      </div>
+    </Link>
   );
 }
 
