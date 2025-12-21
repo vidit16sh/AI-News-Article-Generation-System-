@@ -83,7 +83,7 @@ const createJsonLd = (article, url, authorObj) => {
       logo: {
         "@type": "ImageObject",
         // ✅ Updated to match your current logo path in public/
-        url: `${SITE_URL}/brand/logo.jpg`,
+        url: `${SITE_URL}/brand/logo.png`,
       },
     },
   };

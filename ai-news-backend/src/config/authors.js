@@ -53,7 +53,7 @@ export const EDITORIAL_TEAM = [
     focus: ["Breaking News", "Price Alerts", "Global Markets"],
     bio: "The CoinMarketBuzz Desk tracks real-time market data, regulatory filings, and on-chain alerts. Our automated insights ensure you get the facts as they happen.",
     // ✅ FIX: match your actual logo path (same as Header/Footer)
-    imageUrl: "/brand/logo.jpg",
+    imageUrl: "/brand/logo.png",
     linkedin: null,
   },
 ];

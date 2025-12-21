@@ -15,7 +15,7 @@ export default function Footer() {
             <div className="mb-4 flex items-center gap-3">
               <Link href="/" className="inline-flex items-center">
                 <Image
-                  src="/brand/logo.jpg"
+                  src="/brand/logo.png"
                   alt="CoinMarketBuzz"
                   width={160}
                   height={36}

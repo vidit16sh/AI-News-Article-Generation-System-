@@ -103,7 +103,7 @@ export default async function ArticlePage({ params }) {
       "name": "CoinMarketBuzz",
       "logo": {
         "@type": "ImageObject",
-        "url": `${baseUrl}/brand/logo.jpg` 
+        "url": `${baseUrl}/brand/logo.png` 
       }
     },
     "mainEntityOfPage": {
