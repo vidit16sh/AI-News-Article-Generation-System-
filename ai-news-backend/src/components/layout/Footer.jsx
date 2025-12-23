@@ -40,24 +40,24 @@ export default function Footer() {
               <address className="not-italic space-y-1.5 text-[0.8rem] text-slate-400">
                 <p>
                   <strong className="text-slate-300">
-                    CoinMarketBuzz HQ
+                    CoinMarketBuzz
                   </strong>
                 </p>
-                <p>123 Innovation Drive, Suite 100</p>
-                <p>New York, NY 10001, USA</p>
+                <p>C-14, Giriraj Society, Ekta Nagar, New Sama,</p>
+                <p>Vadodara, Gujarat 39002</p>
 
                 <p className="mt-2 flex items-center gap-2">
                   <span className="text-slate-500">Phone:</span>
-                  <span>+1 (555) 012-3456</span>
+                  <span>+91 97603 95655</span>
                 </p>
 
                 <p className="flex items-center gap-2">
                   <span className="text-slate-500">Email:</span>
                   <a
-                    href="mailto:editor@coinmarketbuzz.com"
+                    href="mailto:contact@coinmarketbuzz.com"
                     className="text-blue-400 hover:text-blue-300 transition-colors"
                   >
-                    editor@coinmarketbuzz.com
+                    contact@coinmarketbuzz.com
                   </a>
                 </p>
               </address>
