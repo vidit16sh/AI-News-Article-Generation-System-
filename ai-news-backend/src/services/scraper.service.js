@@ -40,8 +40,7 @@ const getBrowser = async () => {
             '--disable-dev-shm-usage', // Prevents crashes in Docker/Linux
             '--disable-gpu',           // Saves significant RAM
             '--no-zygote',             // Reduces background process overhead
-            '--disable-extensions',
-            '--single-process',        // Drastically lowers memory footprint
+            '--disable-extensions',    
             '--no-first-run',
             '--window-size=1920,1080'
         ]
