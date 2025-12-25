@@ -73,7 +73,14 @@ export default async function ArticlePage({ params }) {
 
   const { article, relatedArticles } = data;
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
-
+  
+  const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
+  const author = article.author || {
+    name: "Editorial Desk",
+    role: "AI News Desk",
+    slug: null,
+    imageUrl: null,
+  }; 
   // ✅ DATA PREP FOR JSON-LD
   const publishedISO = new Date(article.publishAt || article.createdAt).toISOString();
   const modifiedISO = new Date(article.updatedAt || article.publishAt || article.createdAt).toISOString();
@@ -90,20 +97,25 @@ export default async function ArticlePage({ params }) {
     "description": article.metaDescription || article.excerpt || article.headline,
     "image": [absoluteImage], 
     "datePublished": publishedISO,
-    "dateModified": modifiedISO,
+    "dateModified": modifiedISO, 
+    "articleSection": category,
+    "isAccessibleForFree": "True",
     "author": [{
       "@type": "Person",
-      "name": article.author?.name || "CoinMarketBuzz Staff",
-      "url": article.author?.slug 
-        ? `${baseUrl}/authors/${article.author.slug}` 
+      // Uses "CoinMarketBuzz Staff" for Google Schema if no specific author exists
+      "name": article.author?.name || "CoinMarketBuzz Staff", 
+      "jobTitle": author.role, 
+      "url": author.slug 
+        ? `${baseUrl}/authors/${author.slug}` 
         : `${baseUrl}/about`
     }],
     "publisher": {
       "@type": "Organization",
-      "name": "CoinMarketBuzz",
+      "name": "CoinMarketBuzz", 
+      "url": baseUrl,
       "logo": {
         "@type": "ImageObject",
-        "url": `${baseUrl}/brand/logo.jpg` 
+        "url": `${baseUrl}/brand/logo.png` 
       }
     },
     "mainEntityOfPage": {
@@ -112,8 +124,7 @@ export default async function ArticlePage({ params }) {
     }
   };
 
-  const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
-
+ 
   const publishedDate = article.publishAt || article.createdAt
     ? new Date(article.publishAt || article.createdAt).toLocaleDateString("en-US", {
         weekday: "long",
@@ -121,15 +132,8 @@ export default async function ArticlePage({ params }) {
         day: "numeric",
         year: "numeric",
       })
-    : "";
-
-  const author = article.author || {
-    name: "Editorial Team",
-    role: "AI News Desk",
-    slug: null,
-    imageUrl: null,
-  };
-
+    : ""; 
+  
   const authorName = author?.name || "Editorial Team";
   const authorSlug = author?.slug || null;
 
@@ -268,7 +272,7 @@ export default async function ArticlePage({ params }) {
             />
           </div>
 
-          <AuthorBioBox author={article.author} />
+          <AuthorBioBox author={author} />
 
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
