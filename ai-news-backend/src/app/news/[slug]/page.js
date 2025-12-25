@@ -276,8 +276,8 @@ export default async function ArticlePage({ params }) {
 
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
-              <strong>Disclaimer:</strong> The information provided is not trading advice,{" "}
-              <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> holds no liability for any investments made based on this page.
+              <strong>Disclaimer:</strong> The information provided is not trading advice, <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> holds no liability for any investments made based on the information provided on this page. We strongly recommend independent research and/or consultation with a qualified professional before making any investment decisions. <br></br>
+              <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> leverages advanced AI technology to analyze market data. All content is fact-checked and reviewed by our editorial team to ensure accuracy and neutrality.
             </p>
           </div>
 

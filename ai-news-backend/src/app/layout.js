@@ -36,9 +36,9 @@ export const metadata = {
 
   // ✅ FAVICON CONFIG (App Router way)
   icons: {
-    icon: "/brand/iconcircle.jpg",
-    shortcut: "/brand/iconcircle.jpg",
-    apple: "/brand/iconcircle.jpg",
+    icon: "/brand/logocircle.png",
+    shortcut: "/brand/logocircle.png",
+    apple: "/brand/logocircle.png",
   },
 };
 

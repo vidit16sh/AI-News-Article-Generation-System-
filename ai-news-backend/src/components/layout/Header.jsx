@@ -173,7 +173,7 @@ function LogoDesktop() {
   return (
     <Link href="/" className="flex items-center">
       <Image
-        src="/brand/logo.jpg"
+        src="/brand/logo.png"
         alt="CoinMarketBuzz"
         width={200}
         height={40}
@@ -187,7 +187,7 @@ function LogoMobile({ dark = false }) {
   return (
     <Link href="/" className="flex items-center">
       <Image
-        src="/brand/logo.jpg"
+        src="/brand/logo.png"
         alt="CoinMarketBuzz"
         width={140}
         height={32}

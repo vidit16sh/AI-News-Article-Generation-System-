@@ -9,8 +9,8 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const DEFAULT_IMAGE = `${SITE_URL}/default-news.jpg`;
 
 // ✅ Your new brand logo (based on your frontend)
-// Put this file at: /public/brand/logo.jpg
-const PUBLISHER_LOGO = `${SITE_URL}/brand/logo.jpg`;
+// Put this file at: /public/brand/logo.png
+const PUBLISHER_LOGO = `${SITE_URL}/brand/logo.png`;
 
 // ✅ Publisher name
 const PUBLISHER_NAME = "CoinMarketBuzz";
