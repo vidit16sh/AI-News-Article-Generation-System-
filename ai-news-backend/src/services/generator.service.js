@@ -84,7 +84,7 @@ const cleanJsonOutput = (text) => {
   }
 }; 
 
-const auditAndFixArticle = (json,sourceUrl) => {
+const auditAndFixArticle = (json, sourceUrl) => {
   let html = json.article_html || ""; 
   let score = 100;
   
@@ -103,15 +103,8 @@ const auditAndFixArticle = (json,sourceUrl) => {
     throw new Error(`Article too short: ${wordCount} words. Minimum 400 required.`);
   }
 
-  // C. Headline Keyword Check 
-  if (json.headline && json.focus_keywords) {
-      if (!json.headline.toLowerCase().includes(json.focus_keywords.toLowerCase())) {
-        // Only append if it fits naturally, otherwise ignore to avoid spammy look
-        if (json.headline.length < 50) {
-            json.headline = `${json.focus_keywords}: ${json.headline}`;
-        }
-      }
-  } 
+  // ✅ FIX: Removed the logic that was hard-coding keywords into the headline prefix.
+  // This allows the AI to generate natural, non-repetitive headlines as requested by the audit.
 
   const sourceNote = `
     <p class="text-sm mt-8 text-slate-500 italic border-t pt-4">
@@ -207,7 +200,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 2. ARTICLE STRUCTURE (HTML Tags Only)
 ============================================================
 **Phase 1: The Hook**
-1. <h1>Headline</h1> (60-80 chars, strictly containing Focus Keyword. MUST be punchy/click-worthy but accurate.)
+1. <h1>Headline</h1> (60-80 chars. MUST start with a bracketed content type tag like [Analysis] or [News]. The headline must be punchy, accurate, and high-engagement (click-worthy) while naturally weaving in the Focus Keyword. Example: "[Analysis] Bitcoin Support Holds at $90k Despite Regulatory Headwinds". STRICT RULE: Do not use generic "Daily Crypto Analysis" prefixes.)
 2. **Executive Summary:** A <blockquote><ul> list of 3-4 key bullet points (The "TL;DR" for traders).
 3. **Dateline & Lede:** The opening paragraph summarizing the "Who, What, When" immediately.
 

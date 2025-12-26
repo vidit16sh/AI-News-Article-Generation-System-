@@ -103,7 +103,7 @@ export default async function ArticlePage({ params }) {
     "author": [{
       "@type": "Person",
       // Uses "CoinMarketBuzz Staff" for Google Schema if no specific author exists
-      "name": article.author?.name || "CoinMarketBuzz Staff", 
+      "name": article.author?.name || "CoinMarketBuzz Desk", 
       "jobTitle": author.role, 
       "url": author.slug 
         ? `${baseUrl}/authors/${author.slug}` 
@@ -134,7 +134,7 @@ export default async function ArticlePage({ params }) {
       })
     : ""; 
   
-  const authorName = author?.name || "Editorial Team";
+  const authorName = author?.name || "Editorial Desk";
   const authorSlug = author?.slug || null;
 
   const sidebarArticles = Array.isArray(relatedArticles) ? relatedArticles : [];
@@ -186,7 +186,7 @@ export default async function ArticlePage({ params }) {
               {publishedDate && (
                 <>
                   <span className="mx-2 inline-block h-1 w-1 align-middle rounded-full bg-red-600" />
-                  <time className="text-slate-500">
+                 <time dateTime={publishedISO} className="text-slate-500">
                     {publishedDate}
                   </time>
                 </>
@@ -224,9 +224,9 @@ export default async function ArticlePage({ params }) {
                   {publishedDate && <span className="h-1 w-1 rounded-full bg-red-600" />}
 
                   {publishedDate && (
-                    <time className="text-slate-500">
-                      {publishedDate}
-                    </time>
+                   <time dateTime={publishedISO} className="text-slate-500">
+                    {publishedDate}
+                  </time>
                   )}
                 </div>
               </div>
