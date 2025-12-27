@@ -1,75 +1,150 @@
+// src/app/terms/page.js
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service | CoinMarketBuzz",
+  title: "Terms & Conditions | CoinMarketBuzz",
   description: "Terms and conditions for using CoinMarketBuzz.",
 };
 
 export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-[800px] px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="mb-8 text-3xl font-bold text-slate-900">Terms of Service</h1>
-      
-      <div className="prose prose-slate max-w-none text-slate-600">
-        <p className="text-sm text-slate-500 mb-8">Last Updated: {new Date().toLocaleDateString()}</p>
+    <div className="mx-auto max-w-[900px] px-4 py-12 sm:px-6 lg:px-8">
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-6 text-xs font-medium text-slate-500"
+      >
+        <ol className="flex flex-wrap items-center gap-1">
+          <li>
+            <Link href="/" className="transition-colors hover:text-slate-800">
+              Home
+            </Link>
+          </li>
+          <li>/</li>
+          <li className="text-slate-700" aria-current="page">
+            Terms &amp; Conditions
+          </li>
+        </ol>
+      </nav>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">1. Acceptance of Terms</h2>
-          <p>
-            By accessing or using the CoinMarketBuzz website, you agree to be bound by these Terms of Service and all applicable laws and regulations. 
-            If you do not agree with any of these terms, you are prohibited from using or accessing this site.
-          </p>
-        </section>
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Terms &amp; Conditions
+        </h1>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">2. Use License</h2>
-          <p>
-            Permission is granted to temporarily download one copy of the materials (information or software) on CoinMarketBuzz's website for personal, 
-            non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
-          </p>
-          <ul className="list-disc pl-5 space-y-2 mt-2">
-            <li>Modify or copy the materials;</li>
-            <li>Use the materials for any commercial purpose, or for any public display (commercial or non-commercial);</li>
-            <li>Attempt to decompile or reverse engineer any software contained on CoinMarketBuzz's website;</li>
-            <li>Remove any copyright or other proprietary notations from the materials; or</li>
-            <li>Transfer the materials to another person or "mirror" the materials on any other server.</li>
-          </ul>
-        </section>
+        <p className="mt-2 text-sm text-slate-500">
+          Last Updated: <span className="italic">[Insert Date]</span>
+        </p>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">3. Disclaimer</h2>
-          <p>
-            The materials on CoinMarketBuzz's website are provided on an 'as is' basis. CoinMarketBuzz makes no warranties, expressed or implied, 
-            and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, 
-            fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.
-          </p>
-          <p className="mt-4 font-medium text-slate-800 bg-slate-100 p-4 rounded-md">
-            <strong>Financial Disclaimer:</strong> CoinMarketBuzz is a news and information platform. Nothing on this website constitutes financial advice. 
-            Cryptocurrency investments carry significant risk. Always conduct your own research before making investment decisions.
-          </p>
-        </section>
+        <p className="mt-5 max-w-[85ch] text-sm leading-relaxed text-slate-600">
+          Welcome to CoinMarketBuzz.com (“CoinMarketBuzz”, “we”, “our”, or “us”).
+          By accessing or using this website, you agree to comply with and be
+          bound by the following Terms and Conditions.
+        </p>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">4. Limitations</h2>
-          <p>
-            In no event shall CoinMarketBuzz or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, 
-            or due to business interruption) arising out of the use or inability to use the materials on CoinMarketBuzz's website.
-          </p>
-        </section>
+        <p className="mt-3 max-w-[85ch] text-sm leading-relaxed text-slate-600">
+          If you do not agree with these terms, please discontinue use of the
+          website.
+        </p>
+      </header>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">5. Governing Law</h2>
-          <p>
-            These terms and conditions are governed by and construed in accordance with the laws of the State of New York and you irrevocably submit to 
-            the exclusive jurisdiction of the courts in that State or location.
-          </p>
-        </section>
+      <main className="prose prose-slate max-w-none text-slate-700">
+        <h2>1. Use of Website</h2>
+        <p>
+          CoinMarketBuzz.com provides news, information, and educational content
+          related to cryptocurrency, blockchain, finance, technology, and
+          business.
+        </p>
+        <ul>
+          <li>Content is for informational purposes only</li>
+          <li>We do not provide financial, investment, legal, or tax advice</li>
+          <li>
+            Users are responsible for how they interpret or act on the
+            information
+          </li>
+        </ul>
 
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">6. Contact Us</h2>
-          <p>If you have any questions about these Terms, please contact us at <a href="mailto:legal@coinmarketbuzz.com" className="text-blue-600 hover:underline">legal@coinmarketbuzz.com</a>.</p>
-        </section>
-      </div>
+        <h2>2. Intellectual Property Rights</h2>
+        <p>
+          All content published on CoinMarketBuzz.com, including articles, text,
+          graphics, logos, and design, is the intellectual property of
+          CoinMarketBuzz unless otherwise stated.
+        </p>
+        <p>
+          Unauthorized reproduction, copying, or redistribution without written
+          permission is strictly prohibited.
+        </p>
+
+        <h2>3. User Conduct</h2>
+        <p>Users agree not to:</p>
+        <ul>
+          <li>Use the website for unlawful purposes</li>
+          <li>Submit false, misleading, or harmful information</li>
+          <li>Attempt to hack, disrupt, or compromise site security</li>
+          <li>Scrape or automate content without permission</li>
+        </ul>
+        <p>
+          We reserve the right to restrict access to users who violate these
+          terms.
+        </p>
+
+        <h2>4. Third-Party Links</h2>
+        <p>
+          Our website may contain links to third-party websites for reference or
+          advertising purposes.
+        </p>
+        <p>
+          CoinMarketBuzz does not control or endorse third-party content and is
+          not responsible for external websites’ practices or policies.
+        </p>
+
+        <h2>5. Sponsored Content &amp; Press Releases</h2>
+        <p>
+          CoinMarketBuzz may publish sponsored articles, press releases, or
+          promotional content.
+        </p>
+        <ul>
+          <li>Sponsored content is clearly labeled</li>
+          <li>Editorial independence is maintained</li>
+          <li>Advertisers do not influence news coverage</li>
+        </ul>
+
+        <h2>6. Disclaimer of Warranties</h2>
+        <p>
+          All content is provided “as is” and “as available.” We make no
+          guarantees regarding accuracy, completeness, or reliability of
+          information.
+        </p>
+
+        <h2>7. Limitation of Liability</h2>
+        <p>
+          CoinMarketBuzz shall not be liable for any direct, indirect,
+          incidental, or consequential damages arising from the use of this
+          website.
+        </p>
+
+        <h2>8. Modifications</h2>
+        <p>
+          We reserve the right to update these Terms &amp; Conditions at any
+          time. Continued use of the website constitutes acceptance of changes.
+        </p>
+
+        <h2>9. Governing Law</h2>
+        <p>
+          These terms are governed by and construed in accordance with the laws
+          of India.
+        </p>
+
+        <h2>10. Contact</h2>
+        <p className="not-prose mt-2">
+          📧{" "}
+          <a
+            href="mailto:Contact@CoinmarketBuzz.com"
+            className="font-medium text-blue-600 hover:underline"
+          >
+            Contact@CoinmarketBuzz.com
+          </a>
+        </p>
+      </main>
     </div>
   );
 }

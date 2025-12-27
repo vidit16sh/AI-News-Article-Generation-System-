@@ -2,15 +2,19 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Editorial Policy | VrajNews",
+  title: "Editorial Policy - CoinMarketBuzz",
   description:
-    "How VrajNews produces AI-assisted coverage with human editorial oversight, transparency, sourcing, and correction standards.",
+    "Learn how CoinMarketBuzz creates, reviews, and publishes content with editorial independence, transparency, and ethical standards.",
 };
 
 export default function EditorialPolicyPage() {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-10 sm:px-6">
-      <nav aria-label="Breadcrumb" className="mb-6 text-xs font-medium text-slate-500">
+      {/* Breadcrumb */}
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-6 text-xs font-medium text-slate-500"
+      >
         <ol className="flex flex-wrap items-center gap-1">
           <li>
             <Link href="/" className="hover:text-slate-800 transition-colors">
@@ -24,66 +28,97 @@ export default function EditorialPolicyPage() {
         </ol>
       </nav>
 
+      {/* Header */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           Editorial Policy
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          VrajNews publishes timely crypto and technology coverage using{" "}
-          <strong>AI-assisted data analysis with human oversight</strong>. This page
-          explains how our content is created, reviewed, and corrected.
+        <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-slate-600">
+          CoinMarketBuzz is an independent digital news platform committed to
+          accuracy, transparency, and responsible journalism. This page outlines
+          how our editorial content is created, reviewed, and maintained.
         </p>
       </header>
 
+      {/* Content */}
       <main className="prose prose-slate max-w-none">
-        <h2>How our content is produced</h2>
+        <h2>Editorial Independence</h2>
+        <p>
+          CoinMarketBuzz operates with full editorial independence. Our editorial
+          decisions are made without influence from advertisers, sponsors, or
+          commercial partners.
+        </p>
+        <p>
+          Sponsored partnerships do not affect our news coverage. Any sponsored
+          or promotional content is clearly disclosed to ensure transparency for
+          our readers.
+        </p>
+
+        <h2>Content Standards</h2>
+        <p>
+          We publish content related to cryptocurrency, blockchain, finance,
+          technology, business, and regulatory developments. All editorial
+          content follows these principles:
+        </p>
         <ul>
-          <li>
-            We monitor public sources (press releases, reputable publishers, and public market data)
-            using automated systems to identify noteworthy stories.
-          </li>
-          <li>
-            AI tools may assist with summarization, topic classification, headline suggestions,
-            and extracting key facts (“By the Numbers”).
-          </li>
-          <li>
-            A human editor reviews articles before publication to confirm clarity, formatting,
-            and to reduce obvious errors or hallucinations.
-          </li>
+          <li>Fact-based and verifiable reporting</li>
+          <li>Neutral, professional, and balanced tone</li>
+          <li>Clear attribution of sources where applicable</li>
+          <li>Clear distinction between editorial and sponsored material</li>
         </ul>
 
-        <h2>Human oversight and accountability</h2>
+        <h2>Accuracy &amp; Corrections</h2>
         <p>
-          Every published article is attributed to an author profile. Author pages include
-          a bio and a list of recent work to support transparency and accountability.
+          Accuracy is a core priority at CoinMarketBuzz. We make reasonable
+          efforts to verify information before publication.
+        </p>
+        <p>
+          If an error is identified after publication, we take corrective action
+          as quickly as possible. Corrections or updates are reflected directly
+          within the article to maintain transparency.
         </p>
 
-        <h2>Sourcing, attribution, and links</h2>
+        <h2>Sponsored &amp; Promotional Content</h2>
+        <p>
+          Some content on CoinMarketBuzz may be sponsored or provided as press
+          releases. Such content:
+        </p>
         <ul>
-          <li>We aim to cite or link to original sources when available.</li>
-          <li>We avoid copying paywalled or proprietary text.</li>
-          <li>We clearly distinguish reporting from opinion when applicable.</li>
+          <li>Is clearly labeled as “Sponsored” or “Press Release”</li>
+          <li>Does not mislead readers</li>
+          <li>Complies with advertising and disclosure guidelines</li>
         </ul>
 
-        <h2>Corrections policy</h2>
+        <h2>Plagiarism Policy</h2>
         <p>
-          If a factual error is identified, we correct it as quickly as possible. Material
-          changes may be reflected within the article content or metadata. If you believe an
-          article contains an error, contact us and include the article link and the correction request.
+          CoinMarketBuzz maintains zero tolerance for plagiarism. All published
+          content must be original or properly attributed to its source.
         </p>
 
-        <h2>Financial and investment disclaimer</h2>
+        <h2>Ethical Standards</h2>
         <p>
-          Content on VrajNews is for informational purposes only and does not constitute financial,
-          legal, or investment advice. Cryptocurrency markets are volatile. Always do your own research
-          and consult professionals where appropriate.
+          We are committed to ethical journalism. We do not publish content that
+          includes:
+        </p>
+        <ul>
+          <li>Hate speech or discriminatory language</li>
+          <li>Misleading or deceptive financial claims</li>
+          <li>Illegal, harmful, or unethical material</li>
+        </ul>
+
+        <h2>Contact for Editorial Concerns</h2>
+        <p>
+          If you have concerns regarding editorial accuracy, ethics, or
+          transparency, you may contact us at:
         </p>
 
-        <h2>AI transparency</h2>
-        <p>
-          We are transparent about our use of AI. Articles may be AI-assisted, but publication includes
-          human editorial review. Our goal is to provide fast, readable coverage while maintaining clear
-          sourcing and responsible presentation.
+        <p className="not-prose mt-2">
+          <a
+            href="mailto:Contact@CoinmarketBuzz.com"
+            className="font-medium text-blue-600 hover:underline"
+          >
+            contact@CoinmarketBuzz.com
+          </a>
         </p>
       </main>
     </div>

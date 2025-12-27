@@ -48,7 +48,7 @@ export default function Footer() {
 
                 <p className="mt-2 flex items-center gap-2">
                   <span className="text-slate-500">Phone:</span>
-                  <span>+91 97603 95655</span>
+                  <span>+971 50 942 9651</span>
                 </p>
 
                 <p className="flex items-center gap-2">
@@ -69,8 +69,11 @@ export default function Footer() {
             
             <FooterColumn title="Company">
               <FooterLink href="/about">About Us</FooterLink>
+              <FooterLink href="/disclaimer">Disclaimer</FooterLink>
+              <FooterLink href="/editorial-policy">Editorial Policy</FooterLink>
               <FooterLink href="/authors">Editorial Team</FooterLink>
               <FooterLink href="/contact">Contact & Tips</FooterLink>
+              <FooterLink href="/archive">Archive</FooterLink>
               <FooterLink href="/privacy">Privacy Policy</FooterLink>
               <FooterLink href="/terms">Terms of Service</FooterLink>
             </FooterColumn>

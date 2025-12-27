@@ -6,7 +6,7 @@ export default function ContactPage() {
       <h1 className="text-3xl font-bold mb-6">Contact Us</h1>
       <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
         <p className="mb-4"><strong>Editorial Team:</strong> contact@coinmarketbuzz.com</p>
-        <p className="mb-4"><strong>Phone:</strong> +91 97603 95655</p>
+        <p className="mb-4"><strong>Phone:</strong> +971 50 942 9651</p>
         <div className="mt-6 pt-6 border-t border-slate-200">
           <p className="text-sm text-slate-500">
             <strong>Headquarters:</strong><br/>
