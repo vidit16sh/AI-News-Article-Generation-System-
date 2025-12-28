@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function HeroSection({ featured }) {
   const fallback = {
-    slug: "getting-started-with-vrajnews",
+    slug: "getting-started-with-coinmarketbuzz",
     category: "Business",
     title:
       "Small Businesses Flourish as US Government Expands Loan Access and Support",

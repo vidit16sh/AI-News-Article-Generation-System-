@@ -34,7 +34,7 @@ export async function generateMetadata({ params }) {
   const meta = getCategoryMeta(safeSlug);
 
   return {
-    title: `${meta.label} News | VrajNews`,
+    title: `${meta.label} News | CoinMarketBuzz`,
     description:
       meta.description ||
       `AI-generated ${meta.label.toLowerCase()} news, summaries, and explainers.`,
