@@ -166,7 +166,7 @@ export default async function ArchivePage() {
                                     <div className="mt-1 text-xs text-slate-500">
                                       By{" "}
                                       <span className="text-slate-700">{author}</span>
-                                      {date ? <> • <time>{date}</time></> : null}
+                                      {date ? <> • <time dateTime={new Date(a.publishAt).toISOString()}>{date}</time></> : null}
                                     </div>
                                   </li>
                                 );

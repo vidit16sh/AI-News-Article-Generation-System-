@@ -18,7 +18,8 @@ const PRIMARY_LINKS = [
 
 const SECONDARY_LINKS = [
   { label: "About", href: "/about" },
-  { label: "Careers", href: "/careers" },
+  { label: "Careers", href: "/careers" }, 
+  { label: "News Archive", href: "/archive" },
   { label: "Authors", href: "/authors" },
   { label: "Advertise", href: "/advertise" },
   { label: "Contact", href: "/contact" },

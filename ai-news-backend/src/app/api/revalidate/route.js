@@ -24,7 +24,7 @@ export async function POST(request) {
     }
 
     if (tag) {
-      revalidateTag(tag);
+      revalidateTag(tag, 'max');
       console.log(`✨ Tag revalidated: ${tag}`);
     }
 
