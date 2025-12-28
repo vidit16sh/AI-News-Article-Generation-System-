@@ -18,7 +18,9 @@ export const metadata = {
 
   description:
     "Your daily source for breaking cryptocurrency news, live crypto prices, and market analysis. Get updates on Bitcoin, Ethereum, Shiba Inu, and DeFi trends.",
-
+  verification: {
+    google: "tnNTMQdn3oiUw-fpj-4ouecVjcPCC6duljA8R_bB7Sg",
+  },
   keywords: [
     "Cryptocurrency news",
     "Bitcoin news",
