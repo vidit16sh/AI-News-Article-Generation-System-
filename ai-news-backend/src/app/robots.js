@@ -8,12 +8,17 @@ export default function robots() {
       {
         // ✅ 1. General Rules for All Bots
         userAgent: '*',
-        allow: '/',
+        allow: [
+          '/',
+          '/_next/static/', // ✅ Allow JS/CSS bundles
+          '/_next/image/',  // ✅ Allow optimized images
+        ],
         disallow: [
           '/api/',           // Protect internal API logic
           '/admin/',         // Protect admin dashboard
           '/private/',       // Protect internal/staging folders
-          '/*?search=',      // Avoid indexing internal search results to prevent duplicate content
+          '/*?search=',
+          '/_next/data/',      // Avoid indexing internal search results to prevent duplicate content
         ],
       },
       {
