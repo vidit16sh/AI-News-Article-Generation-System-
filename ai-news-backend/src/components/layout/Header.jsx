@@ -13,7 +13,11 @@ const PRIMARY_LINKS = [
   { label: "Ethereum", href: "/category/ethereum" },
   { label: "Finance News", href: "/category/finance" },
   { label: "Forex News", href: "/category/defi" },
-  { label: "Regulation", href: "/category/regulation" },
+  // { label: "Regulation", href: "/category/regulation" },
+  { label: "Price Prediction", href: "/category/price-prediction" },
+  { label: "Guide", href: "/category/guide" },
+  { label: "Events", href: "/category/events" },
+  { label: "Press Release", href: "/category/press-release" },
 ];
 
 const SECONDARY_LINKS = [

@@ -87,11 +87,9 @@ export default function Footer() {
             </FooterColumn>
 
             <FooterColumn title="Social Media" className="lg:pl-8">
-              <FooterSocial label="Twitter" Icon={Twitter} href="#" />
-              <FooterSocial label="Facebook" Icon={Facebook} href="#" />
-              <FooterSocial label="LinkedIn" Icon={Linkedin} href="#" />
-              <FooterSocial label="Instagram" Icon={Instagram} href="#" />
-              <FooterSocial label="YouTube" Icon={Youtube} href="#" />
+              <FooterSocial label="Twitter" Icon={Twitter} href="https://x.com/CMB_Insights" />
+              <FooterSocial label="Facebook" Icon={Facebook} href="https://www.facebook.com/CoinmarketBuzz/" />
+              <FooterSocial label="LinkedIn" Icon={Linkedin} href="https://www.linkedin.com/company/coinmarketbuzz" />
             </FooterColumn>
           </div>
         </div>
@@ -153,6 +151,8 @@ function FooterSocial({ label, Icon, href }) {
   return (
     <Link
       href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       aria-label={label}
       className="group flex items-center gap-3 py-1 text-[0.9rem] text-slate-400 transition-colors hover:text-white"
     >
