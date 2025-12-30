@@ -6,7 +6,15 @@ import RightSidebar from "../../../components/layout/RightSidebar";
 import AuthorBioBox from "../../../components/article/AuthorBioBox";
 
 // ✅ Icons (lucide-react)
-import { Facebook, Twitter, Linkedin, Mail } from "lucide-react";
+import { Facebook, Twitter, Linkedin, Mail } from "lucide-react"; 
+
+const cleanHeadline = (title) => {
+  if (!title) return "";
+  return title
+    .replace(/^\[Analysis\]\s*/i, "")
+    .replace(/^Daily Crypto Analysis:\s*/i, "")
+    .trim();
+};
 
 // 1. Fetch Data Function
 async function getArticle(slug) {
@@ -35,8 +43,9 @@ export async function generateMetadata({ params }) {
   }
 
   const { article } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com"; 
 
+  const seoTitle = cleanHeadline(article.headline);
   const url = `${baseUrl}/news/${article.slug}`;
   const image =
     article.imageUrl && article.imageUrl.startsWith("http")
@@ -44,11 +53,11 @@ export async function generateMetadata({ params }) {
       : `${baseUrl}${article.imageUrl || "/default-og-image.png"}`;
 
   return {
-    title: article.headline,
+    title: seoTitle,
     description: article.metaDescription || article.excerpt || article.headline,
     alternates: { canonical: url },
     openGraph: {
-      title: article.headline,
+      title: seoTitle,
       description: article.metaDescription || article.excerpt || article.headline,
       url,
       type: "article",
@@ -57,7 +66,7 @@ export async function generateMetadata({ params }) {
     },
     twitter: {
       card: "summary_large_image",
-      title: article.headline,
+      title: seoTitle,
       description: article.metaDescription || article.excerpt || article.headline,
       images: [image],
     },
@@ -92,7 +101,7 @@ export default async function ArticlePage({ params }) {
   // ✅ PERFECTED JSON-LD (Removed Warnings)
   const newsJsonLd = {
     "@context": "https://schema.org",
-    "@type": "NewsArticle",
+    "@type": "AnalysisNewsArticle",
     "headline": article.headline,
     "description": article.metaDescription || article.excerpt || article.headline,
     "image": [absoluteImage], 
@@ -188,7 +197,7 @@ export default async function ArticlePage({ params }) {
                   <span className="mx-2 inline-block h-1 w-1 align-middle rounded-full bg-red-600" />
                  <time dateTime={publishedISO} className="text-slate-500">
                     {publishedDate}
-                  </time>
+                  </time> 
                 </>
               )}
             </div>

@@ -134,7 +134,7 @@ const generateFallbackArticle = (data) => {
     meta_description: data.summary?.substring(0, 150) || `Latest updates on ${data.title}.`,
     article_html: `
         <h1>${data.title}</h1>
-        <p><strong>NEW YORK, ${safeDate}</strong> — ${data.summary}</p>
+        <p><strong>VADODARA, ${safeDate}</strong> — ${data.summary}</p>
         <blockquote><ul><li>Developing Story: Details are still emerging.</li><li>Category: ${categoryName} Market Update.</li></ul></blockquote>
         <h2>Market Update</h2>
         <p>We are tracking a developing story regarding <strong>${data.title}</strong>. Data indicates significant activity in the ${categoryName} sector.</p>
@@ -187,7 +187,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 ============================================================
 1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
 ============================================================
-- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
+- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>VADODARA,, ${dateStr}</strong> — ...</p>
 - **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype. 
 - **No Hallucinations:** If the source text does not contain a quote from a specific person (e.g., Michael Saylor, Cathie Wood), **DO NOT INVENT ONE**. Attribute sentiment to "Market Analysts" or "Bulls" instead.
 - **Sourcing:** Attribute every claim. Use phrases like "According to on-chain data," "In a statement to investors," etc.
@@ -200,8 +200,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 2. ARTICLE STRUCTURE (HTML Tags Only)
 ============================================================
 **Phase 1: The Hook**
-1. <h1>Headline</h1> (60-80 chars. MUST start with a bracketed content type tag like [Analysis] or [News]. The headline must be punchy, accurate, and high-engagement (click-worthy) while naturally weaving in the Focus Keyword. Example: "[Analysis] Bitcoin Support Holds at $90k Despite Regulatory Headwinds". STRICT RULE: Do not use generic "Daily Crypto Analysis" prefixes.)
-2. **Executive Summary:** A <blockquote><ul> list of 3-4 key bullet points (The "TL;DR" for traders).
+1. <h1>Headline</h1> (60-80 chars. The headline must be punchy, accurate, and high-engagement (click-worthy) while naturally weaving in the Focus Keyword. Example: "Bitcoin Support Holds at $90k Despite Regulatory Headwinds". STRICT RULE: Do not use bracketed tags like [Analysis] or generic "Daily Crypto Analysis" prefixes.)
 3. **Dateline & Lede:** The opening paragraph summarizing the "Who, What, When" immediately.
 
 **Phase 2: The Deep Dive**
@@ -291,7 +290,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
             ### 🛡️ FINAL CHECKS:
             1. **Headline:** 60-75 chars.
             2. **Keyword:** 'focus_keywords' MUST appear VERBATIM in 'headline'.
-            3. **Dateline:** Start with <p><strong>NEW YORK, ${dateStr}</strong> — ...</p>
+            3. **Dateline:** Start with <p><strong>VADODARA, ${dateStr}</strong> — ...</p>
             4. **Table:** Did you include the HTML Table for 'By The Numbers'?
             `;
 

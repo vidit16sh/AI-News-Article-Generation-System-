@@ -10,28 +10,26 @@ export default function robots() {
         userAgent: '*',
         allow: [
           '/',
-          '/_next/static/', // ✅ Allow JS/CSS bundles
-          '/_next/image/',  // ✅ Allow optimized images
+          '/_next/static/', // Allow JS/CSS bundles
+          '/_next/image/',  // Allow optimized images
         ],
         disallow: [
           '/api/',           // Protect internal API logic
           '/admin/',         // Protect admin dashboard
           '/private/',       // Protect internal/staging folders
-          '/*?search=',
-          '/_next/data/',      // Avoid indexing internal search results to prevent duplicate content
+          '/*?search=',      // Avoid indexing search results
+          '/_next/data/',    // Avoid duplicate content from Next.js data
         ],
       },
       {
-        // ✅ 2. Specific Rules for Googlebot-News (Critical for Ranking)
-        // This explicitly tells Google News bots they have full access
+        // ✅ 2. Specific Access for Googlebot-News
+        // Ensuring the news crawler has full priority access
         userAgent: 'Googlebot-News',
         allow: '/',
       },
     ],
-    // ✅ 3. Sitemaps: List both for indexing and news ranking
-    sitemap: [
-      `${baseUrl}/sitemap.xml`,        // Main site directory
-      `${baseUrl}/news-sitemap.xml`,   // Google News-specific feed (48-hour rule)
-    ],
+    // ✅ 3. Points only to the Master Sitemap Index
+    // This index (/sitemap.xml) will guide bots to both your main and news feeds
+    sitemap: `${baseUrl}/sitemap.xml`,
   };
 }
