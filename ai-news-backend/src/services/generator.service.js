@@ -187,7 +187,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 ============================================================
 1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
 ============================================================
-- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>VADODARA,, ${dateStr}</strong> — ...</p>
+- **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>VADODARA, ${dateStr}</strong> — ...</p>
 - **Objective Tone:** Use professional, institutional language (Tier 1 Financial Standard). Zero hype. 
 - **No Hallucinations:** If the source text does not contain a quote from a specific person (e.g., Michael Saylor, Cathie Wood), **DO NOT INVENT ONE**. Attribute sentiment to "Market Analysts" or "Bulls" instead.
 - **Sourcing:** Attribute every claim. Use phrases like "According to on-chain data," "In a statement to investors," etc.
