@@ -7,29 +7,33 @@ puppeteer.use(StealthPlugin());
 
 // ⚡ GLOBAL BROWSER INSTANCE (Recycling Singleton Pattern)
 let sharedBrowser = null;
-let scrapeCounter = 0;
+let scrapeCounter = 0; 
+let activeScrapes = 0;
 const BROWSER_RECYCLE_LIMIT = 50; // Resets every 50 articles to prevent RAM leaks
 
 const getBrowser = async () => {
     // ✅ DEFENSIVE RECYCLING: Check if limit hit OR if browser connection is lost
     const isLimitReached = scrapeCounter >= BROWSER_RECYCLE_LIMIT;
     const isDisconnected = sharedBrowser && !sharedBrowser.isConnected();
+    const canSafelyRecycle = activeScrapes === 0; 
 
-    if (sharedBrowser && (isLimitReached || isDisconnected)) {
-        console.log(isLimitReached ? "♻️ Recycling Browser (Limit Hit)..." : "⚠️ Browser disconnected! Resetting...");
+    if (sharedBrowser && (isDisconnected || (isLimitReached && canSafelyRecycle))) {
+        const reason = isDisconnected ? "Browser disconnected" : "Limit Hit";
+        console.log(`♻️ Recycling Browser (${reason})...`);
+        
         try {
-            // Only attempt to close if it's still technically connected
             if (sharedBrowser.isConnected()) {
                 await sharedBrowser.close();
             }
         } catch (e) {
             console.error("⚠️ Error during browser cleanup:", e.message);
         }
+        
         sharedBrowser = null;
         scrapeCounter = 0;
     }
 
-    if (sharedBrowser) return sharedBrowser;
+   if (sharedBrowser) return sharedBrowser;
 
     console.log("🚀 Launching Optimized fresh Chromium instance...");
     sharedBrowser = await puppeteer.launch({
@@ -49,7 +53,8 @@ const getBrowser = async () => {
     return sharedBrowser;
 };
 
-export const scrapeArticle = async (url) => { 
+export const scrapeArticle = async (url) => {  
+    activeScrapes++;
     scrapeCounter++;
     let page = null;
     console.log(`🕷️ Scraping (#${scrapeCounter}): ${url}`);
@@ -165,5 +170,9 @@ export const scrapeArticle = async (url) => {
             sharedBrowser = null;
         }
         return null;
+    } 
+    finally {
+        // ✅ UNLOCK: Decrement active job count so recycling can happen later
+        activeScrapes--;
     }
 };
