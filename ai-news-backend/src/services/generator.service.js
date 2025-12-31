@@ -102,7 +102,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
   FORBIDDEN_WORDS.forEach(word => {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     if (regex.test(html)) {
-      html = html.replace(regex, ""); 
+      html = html.replace(regex, " "); 
       score -= 5;
     }
   });
@@ -113,17 +113,14 @@ const auditAndFixArticle = (json, sourceUrl) => {
     throw new Error(`Article too short: ${wordCount} words. Minimum 600 required.`);
   }
 
-  // ✅ FIX: Removed the logic that was hard-coding keywords into the headline prefix.
-  // This allows the AI to generate natural, non-repetitive headlines as requested by the audit.
-
-  const sourceNote = `
-    <p class="text-sm mt-8 text-slate-500 italic border-t pt-4">
-      <strong>Source Note:</strong> Market data and factual reporting in this article are sourced from 
-      <a href="${sourceUrl}" target="_blank" rel="nofollow" class="text-blue-600 hover:underline">original reports</a>. 
-      Commentary and analysis provided by CoinMarketBuzz.
-    </p>
-  `; 
- if (!html.includes("Source Note:") && !html.includes("id=\"source-verification\"")) {
+  if (!html.includes('id="source-verification"')) {
+    const sourceNote = `
+      <div id="source-verification" class="verified-sources" style="margin-top: 30px; padding: 20px; border: 1px dashed #cbd5e1; background: #fdfdfd; font-size: 0.85rem;">
+        <strong>Source Note:</strong> Factual reporting in this analysis is sourced from 
+        <a href="${sourceUrl}" target="_blank" rel="nofollow" style="color: #2563eb; text-decoration: underline;">original market reports</a>. 
+        Commentary and technical forecasting provided by CoinMarketBuzz Intelligence Desk.
+      </div>
+    `; 
     html += sourceNote;
   }
   
@@ -243,22 +240,30 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 9. <h3>Community Sentiment</h3> (Synthesize what industry leaders are saying on X/Twitter. Use quotes.)
 
 **Phase 5: The Forecast** 
-10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.)
-11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.) 
+10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.) 
 
-**Phase 6: Transparency & Verification**
-12. <section class="faq-section" style="margin-top: 40px; padding: 25px; background: #eff6ff; border-radius: 12px;">
+**Phase 6: The Market FAQ Intelligence (MANDATORY)**
+11. <section class="faq-section" style="margin-top: 40px; padding: 25px; background: #eff6ff; border-radius: 12px;">
       <h3>Market FAQ (People Also Ask)</h3>
+      <p>Answers to the most critical technical and market questions regarding this development.</p>
       <dl>
-        <dt><strong>Is this a bullish or bearish signal?</strong></dt>
-        <dd>[Detailed data-backed answer]</dd>
-        <dt><strong>What is the critical support level now?</strong></dt>
-        <dd>[Specific level from the analysis]</dd>
+        <dt><strong>[Search-Friendly Question 1]</strong></dt>
+        <dd>[Detailed data-backed answer explaining the "Why"]</dd>
+        <dt><strong>[Search-Friendly Question 2]</strong></dt>
+        <dd>[Detailed data-backed answer explaining technical impact]</dd>
+        <dt><strong>[Search-Friendly Question 3]</strong></dt>
+        <dd>[Detailed data-backed answer on critical support/resistance levels]</dd>
+        <dt><strong>[Search-Friendly Question 4]</strong></dt>
+        <dd>[Detailed data-backed answer on institutional vs retail sentiment]</dd>
+        <dt><strong>[Search-Friendly Question 5]</strong></dt>
+        <dd>[Detailed data-backed answer on the 12-month outlook]</dd>
       </dl>
-    </section>
-13. <footer class="verified-sources" style="font-size: 0.85rem; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+    </section> 
+
+**Phase 7: Transparency & Verification**
+12. <footer class="verified-sources" style="font-size: 0.85rem; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
       <strong>Verified Data Sources:</strong> 
-      Primary Data: [Source Name] | Metrics: [e.g. Etherscan/Glassnode] | Verification: CoinMarketBuzz Intelligence Desk
+      Primary Data: [Name of Source from Context] | Metrics: [e.g. Etherscan/Glassnode/CoinMarketCap] | Verification: CoinMarketBuzz Intelligence Desk
     </footer>
 
 ============================================================
@@ -355,19 +360,6 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 
       if (!json || typeof json !== "object") {
         throw new Error("Parsed JSON is null or invalid.");
-      }
-
-      // Self-Healing Source Link
-      if (!json.article_html.includes('href="http')) {
-        const trustBlock = `
-      <div id="source-verification" class="verified-sources" style="margin-top: 25px; padding: 15px; border: 1px dashed #cbd5e1; font-size: 0.8rem; background: #fdfdfd;">
-        <strong>Primary Source Verification:</strong> 
-        This intelligence report cross-references data from the 
-        <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow" style="color: #2563eb; text-decoration: underline;">Original Reporting Source</a> 
-        to ensure 100% factual accuracy for institutional readers.
-        </div>
-      `;
-       json.article_html += trustBlock;
       }
 
       json = auditAndFixArticle(json, cleanedNewsData.sourceUrl); 
