@@ -61,7 +61,9 @@ export default async function AuthorPage({ params }) {
   const author = await getAuthorWithArticles(slug);
 
   if (!author) notFound();
-
+   
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com"; 
+  
   const name = author.name || "Editorial Team";
   const role = author.role || "Contributor";
   // Fallback if image is missing
