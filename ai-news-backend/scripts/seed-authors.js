@@ -12,7 +12,8 @@ async function main() {
       update: {
         name: author.name,
         role: author.role,
-        bio: author.bio, // Standardizing on 'bio'
+        bio: author.bio,
+        expertise: author.expertise, 
         imageUrl: author.imageUrl,
         linkedin: author.linkedin || null, // Only LinkedIn as requested
       },

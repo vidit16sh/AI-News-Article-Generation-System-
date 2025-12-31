@@ -53,7 +53,8 @@ model Author {
   name        String
   slug        String   @unique // e.g., "james-carter"
   role        String   // e.g., "Senior Crypto Analyst"
-  bio         String   @db.Text
+  bio         String   @db.Text 
+  expertise   String[]
   imageUrl    String   // Path to image, e.g., "/authors/james.jpg"
   email       String?
   twitter     String?

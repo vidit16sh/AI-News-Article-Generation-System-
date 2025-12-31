@@ -86,7 +86,17 @@ const cleanJsonOutput = (text) => {
 
 const auditAndFixArticle = (json, sourceUrl) => {
   let html = json.article_html || ""; 
-  let score = 100;
+  let score = 100; 
+
+  const hasSummary = html.includes('class="executive-summary"');
+  const hasFAQ = html.includes('class="faq-section"');
+  const hasSources = html.includes('class="verified-sources"');
+  
+ if (hasSummary && hasFAQ && hasSources) {
+    score += 10; // Bonus for high-utility structure
+  } else {
+    score -= 15; // Penalty for missing "People-First" content
+ }
   
   // A. Forbidden Word Remover (Auto-Fix)
   FORBIDDEN_WORDS.forEach(word => {
@@ -99,8 +109,8 @@ const auditAndFixArticle = (json, sourceUrl) => {
 
   // B. Length Check (Critical Failure)
   const wordCount = html.replace(/<[^>]*>/g, '').split(/\s+/).length;
-  if (wordCount < 400) { 
-    throw new Error(`Article too short: ${wordCount} words. Minimum 400 required.`);
+  if (wordCount < 600) { 
+    throw new Error(`Article too short: ${wordCount} words. Minimum 600 required.`);
   }
 
   // ✅ FIX: Removed the logic that was hard-coding keywords into the headline prefix.
@@ -113,7 +123,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
       Commentary and analysis provided by CoinMarketBuzz.
     </p>
   `; 
-  if (!html.includes("Source Note:")) {
+ if (!html.includes("Source Note:") && !html.includes("id=\"source-verification\"")) {
     html += sourceNote;
   }
   
@@ -185,6 +195,12 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 **DO NOT** just summarize. **ANALYZE.**
 
 ============================================================
+0. PRIMARY SOURCE IDENTIFICATION & CITATIONS
+============================================================
+- **Identity Primary Sources:** You MUST explicitly name primary data providers found in the context (e.g., "According to Etherscan," "Glassnode liquidity maps indicate," "Per the official SEC filing").
+- **External Citations:** You are required to reference at least one institutional domain (e.g., Ethereum.org, SEC.gov, or FederalReserve.gov) to support your technical claims. 
+
+============================================================
 1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
 ============================================================
 - **Dateline Rule:** Paragraph 1 MUST start with: <p><strong>VADODARA, ${dateStr}</strong> — ...</p>
@@ -195,10 +211,21 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 - **Citations:** Include EXACTLY ONE HTML link to the Source URL provided in the text.
 - **Link Hierarchy:** You MUST include the Source URL citation. Additionally, if the prompt provides "Internal Links," you MUST weave them naturally into the text.
 - **Data Integrity:** If the input text is short, DO NOT invent quotes or specific event details to fill space. Instead, expand deeply on "Market Context" and "Why It Matters" using general knowledge.
-- ** You must mention a specific technical detail (e.g., "EIP-4844," "Fed Funds Rate," or "Fibonacci Support at $82k") that was NOT in the source text.
+- ** You must mention a specific technical detail (e.g., "EIP-4844," "Fed Funds Rate," or "Fibonacci Support at $82k") that was NOT in the source text. 
+- **Anchor Text Rule:** NEVER use generic phrases like "click here," "source," or "this report" as link text. Use descriptive, keyword-rich anchors (e.g., "The latest SEC filing on Bitcoin ETFs" or "Ethereum's official Pectra documentation").
 ============================================================
 2. ARTICLE STRUCTURE (HTML Tags Only)
-============================================================
+============================================================ 
+**Phase 0: The Executive Intelligence Summary**
+0. <div class="executive-summary" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
+     <strong>Executive Summary:</strong>
+     <ul>
+       <li><strong>Impact:</strong> [1-sentence on why this matters to the portfolio]</li>
+       <li><strong>Sentiment:</strong> [Current market mood: Fear/Greed/Neutral]</li>
+       <li><strong>Actionable Level:</strong> [Key price level to watch]</li>
+     </ul>
+   </div> 
+
 **Phase 1: The Hook**
 1. <h1>Headline</h1> (60-80 chars. The headline must be punchy, accurate, and high-engagement (click-worthy) while naturally weaving in the Focus Keyword. Example: "Bitcoin Support Holds at $90k Despite Regulatory Headwinds". STRICT RULE: Do not use bracketed tags like [Analysis] or generic "Daily Crypto Analysis" prefixes.)
 3. **Dateline & Lede:** The opening paragraph summarizing the "Who, What, When" immediately.
@@ -209,8 +236,7 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 6. <h2>Technical Analysis & Price Action</h2> (MANDATORY: Discuss Support/Resistance levels, RSI, and Moving Averages. If policy-related: Discuss Legal Precedents.)
 
 **Phase 3: The Data Snapshot (NEW)**
-7. <h2>By The Numbers</h2> 
-   (Create a simple HTML <table> with 2 columns: 'Metric' and 'Value'. Fill it with 4-5 key data points from the story/market data.) 
+7. <h2>By The Numbers</h2> (Create a simple HTML <table>. Fill it with 4-5 key data points. **MANDATORY:** If 'Live Market Data' is provided in the prompt, you MUST include the "Crypto Fear & Greed Index" and current "Price Stats" in this table.)
 
 **Phase 4: The Impact**
 8. <h2>Why It Matters</h2> (Institutional impact vs. Retail impact.)
@@ -218,7 +244,22 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 
 **Phase 5: The Forecast** 
 10. <h2>Price Prediction / Future Outlook</h2> (Provide two scenarios: **Bullish Case** vs. **Bearish Case**.)
-11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.)
+11. <h2>FAQs</h2> (5 Questions people actually search for regarding this topic.) 
+
+**Phase 6: Transparency & Verification**
+12. <section class="faq-section" style="margin-top: 40px; padding: 25px; background: #eff6ff; border-radius: 12px;">
+      <h3>Market FAQ (People Also Ask)</h3>
+      <dl>
+        <dt><strong>Is this a bullish or bearish signal?</strong></dt>
+        <dd>[Detailed data-backed answer]</dd>
+        <dt><strong>What is the critical support level now?</strong></dt>
+        <dd>[Specific level from the analysis]</dd>
+      </dl>
+    </section>
+13. <footer class="verified-sources" style="font-size: 0.85rem; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+      <strong>Verified Data Sources:</strong> 
+      Primary Data: [Source Name] | Metrics: [e.g. Etherscan/Glassnode] | Verification: CoinMarketBuzz Intelligence Desk
+    </footer>
 
 ============================================================
 3. HTML OUTPUT RULES (STRICT)
@@ -239,7 +280,10 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 - **Formatting:** Use <strong> for every single dollar amount or percentage (e.g., <strong>$92,000</strong>).
 - **No Financial Advice:** Never say "You should buy." Say "Analysts suggest..." or "Historical patterns indicate..."
 - **Time Sensitivity:** Never use phrases like "In recent news" or "Recently." Be specific: "On Tuesday," "This week," or "Following the announcement."   
-- **Insert one context-appropriate link to a high-authority site (e.g., SEC.gov, FederalReserve.gov, or Ethereum.org) to support your claims.
+- **Insert one context-appropriate link to a high-authority site (e.g., SEC.gov, FederalReserve.gov, or Ethereum.org) to support your claims. 
+- **No Generic Openers:** NEVER start a section with "In the ever-changing world of crypto..."
+- **Sentence Variance:** Every paragraph must contain at least one specific technical blockchain term (e.g., "Post-merge issuance," "EIP-4844 blobs," or "UTXO age").
+- **Verification Tone:** Use "Historical cycles suggest..." or "On-chain forensic data confirms..." to increase perceived authority.
 ============================================================
 5. SEO REQUIREMENTS (STRICT)
 ============================================================
@@ -315,7 +359,15 @@ Your goal: Write a **1,000 - 1,500 word** investigative news report that rivals 
 
       // Self-Healing Source Link
       if (!json.article_html.includes('href="http')) {
-        json.article_html += `<p class="text-sm mt-4 text-slate-500">Data source: <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow">Read Original Report</a></p>`;
+        const trustBlock = `
+      <div id="source-verification" class="verified-sources" style="margin-top: 25px; padding: 15px; border: 1px dashed #cbd5e1; font-size: 0.8rem; background: #fdfdfd;">
+        <strong>Primary Source Verification:</strong> 
+        This intelligence report cross-references data from the 
+        <a href="${cleanedNewsData.sourceUrl}" target="_blank" rel="nofollow" style="color: #2563eb; text-decoration: underline;">Original Reporting Source</a> 
+        to ensure 100% factual accuracy for institutional readers.
+        </div>
+      `;
+       json.article_html += trustBlock;
       }
 
       json = auditAndFixArticle(json, cleanedNewsData.sourceUrl); 

@@ -83,6 +83,9 @@ export default async function ArticlePage({ params }) {
   const { article, relatedArticles } = data;
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
   
+  const displayTitle = cleanHeadline(article.headline);
+  const articleUrl = `${baseUrl}/news/${article.slug}`;
+  const isAnalysis = article.headline.toLowerCase().includes("analysis"); 
   const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
   const author = article.author || {
     name: "Editorial Desk",
@@ -98,11 +101,20 @@ export default async function ArticlePage({ params }) {
     ? article.imageUrl
     : `${baseUrl}${article.imageUrl || "/default-news.jpg"}`;
 
+  const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": baseUrl },
+    { "@type": "ListItem", "position": 2, "name": category, "item": `${baseUrl}/category/${article.categorySlug}` },
+    { "@type": "ListItem", "position": 3, "name": displayTitle, "item": articleUrl }
+  ]
+  };
   // ✅ PERFECTED JSON-LD (Removed Warnings)
   const newsJsonLd = {
     "@context": "https://schema.org",
-    "@type": "AnalysisNewsArticle",
-    "headline": article.headline,
+    "@type": isAnalysis ? "AnalysisNewsArticle" : "NewsArticle",
+    "headline": displayTitle,
     "description": article.metaDescription || article.excerpt || article.headline,
     "image": [absoluteImage], 
     "datePublished": publishedISO,
@@ -116,7 +128,8 @@ export default async function ArticlePage({ params }) {
       "jobTitle": author.role, 
       "url": author.slug 
         ? `${baseUrl}/authors/${author.slug}` 
-        : `${baseUrl}/about`
+        : `${baseUrl}/about`, 
+      "knowsAbout": author.expertise || author.focus || ["Blockchain", "Cryptocurrency"] // ✅ E-E-A-T Signal
     }],
     "publisher": {
       "@type": "Organization",
@@ -149,8 +162,7 @@ export default async function ArticlePage({ params }) {
   const sidebarArticles = Array.isArray(relatedArticles) ? relatedArticles : [];
   const relatedForMain = sidebarArticles.slice(0, 6);
 
-  const articleUrl = `${baseUrl}/news/${article.slug}`;
-  const shareText = article.headline || "Check this out";
+  const shareText = displayTitle || "Check this out";
 
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`,
@@ -162,8 +174,7 @@ export default async function ArticlePage({ params }) {
   return (
     <div className="mx-auto max-w-[1440px] lg:px-0">
       <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-8">
-        
-        {/* ✅ Injected cleaned Metadata */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
@@ -175,11 +186,16 @@ export default async function ArticlePage({ params }) {
             <div className="mb-4">
               <span className="inline-flex items-center gap-2 rounded-md border border-[#f7d9d9] bg-[#fcf2f2] px-3 py-1 text-[0.8rem] text-[#cc0000]">
                 {category}
-              </span>
+              </span> 
+              {isAnalysis && (
+                <span className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-[0.8rem] font-bold uppercase tracking-wider text-blue-700">
+                  Analysis
+                </span>
+              )}
             </div>
 
             <h1 className="mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]">
-              {article.headline}
+              {displayTitle}
             </h1>
 
             {/* MOBILE AUTHOR ROW */}

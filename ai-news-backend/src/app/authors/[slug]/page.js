@@ -21,7 +21,7 @@ async function getAuthorWithArticles(slug) {
         imageUrl: true,
         bio: true, 
         linkedin: true, 
-
+        expertise: true,
         articles: {
           where: { status: "PUBLISHED" },
           orderBy: { publishAt: "desc" },
@@ -72,8 +72,42 @@ export default async function AuthorPage({ params }) {
   const bio = author.bio || "Crypto market analyst and contributor.";
   const articles = author.articles || []; 
   
+  const authorJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": name,
+  "jobTitle": role,
+  "url": `${baseUrl}/authors/${author.slug}`,
+  "image": imageUrl.startsWith('http') ? imageUrl : `${baseUrl}${imageUrl}`,
+  "description": bio,
+  // ✅ ESSENTIAL: Link to their verified LinkedIn and the author page itself
+  "sameAs": [
+    author.linkedin,
+    `${baseUrl}/authors/${author.slug}`
+  ].filter(Boolean),
+  "worksFor": {
+    "@type": "Organization",
+    "name": "CoinMarketBuzz",
+    "url": baseUrl,
+    "logo": `${baseUrl}/brand/logo.png`
+  },
+  // ✅ E-E-A-T SIGNAL: List their specific expertise areas
+  "knowsAbout": author.expertise || [
+    "Blockchain Technology", 
+    "Cryptocurrency Markets", 
+    "Financial Analysis"
+  ],
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": `${baseUrl}/authors/${author.slug}`
+  }
+};
   return (
-    <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-0">
+    <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-0"> 
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+      />
       {/* Breadcrumbs */}
       <nav aria-label="Breadcrumb" className="mb-6 text-xs font-medium text-slate-500">
         <ol className="flex flex-wrap items-center gap-1">
@@ -109,7 +143,12 @@ export default async function AuthorPage({ params }) {
                 <div className="mt-1 flex items-center gap-3">
                   <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                     {role}
-                  </span>
+                  </span> 
+                  {author.expertise?.map((exp) => (
+                    <span key={exp} className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight text-slate-500 border border-slate-100">
+                      {exp}
+                    </span>
+                  ))}
                 </div>
                 
                 <div className="mt-4 text-base leading-relaxed text-slate-600 max-w-2xl">
@@ -117,10 +156,10 @@ export default async function AuthorPage({ params }) {
                 </div>
 
                 {/* ✅ Only LinkedIn shown */}
-                {author.linkedinUrl && (
+                {author.linkedin && (
                   <div className="mt-5 border-t border-slate-100 pt-4">
                     <a
-                      href={author.linkedinUrl}
+                      href={author.linkedin}
                       className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:underline"
                       rel="noopener noreferrer"
                       target="_blank"
