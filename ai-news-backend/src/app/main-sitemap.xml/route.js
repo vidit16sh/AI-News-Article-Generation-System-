@@ -1,11 +1,29 @@
 import prisma from '@/lib/prisma';
 
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com'; 
+  const staticRoutes = [
+    '',
+    '/about',
+    '/contact',
+    '/authors',
+    '/category/crypto',
+    '/category/bitcoin',
+    '/category/ethereum',
+    '/category/finance',
+  ].map(route => `
+    <url>
+      <loc>${baseUrl}${route}</loc>
+      <lastmod>${new Date().toISOString()}</lastmod>
+      <changefreq>daily</changefreq>
+      <priority>1.0</priority>
+    </url>
+  `).join(''); 
+
   const articles = await prisma.generatedArticle.findMany({
     where: { status: 'PUBLISHED' },
     orderBy: { publishAt: 'desc' },
-    take: 50000, // Standard sitemaps can hold up to 50k
+    take: 49000, // Standard sitemaps can hold up to 50k
     select: { slug: true, updatedAt: true }
   });
 

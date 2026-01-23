@@ -11,14 +11,14 @@ export default function robots() {
         allow: [
           '/',
           '/_next/static/', // Allow JS/CSS bundles
-          '/_next/image/',  // Allow optimized images
+          '/_next/image/', // Allow optimized images
+          '/_next/data/', 
         ],
         disallow: [
           '/api/',           // Protect internal API logic
           '/admin/',         // Protect admin dashboard
           '/private/',       // Protect internal/staging folders
           '/*?search=',      // Avoid indexing search results
-          '/_next/data/',    // Avoid duplicate content from Next.js data
         ],
       },
       {
