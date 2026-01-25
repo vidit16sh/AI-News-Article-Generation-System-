@@ -91,7 +91,6 @@ const auditAndFixArticle = (json, sourceUrl) => {
   // 1. Detect structural elements using the same classes mandated in the prompt
   const hasSummary = html.includes('class="executive-summary"');
   const hasFAQ = html.includes('class="faq-section"');
-  // ✅ FIX: Consistently use the class defined in the System Prompt
   const hasSources = html.includes('class="verified-sources"');
   
   if (hasSummary && hasFAQ && hasSources) {
@@ -214,7 +213,7 @@ Generate a 100% unique, experience-driven, and institutional-grade news report (
 ============================================================
 - **Identity Primary Sources:** You MUST explicitly name primary data providers found in the context (e.g., "According to Etherscan," "Glassnode liquidity maps indicate," "Per the official SEC filing").
 - **External Citations:** You are required to reference at least one institutional domain (e.g., Ethereum.org, SEC.gov, or FederalReserve.gov) to support your technical claims. 
-
+- **Citations**: You MUST include at least one contextually placed <a> tag linking to the Source URL provided.
 ============================================================
 1. MANDATORY GOOGLE NEWS COMPLIANCE & EEAT
 ============================================================
@@ -257,7 +256,7 @@ Generate a 100% unique, experience-driven, and institutional-grade news report (
    (Connect this event to broader trends. Explain how this mirrors or breaks from past cycles like 2017 or 2021. Use transition words like "Historically," "In contrast," or "Underlying this trend.")
 
 6. <h2>Technical Architecture & Price Action</h2>
-   (MANDATORY: Discuss Support/Resistance levels, RSI, and Moving Averages. Connect these to specific technical details NOT in the source, such as "Fibonacci 0.618 levels" or "UTXO age bands" to demonstrate E-E-A-T.)d Moving Averages. If policy-related: Discuss Legal Precedents.)
+   (MANDATORY: Discuss Support/Resistance levels, RSI, and Moving Averages. Connect these to specific technical details NOT in the source, such as "Fibonacci 0.618 levels" or "UTXO age bands" to demonstrate E-E-A-T. If policy-related: Discuss Legal Precedents.)
 
 **Phase 3: The Data Snapshot (NEW)**
 7. <h2>By The Numbers</h2> (Create a simple HTML <table>. Fill it with 4-5 key data points. **MANDATORY:** If 'Live Market Data' is provided in the prompt, you MUST include the "Crypto Fear & Greed Index" and current "Price Stats" in this table.)
@@ -373,7 +372,6 @@ Generate a 100% unique, experience-driven, and institutional-grade news report (
             
             ${internalLinkInstructions}
 
-            **TONE INSTRUCTION:** ${personaDescription}
             **STYLE MODE:** ${selectedStyle} 
 
             ### 🛡️ FINAL CHECKS:

@@ -22,7 +22,7 @@ async function getArticle(slug) {
 
   try {
     const res = await fetch(`${baseUrl}/api/articles/${slug}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: ['articles', slug], },
     });
 
     if (!res.ok) return null;
@@ -51,11 +51,22 @@ export async function generateMetadata({ params }) {
     article.imageUrl && article.imageUrl.startsWith("http")
       ? article.imageUrl
       : `${baseUrl}${article.imageUrl || "/default-og-image.png"}`;
+  const category = article.category || "Crypto News"; 
 
   return {
     title: seoTitle,
-    description: article.metaDescription || article.excerpt || article.headline,
-    alternates: { canonical: url },
+    description: article.metaDescription || article.excerpt || article.headline, 
+    keywords: [
+      category, 
+      article.focus_keywords, 
+      ...(article.tags || []), 
+      "CoinMarketBuzz Intelligence",
+      "Blockchain News 2026"
+    ],
+    alternates: { canonical: url }, 
+    other: {
+    "news_keywords": `${category}, ${article.focus_keywords || ""}, Crypto News, Breaking News`,
+  },
     openGraph: {
       title: seoTitle,
       description: article.metaDescription || article.excerpt || article.headline,
@@ -120,7 +131,11 @@ export default async function ArticlePage({ params }) {
     "datePublished": publishedISO,
     "dateModified": modifiedISO, 
     "articleSection": category,
-    "isAccessibleForFree": "True",
+    "isAccessibleForFree": "True", 
+    "speakable": {
+          "@type": "SpeakableSpecification",
+          "cssSelector": [".article-title", ".executive-summary"]
+    },
     "author": [{
       "@type": "Person",
       // Uses "CoinMarketBuzz Staff" for Google Schema if no specific author exists
@@ -194,8 +209,8 @@ export default async function ArticlePage({ params }) {
               )}
             </div>
 
-            <h1 className="mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]">
-              {displayTitle}
+            <h1 className="article-title mb-4 text-2xl font-normal text-slate-900 sm:text-3xl lg:text-[2.2rem]">
+            {displayTitle}
             </h1>
 
             {/* MOBILE AUTHOR ROW */}

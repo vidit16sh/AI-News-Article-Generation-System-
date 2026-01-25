@@ -6,8 +6,6 @@ export default function robots() {
   return {
     rules: [
       {
-        // ✅ 1. General Rules for All Bots
-        userAgent: '*',
         allow: [
           '/',
           '/_next/static/', // Allow JS/CSS bundles
@@ -18,18 +16,20 @@ export default function robots() {
           '/api/',           // Protect internal API logic
           '/admin/',         // Protect admin dashboard
           '/private/',       // Protect internal/staging folders
-          '/*?search=',      // Avoid indexing search results
+          '/*?search=',
+          '/*?q='
         ],
       },
       {
-        // ✅ 2. Specific Access for Googlebot-News
-        // Ensuring the news crawler has full priority access
         userAgent: 'Googlebot-News',
         allow: '/',
       },
     ],
     // ✅ 3. Points only to the Master Sitemap Index
     // This index (/sitemap.xml) will guide bots to both your main and news feeds
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: [
+      `${baseUrl}/sitemap.xml`,
+      `${baseUrl}/news-sitemap.xml`,
+    ], 
   };
 }
