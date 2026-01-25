@@ -53,18 +53,17 @@ export async function GET() {
   </url>`;
   }).join('');
 
-const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"> 
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   ${newsUrls}
 </urlset>`;
 
   return new Response(sitemap, {
     headers: {
-      'Content-Type': 'application/xml; charset=utf-8',
-      // ✅ Cache-Control with stale-while-revalidate for Next.js 15 performance
-      'Cache-Control': 's-maxage=3600, stale-while-revalidate=60'
+      'Content-Type': 'application/xml',
+      'Cache-Control': 's-maxage=3600, stale-while-revalidate=600'
     }
   });
 }
