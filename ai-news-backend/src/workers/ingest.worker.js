@@ -37,6 +37,9 @@ const getFinalCanonicalUrl = async (url) => {
         });
 
         const finalUrl = response.request.res.responseUrl || url;
+        if (response?.data?.destroy) {
+            response.data.destroy();
+        }
         
         // Final check: If still stuck on consent page, try manual param extraction
         if (finalUrl.includes('consent.google.com')) {

@@ -9,6 +9,8 @@ export const metadata = {
   title: "News Archive | CoinMarketBuzz",
   description:
     "Browse the complete CoinMarketBuzz archive. Find every published article grouped by year and month.",
+  alternates: { canonical: "/archive" },
+  robots: { index: true, follow: true },
 };
 
 function monthLabel(monthIndex) {

@@ -1,178 +1,191 @@
-// src/services/scraper.service.js - PRODUCTION GRADE (OPTIMIZED)
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-// 1. Enable Stealth Mode (Bypasses Cloudflare/403s)
 puppeteer.use(StealthPlugin());
 
-// ⚡ GLOBAL BROWSER INSTANCE (Recycling Singleton Pattern)
 let sharedBrowser = null;
-let scrapeCounter = 0; 
+let browserLaunchPromise = null;
+let scrapeCounter = 0;
 let activeScrapes = 0;
-const BROWSER_RECYCLE_LIMIT = 50; // Resets every 50 articles to prevent RAM leaks
+
+const BROWSER_RECYCLE_LIMIT = 50;
+const BLOCKED_RESOURCES = new Set(['image', 'media', 'font', 'stylesheet']);
+const JUNK_PATTERNS = ['/price-converter/', '/tag/', '/author/', '/category/', '/login', '/signup'];
+
+const closeBrowser = async (reason = 'cleanup') => {
+  if (!sharedBrowser) return;
+
+  console.log(`Recycling browser (${reason})...`);
+  try {
+    if (sharedBrowser.isConnected()) {
+      await sharedBrowser.close();
+    }
+  } catch (error) {
+    console.error('Browser cleanup error:', error.message);
+  } finally {
+    sharedBrowser = null;
+    browserLaunchPromise = null;
+    scrapeCounter = 0;
+  }
+};
+
+const maybeRecycleBrowser = async () => {
+  if (sharedBrowser && scrapeCounter >= BROWSER_RECYCLE_LIMIT && activeScrapes === 0) {
+    await closeBrowser('recycle-limit');
+  }
+};
 
 const getBrowser = async () => {
-    // ✅ DEFENSIVE RECYCLING: Check if limit hit OR if browser connection is lost
-    const isLimitReached = scrapeCounter >= BROWSER_RECYCLE_LIMIT;
-    const isDisconnected = sharedBrowser && !sharedBrowser.isConnected();
-    const canSafelyRecycle = activeScrapes === 0; 
+  const isDisconnected = sharedBrowser && !sharedBrowser.isConnected();
+  if (isDisconnected) {
+    await closeBrowser('disconnected');
+  }
 
-    if (sharedBrowser && (isDisconnected || (isLimitReached && canSafelyRecycle))) {
-        const reason = isDisconnected ? "Browser disconnected" : "Limit Hit";
-        console.log(`♻️ Recycling Browser (${reason})...`);
-        
-        try {
-            if (sharedBrowser.isConnected()) {
-                await sharedBrowser.close();
-            }
-        } catch (e) {
-            console.error("⚠️ Error during browser cleanup:", e.message);
-        }
-        
-        sharedBrowser = null;
-        scrapeCounter = 0;
-    }
+  if (sharedBrowser) return sharedBrowser;
+  if (browserLaunchPromise) return browserLaunchPromise;
 
-   if (sharedBrowser) return sharedBrowser;
-
-    console.log("🚀 Launching Optimized fresh Chromium instance...");
-    sharedBrowser = await puppeteer.launch({
-        headless: "new",
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // Prevents crashes in Docker/Linux
-            '--disable-gpu',           // Saves significant RAM
-            '--no-zygote',             // Reduces background process overhead
-            '--disable-extensions',    
-            '--no-first-run',
-            '--window-size=1920,1080'
-        ]
+  console.log('Launching optimized Chromium instance...');
+  browserLaunchPromise = puppeteer
+    .launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
+        '--disable-extensions',
+        '--no-first-run',
+        '--window-size=1920,1080',
+      ],
+    })
+    .then((browser) => {
+      sharedBrowser = browser;
+      browserLaunchPromise = null;
+      return browser;
+    })
+    .catch((error) => {
+      browserLaunchPromise = null;
+      throw error;
     });
 
-    return sharedBrowser;
+  return browserLaunchPromise;
 };
 
-export const scrapeArticle = async (url) => {  
-    activeScrapes++;
-    scrapeCounter++;
-    let page = null;
-    console.log(`🕷️ Scraping (#${scrapeCounter}): ${url}`);
-    
-    try {
-        const browser = await getBrowser();
-        page = await browser.newPage();
-        
-        // Use a modern User Agent
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-        await page.setViewport({ width: 1920, height: 1080 });
+export const scrapeArticle = async (url) => {
+  activeScrapes++;
+  let page = null;
+  console.log(`Scraping: ${url}`);
 
-        // ✅ RESOURCE BLOCKING (Optimized for News sites - Saves RAM/Bandwidth)
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const rType = req.resourceType();
-            if (['image', 'media', 'font', 'stylesheet'].includes(rType)) {
-                req.abort();
-            } else {
-                req.continue();
-            }
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    );
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      if (BLOCKED_RESOURCES.has(req.resourceType())) req.abort();
+      else req.continue();
+    });
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+
+    if (page.url().includes('news.google.com')) {
+      try {
+        await page.waitForFunction(() => !window.location.hostname.includes('news.google.com'), {
+          timeout: 15000,
         });
-
-        // ✅ SPEED TWEAK: Changed to 'domcontentloaded' to avoid waiting for slow tracking scripts
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-
-        // 6. Handle Google Redirects SECURELY
-        if (page.url().includes('news.google.com')) {
-            console.log("⏳ Waiting for Google Redirect...");
-            try {
-                await page.waitForFunction(
-                    () => !window.location.hostname.includes('news.google.com'),
-                    { timeout: 15000 }
-                );
-            } catch (e) {
-                console.log("   ⚠️ Redirect timeout. Skipping to avoid landing on junk pages.");
-                await page.close();
-                return null;
-            }
-        }
-
-        const finalUrl = page.url();
-        
-        // 🛡️ JUNK URL FILTER: Immediately skip if we landed on a non-article page
-        const junkPatterns = ['/price-converter/', '/tag/', '/author/', '/category/', '/login'];
-        if (junkPatterns.some(pattern => finalUrl.toLowerCase().includes(pattern))) {
-            console.log(`   🗑️  Landed on junk page: ${finalUrl}. Skipping.`);
-            await page.close();
-            return null;
-        }
-
-        console.log(`✅ Landed on: ${finalUrl}`);
-
-        // Wait for basic content structure
-        try {
-            await page.waitForSelector('p', { timeout: 8000 });
-        } catch (e) {}
-
-        // 8. Extract Content (Your original logic preserved)
-        const content = await page.evaluate(() => {
-            const junkSelectors = [
-                'nav', 'footer', 'script', 'style', 'noscript', 'iframe',
-                '.ad', '.advertisement', '.subscribe', '.cookie-banner', 
-                'header', 'aside', '[aria-label="cookieconsent"]', '.sidebar'
-            ];
-            junkSelectors.forEach(sel => document.querySelectorAll(sel).forEach(el => el.remove()));
-
-            const contentSelectors = [
-                '.post-content',             
-                '[class*="Post_content"]',   
-                '.article-body',             
-                '.ArticleBody-articleBody',  
-                'article',                   
-                '#article-content',
-                'main'
-            ];
-
-            for (const sel of contentSelectors) {
-                const el = document.querySelector(sel);
-                if (el && el.innerText.length > 500) {
-                    return el.innerText;
-                }
-            }
-            
-            const paragraphs = Array.from(document.querySelectorAll('p'))
-                .map(p => p.innerText)
-                .filter(text => text.length > 60);
-            
-            return paragraphs.join('\n\n');
-        });
-
+      } catch {
         await page.close();
-        
-        const cleaned = (content || "").replace(/\s+/g, ' ').trim();
-        
-        if (cleaned.length < 300) {
-            console.log(`⚠️ Content too short (${cleaned.length} chars). Skipping.`);
-            return null;
-        }
-
-        return { content: cleaned, url: finalUrl };
-
-    } catch (err) {
-        console.error(`❌ Scraping Error: ${err.message}`);
-        
-        // Cleanup page
-        if (page && !page.isClosed()) {
-            try { await page.close(); } catch (e) {}
-        }
-
-        // ✅ AUTO-RECOVERY: If browser crashes, kill the reference so getBrowser() starts a new one
-        if (err.message.includes('Target closed') || err.message.includes('Session closed') || err.message.includes('disconnected')) {
-            sharedBrowser = null;
-        }
         return null;
-    } 
-    finally {
-        // ✅ UNLOCK: Decrement active job count so recycling can happen later
-        activeScrapes--;
+      }
     }
+
+    const finalUrl = page.url();
+    if (JUNK_PATTERNS.some((pattern) => finalUrl.toLowerCase().includes(pattern))) {
+      await page.close();
+      return null;
+    }
+
+    try {
+      await page.waitForSelector('p', { timeout: 8000 });
+    } catch {}
+
+    const content = await page.evaluate(() => {
+      const junkSelectors = [
+        'nav',
+        'footer',
+        'script',
+        'style',
+        'noscript',
+        'iframe',
+        '.ad',
+        '.advertisement',
+        '.subscribe',
+        '.cookie-banner',
+        'header',
+        'aside',
+        '[aria-label="cookieconsent"]',
+        '.sidebar',
+      ];
+      junkSelectors.forEach((sel) => document.querySelectorAll(sel).forEach((el) => el.remove()));
+
+      const contentSelectors = [
+        '.post-content',
+        '[class*="Post_content"]',
+        '.article-body',
+        '.ArticleBody-articleBody',
+        'article',
+        '#article-content',
+        'main',
+      ];
+
+      for (const sel of contentSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.innerText.length > 500) return el.innerText;
+      }
+
+      const paragraphs = Array.from(document.querySelectorAll('p'))
+        .map((p) => p.innerText)
+        .filter((text) => text.length > 60);
+
+      return paragraphs.join('\n\n');
+    });
+
+    await page.close();
+    scrapeCounter++;
+
+    const cleaned = (content || '').replace(/\s+/g, ' ').trim();
+    if (cleaned.length < 300) return null;
+
+    return { content: cleaned, url: finalUrl };
+  } catch (error) {
+    console.error(`Scraping error: ${error.message}`);
+    if (page && !page.isClosed()) {
+      try {
+        await page.close();
+      } catch {}
+    }
+
+    if (
+      error.message.includes('Target closed') ||
+      error.message.includes('Session closed') ||
+      error.message.includes('disconnected')
+    ) {
+      await closeBrowser('renderer-crash');
+    }
+    return null;
+  } finally {
+    activeScrapes--;
+    await maybeRecycleBrowser();
+  }
 };
+
+for (const signal of ['SIGINT', 'SIGTERM', 'beforeExit']) {
+  process.on(signal, async () => {
+    await closeBrowser(`signal-${signal}`);
+  });
+}

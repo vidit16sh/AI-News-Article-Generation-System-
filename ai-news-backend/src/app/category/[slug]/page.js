@@ -32,12 +32,16 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   const safeSlug = slug ?? "news";
   const meta = getCategoryMeta(safeSlug);
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const canonical = `${baseUrl}/category/${safeSlug.toString().toLowerCase()}`;
 
   return {
     title: `${meta.label} News | CoinMarketBuzz`,
     description:
       meta.description ||
       `AI-generated ${meta.label.toLowerCase()} news, summaries, and explainers.`,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
   };
 }
 

@@ -3,7 +3,6 @@ import prisma from '@/lib/prisma';
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
   
-  // ✅ Google News: Only articles from the last 48 hours
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
   const articles = await prisma.generatedArticle.findMany({
@@ -12,11 +11,12 @@ export async function GET() {
       publishAt: { gte: twoDaysAgo }
     },
     orderBy: { publishAt: 'desc' },
+    take: 1000,
     include: { originalNews: { include: { category: true } } }
   });
 
-  const escapeXml = (unsafe) => {
-    return unsafe.replace(/[<>&"']/g, (c) => {
+  const escapeXml = (unsafe = '') => {
+    return String(unsafe).replace(/[<>&"']/g, (c) => {
       switch (c) {
         case '<': return '&lt;';
         case '>': return '&gt;';
@@ -28,16 +28,17 @@ export async function GET() {
     });
   };
 
-  const newsUrls = articles.map(article => {
+  const newsUrls = articles
+  .filter((article) => !!article.slug && !!article.headline)
+  .map(article => {
     const publishDate = new Date(article.publishAt || article.createdAt).toISOString();
-    // ✅ Ensure absolute image URLs for Google News thumbnails
     const absoluteImage = article.imageUrl?.startsWith('http') 
       ? article.imageUrl 
       : `${baseUrl}${article.imageUrl || '/default-news.jpg'}`;
 
     return `
   <url>
-    <loc>${baseUrl}/news/${article.slug}</loc>
+    <loc>${escapeXml(`${baseUrl}/news/${article.slug}`)}</loc>
     <news:news>
       <news:publication>
         <news:name>CoinMarketBuzz</news:name>
@@ -53,6 +54,7 @@ export async function GET() {
   </url>`;
   }).join('');
 
+  // 🛡️ CRITICAL FIX: You MUST include the xmlns:image line below
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
@@ -62,7 +64,7 @@ export async function GET() {
 
   return new Response(sitemap, {
     headers: {
-      'Content-Type': 'application/xml',
+      'Content-Type': 'application/xml; charset=utf-8', // Added charset for better browser parsing
       'Cache-Control': 's-maxage=3600, stale-while-revalidate=600'
     }
   });

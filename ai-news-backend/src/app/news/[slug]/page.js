@@ -46,7 +46,10 @@ export async function generateMetadata({ params }) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com"; 
 
   const seoTitle = cleanHeadline(article.headline);
+  const seoDescription = article.metaDescription || article.excerpt || article.headline;
   const url = `${baseUrl}/news/${article.slug}`;
+  const publishedISO = new Date(article.publishAt || article.createdAt).toISOString();
+  const modifiedISO = new Date(article.updatedAt || article.publishAt || article.createdAt).toISOString();
   const image =
     article.imageUrl && article.imageUrl.startsWith("http")
       ? article.imageUrl
@@ -55,30 +58,38 @@ export async function generateMetadata({ params }) {
 
   return {
     title: seoTitle,
-    description: article.metaDescription || article.excerpt || article.headline, 
-    keywords: [
-      category, 
-      article.focus_keywords, 
-      ...(article.tags || []), 
-      "CoinMarketBuzz Intelligence",
-      "Blockchain News 2026"
-    ],
+    description: seoDescription,
+    keywords: [category, article.focus_keywords, ...(article.tags || []), "CoinMarketBuzz Intelligence", "Blockchain News"].filter(Boolean),
     alternates: { canonical: url }, 
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1,
+      },
+    },
     other: {
     "news_keywords": `${category}, ${article.focus_keywords || ""}, Crypto News, Breaking News`,
   },
     openGraph: {
       title: seoTitle,
-      description: article.metaDescription || article.excerpt || article.headline,
+      description: seoDescription,
       url,
       type: "article",
+      publishedTime: publishedISO,
+      modifiedTime: modifiedISO,
+      section: category,
       images: [image],
       siteName: "CoinMarketBuzz",
     },
     twitter: {
       card: "summary_large_image",
       title: seoTitle,
-      description: article.metaDescription || article.excerpt || article.headline,
+      description: seoDescription,
       images: [image],
     },
   };
@@ -96,7 +107,7 @@ export default async function ArticlePage({ params }) {
   
   const displayTitle = cleanHeadline(article.headline);
   const articleUrl = `${baseUrl}/news/${article.slug}`;
-  const isAnalysis = article.headline.toLowerCase().includes("analysis"); 
+  const isAnalysis = (article.headline || "").toLowerCase().includes("analysis"); 
   const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
   const author = article.author || {
     name: "Editorial Desk",
@@ -112,12 +123,18 @@ export default async function ArticlePage({ params }) {
     ? article.imageUrl
     : `${baseUrl}${article.imageUrl || "/default-news.jpg"}`;
 
+  const categorySlug = (article.categorySlug || category || "crypto")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
   const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "Home", "item": baseUrl },
-    { "@type": "ListItem", "position": 2, "name": category, "item": `${baseUrl}/category/${article.categorySlug}` },
+    { "@type": "ListItem", "position": 2, "name": category, "item": `${baseUrl}/category/${categorySlug}` },
     { "@type": "ListItem", "position": 3, "name": displayTitle, "item": articleUrl }
   ]
   };
@@ -130,8 +147,9 @@ export default async function ArticlePage({ params }) {
     "image": [absoluteImage], 
     "datePublished": publishedISO,
     "dateModified": modifiedISO, 
+    "url": articleUrl,
     "articleSection": category,
-    "isAccessibleForFree": "True", 
+    "isAccessibleForFree": true,
     "speakable": {
           "@type": "SpeakableSpecification",
           "cssSelector": [".article-title", ".executive-summary"]

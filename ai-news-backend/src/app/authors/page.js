@@ -7,6 +7,8 @@ import { EDITORIAL_TEAM } from "../../config/authors";
 export const metadata = {
   title: "Editorial Team | CoinMarketBuzz",
   description: "Meet the analysts and journalists behind CoinMarketBuzz's crypto market coverage.",
+  alternates: { canonical: "/authors" },
+  robots: { index: true, follow: true },
 };
 
 export default function AuthorsIndexPage() {

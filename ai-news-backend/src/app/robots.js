@@ -1,5 +1,3 @@
-import { MetadataRoute } from 'next';
-
 export default function robots() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
 
@@ -27,9 +25,7 @@ export default function robots() {
     ],
     // ✅ 3. Points only to the Master Sitemap Index
     // This index (/sitemap.xml) will guide bots to both your main and news feeds
-    sitemap: [
-      `${baseUrl}/sitemap.xml`,
-      `${baseUrl}/news-sitemap.xml`,
-    ], 
+    host: baseUrl,
+    sitemap: [`${baseUrl}/sitemap.xml`], 
   };
 }

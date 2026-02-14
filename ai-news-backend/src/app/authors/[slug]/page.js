@@ -47,12 +47,15 @@ async function getAuthorWithArticles(slug) {
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const author = await getAuthorWithArticles(slug);
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
 
   if (!author) return { title: "Author Not Found | CoinMarketBuzz" };
 
   return {
     title: `${author.name} | Author at CoinMarketBuzz`,
     description: author.bio || `Read the latest crypto analysis by ${author.name}.`,
+    alternates: { canonical: `${baseUrl}/authors/${author.slug}` },
+    robots: { index: true, follow: true },
   };
 }
 

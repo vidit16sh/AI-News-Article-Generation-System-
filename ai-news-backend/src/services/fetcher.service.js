@@ -25,6 +25,15 @@ const normalizeUrl = (url) => {
 const randomSleep = (min = 2000, max = 5000) => 
     new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min)) + min));
 
+const parsePublishedAt = (...candidates) => {
+    for (const value of candidates) {
+        if (!value) continue;
+        const dt = new Date(value);
+        if (!Number.isNaN(dt.getTime())) return dt;
+    }
+    return new Date();
+};
+
 // 🛠️ HELPER: Soft-Cache Wrapper
 const safeRedisSet = async (key, val, mode, ttl) => {
     try {
@@ -74,7 +83,12 @@ export const fetchCoinNess = async () => {
                         sourceUrl: cleanUrl,
                         title: item.title || (item.content ? item.content.substring(0, 100) : "Untitled"),
                         rawBody: item.content || item.title,
-                        publishedAt: new Date(),
+                        publishedAt: parsePublishedAt(
+                            item.publishedAt,
+                            item.pubDate,
+                            item.createdAt,
+                            item.timestamp
+                        ),
                         processed: false
                     }
                 });
@@ -143,7 +157,7 @@ export const fetchRSS = async (url) => {
                         sourceUrl: finalUrl,
                         title: item.title,
                         rawBody: scrapedData.content, 
-                        publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                        publishedAt: parsePublishedAt(item.isoDate, item.pubDate),
                         processed: false 
                     }
                 });

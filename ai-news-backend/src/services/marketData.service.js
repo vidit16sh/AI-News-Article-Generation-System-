@@ -17,11 +17,22 @@ const HEADERS = {
     'Accept': 'application/json'
 };
 
+const HTTP_TIMEOUT = 12000;
+
+const apiGet = async (url) => {
+    const headers = { ...HEADERS };
+    if (process.env.COINGECKO_API_KEY) {
+        headers['x-cg-pro-api-key'] = process.env.COINGECKO_API_KEY;
+    }
+    return axios.get(url, { headers, timeout: HTTP_TIMEOUT });
+};
+
 // 1. Fetch Crypto Fear & Greed Index (Free API)
 const getFearAndGreed = async () => {
     try {
-        const { data } = await axios.get('https://api.alternative.me/fng/', { headers: HEADERS });
-        const item = data.data[0];
+        const { data } = await apiGet('https://api.alternative.me/fng/');
+        const item = data?.data?.[0];
+        if (!item?.value) return null;
         return { value: item.value, classification: item.value_classification };
     } catch (e) { return null; }
 }; 
@@ -52,7 +63,7 @@ export const getEnrichedMarketData = async (text) => {
 
         if (coinId) {
             const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&order=market_cap_desc&per_page=1&page=1&sparkline=false&price_change_percentage=24h`;
-            const { data } = await axios.get(url, { headers: HEADERS });
+            const { data } = await apiGet(url);
             const coin = data[0];
 
             if (coin) {
@@ -64,7 +75,7 @@ export const getEnrichedMarketData = async (text) => {
             }
         } else {
             const btcUrl = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true`;
-            const { data } = await axios.get(btcUrl, { headers: HEADERS });
+            const { data } = await apiGet(btcUrl);
             if (data.bitcoin) {
                 injectionString += `- **Market Proxy (Bitcoin):** $${data.bitcoin.usd} (${data.bitcoin.usd_24h_change.toFixed(2)}% 24h).\n`;
             }
@@ -83,13 +94,14 @@ export const generateChartUrl = async (text) => {
         if (!coinId) return null;
 
         const [chartRes, coinRes] = await Promise.all([
-            axios.get(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=7`, { headers: HEADERS }),
-            axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`, { headers: HEADERS })
+            apiGet(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=7`),
+            apiGet(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`)
         ]);
 
-        const prices = chartRes.data.prices.map(p => p[1]);
-        const currentPrice = coinRes.data[coinId].usd;
-        const change24h = coinRes.data[coinId].usd_24h_change;
+        const prices = (chartRes.data?.prices || []).map(p => p[1]).filter(Number.isFinite);
+        const currentPrice = coinRes.data?.[coinId]?.usd;
+        const change24h = coinRes.data?.[coinId]?.usd_24h_change;
+        if (!prices.length || !Number.isFinite(currentPrice) || !Number.isFinite(change24h)) return null;
         
         const step = Math.ceil(prices.length / 40);
         const cleanPrices = prices.filter((_, i) => i % step === 0);

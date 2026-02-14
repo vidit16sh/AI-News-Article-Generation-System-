@@ -39,7 +39,10 @@ const triggerRevalidation = async (tag) => {
         "Content-Type": "application/json",
         "x-admin-key": process.env.API_SECRET_KEY,
       },
-      body: JSON.stringify({ tag }),
+      body: JSON.stringify({
+        tag,
+        paths: ["/", "/archive", "/sitemap.xml", "/main-sitemap.xml", "/news-sitemap.xml", "/rss.xml"],
+      }),
     }).catch(() => {});
   } catch (error) {}
 };

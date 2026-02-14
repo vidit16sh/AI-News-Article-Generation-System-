@@ -1,4 +1,4 @@
-// src/app/api/feed/rss.xml/route.js
+// src/app/rss.xml/route.js
 import prisma from '@/lib/prisma';
 
 export async function GET() {
@@ -14,6 +14,9 @@ export async function GET() {
 
   const rssItems = articles.map(article => {
     const url = `${baseUrl}/news/${article.slug}`;
+    const imageUrl = article.imageUrl
+      ? (article.imageUrl.startsWith('http') ? article.imageUrl : `${baseUrl}${article.imageUrl}`)
+      : null;
     const authorName = article.author ? article.author.name : "Editorial Team";
     const category = article.originalNews?.category?.name || "News";
     
@@ -26,7 +29,7 @@ export async function GET() {
       <description><![CDATA[${article.metaDescription}]]></description>
       <category>${category}</category>
       <dc:creator>${authorName}</dc:creator>
-      ${article.imageUrl ? `<enclosure url="${article.imageUrl}" length="0" type="image/jpeg" />` : ''}
+      ${imageUrl ? `<enclosure url="${imageUrl}" length="0" type="image/jpeg" />` : ''}
     </item>`;
   }).join('');
 
@@ -38,15 +41,15 @@ export async function GET() {
     <description>Latest AI-generated Crypto and Finance News</description>
     <language>en</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${baseUrl}/api/feed/rss.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="${baseUrl}/rss.xml" rel="self" type="application/rss+xml" />
     ${rssItems}
   </channel>
 </rss>`;
 
   return new Response(rssFeed, {
     headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': 's-maxage=3600, stale-while-revalidate'
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Cache-Control': 's-maxage=3600, stale-while-revalidate=600'
     }
   });
 }
