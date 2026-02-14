@@ -55,6 +55,15 @@ export async function generateMetadata({ params }) {
       ? article.imageUrl
       : `${baseUrl}${article.imageUrl || "/default-og-image.png"}`;
   const category = article.category || "Crypto News"; 
+  const confidenceScore = Number(article.confidenceScore || 0);
+  const publishedDate = new Date(article.publishAt || article.createdAt);
+  const ageDays = Number.isNaN(publishedDate.getTime())
+    ? 999
+    : Math.floor((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60 * 24));
+  const shouldNoindex =
+    article.status !== "PUBLISHED" ||
+    confidenceScore < 0.75 ||
+    (ageDays > 14 && confidenceScore < 0.85);
 
   return {
     title: seoTitle,
@@ -62,10 +71,10 @@ export async function generateMetadata({ params }) {
     keywords: [category, article.focus_keywords, ...(article.tags || []), "CoinMarketBuzz Intelligence", "Blockchain News"].filter(Boolean),
     alternates: { canonical: url }, 
     robots: {
-      index: true,
+      index: !shouldNoindex,
       follow: true,
       googleBot: {
-        index: true,
+        index: !shouldNoindex,
         follow: true,
         "max-image-preview": "large",
         "max-snippet": -1,

@@ -17,6 +17,12 @@ const limiter = new Bottleneck({
   maxConcurrent: 1,
 });
 
+const QUALITY_GATES = {
+  minConfidence: 0.75,
+  minWordCount: 1200,
+  minOriginalityForPublish: 0.6,
+};
+
 // ✅ Normalize base URL once (no trailing slash issues)
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
   /\/$/,
@@ -46,6 +52,14 @@ const triggerRevalidation = async (tag) => {
     }).catch(() => {});
   } catch (error) {}
 };
+
+const countWordsFromHtml = (html = "") =>
+  String(html)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean).length;
 
 // ✅ Helper: ensure absolute URL (for JSON-LD compliance)
 const toAbsoluteUrl = (pathOrUrl) => {
@@ -176,6 +190,17 @@ const processGenerationJob = async (msg, channel) => {
       return;
     }
 
+    const confidence = Number(aiOutput.confidence || 0);
+    const generatedWordCount = countWordsFromHtml(aiOutput.article_html || aiOutput.content || "");
+
+    if (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount) {
+      console.warn(
+        `   🗑️ Discarding low-quality article (confidence=${confidence.toFixed(2)}, words=${generatedWordCount}).`
+      );
+      channel.ack(msg);
+      return;
+    }
+
     // 🛑 FILTER 2: Determine Status based on Priority Score
     let finalStatus = "QUEUED";
     if (priorityScore > 80) finalStatus = "PUBLISHED";
@@ -256,6 +281,13 @@ const processGenerationJob = async (msg, channel) => {
       aiOutput.article_html,
       cleanNews.content
     );
+
+    if (finalStatus === "PUBLISHED" && realOriginalityScore < QUALITY_GATES.minOriginalityForPublish) {
+      finalStatus = "QUEUED";
+      console.warn(
+        `   ⚠️ Downgrading to QUEUED due to low originality (${realOriginalityScore}).`
+      );
+    }
 
     await prisma.generatedArticle.create({
       data: {

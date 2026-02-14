@@ -34,7 +34,10 @@ export async function GET() {
     .join('');
 
   const articles = await prisma.generatedArticle.findMany({
-    where: { status: 'PUBLISHED' },
+    where: {
+      status: 'PUBLISHED',
+      confidenceScore: { gte: 0.75 },
+    },
     orderBy: { publishAt: 'desc' },
     take: 49000,
     select: { slug: true, updatedAt: true },
