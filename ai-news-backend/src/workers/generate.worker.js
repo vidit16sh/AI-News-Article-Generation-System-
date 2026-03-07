@@ -24,9 +24,14 @@ const QUALITY_GATES = {
 };
 
 const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
+const INTERNAL_APP_URL = (
+  process.env.INTERNAL_APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "http://127.0.0.1:3000"
+).replace(/\/$/, "");
 
 // ✅ Normalize base URL once (no trailing slash issues)
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || INTERNAL_APP_URL).replace(
   /\/$/,
   ""
 );
@@ -41,7 +46,7 @@ const calculateOriginality = (aiText, sourceText) => {
 // Helper: Revalidate Cache
 const triggerRevalidation = async (tag) => {
   try {
-    fetch(`${SITE_URL}/api/revalidate`, {
+    fetch(`${INTERNAL_APP_URL}/api/revalidate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

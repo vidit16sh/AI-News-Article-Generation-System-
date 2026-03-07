@@ -10,7 +10,10 @@ const CONFIG = {
 
 const triggerRevalidation = async () => {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const apiUrl =
+      process.env.INTERNAL_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'http://127.0.0.1:3000';
     await fetch(`${apiUrl}/api/revalidate`, {
       method: 'POST',
       headers: {

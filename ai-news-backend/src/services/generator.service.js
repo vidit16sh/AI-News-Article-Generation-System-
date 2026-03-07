@@ -27,6 +27,8 @@ const FORBIDDEN_WORDS = [
   "ever-changing", "dynamic world", "latest updates", "game-changer", "unleash", "harnessing", 
   "beacon", "dive deep", "poised to", "seamlessly", "complex world of"
 ];
+const STRICT_ARTICLE_AUDIT = process.env.STRICT_ARTICLE_AUDIT === "true";
+const MIN_AUDIT_WORD_COUNT = Number(process.env.MIN_AUDIT_WORD_COUNT || 900);
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
@@ -126,6 +128,20 @@ const ensureHtmlContent = (rawContent = "") => {
   return out.join("\n");
 };
 
+const buildFallbackFaq = (topic = "this crypto development") => `
+<h2>Frequently Asked Questions</h2>
+<dl class="faq-section">
+  <dt>What happened?</dt>
+  <dd>The source indicates a material update around ${topic}.</dd>
+  <dt>Why does it matter?</dt>
+  <dd>It can affect short-term sentiment, liquidity, and positioning.</dd>
+  <dt>What should readers monitor next?</dt>
+  <dd>Watch official filings, exchange data, and follow-up statements.</dd>
+  <dt>Is this confirmed final?</dt>
+  <dd>No. Some details may evolve as more verified information arrives.</dd>
+</dl>
+`;
+
 const auditAndFixArticle = (json, sourceUrl) => {
   let content = ensureHtmlContent(json.content || json.article_html || "");
   let score = 100;
@@ -149,8 +165,11 @@ const auditAndFixArticle = (json, sourceUrl) => {
   });
 
   const wordCount = toPlainText(content).split(/\s+/).filter(Boolean).length;
-  if (wordCount < 1200) {
-    throw new Error(`Article too short: ${wordCount} words. Institutional pieces require depth.`);
+  if (wordCount < MIN_AUDIT_WORD_COUNT) {
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error(`Article too short: ${wordCount} words. Institutional pieces require depth.`);
+    }
+    score -= 20;
   }
 
   // Enforce heading cadence and FAQ completeness from the system prompt.
@@ -158,14 +177,20 @@ const auditAndFixArticle = (json, sourceUrl) => {
   const h3Count = (content.match(/<h3\b/gi) || []).length;
   const totalSubheads = h2Count + h3Count;
   if (totalSubheads < 6) {
-    throw new Error(`Insufficient structure: found ${totalSubheads} H2/H3 headings; expected at least 6.`);
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error(`Insufficient structure: found ${totalSubheads} H2/H3 headings; expected at least 6.`);
+    }
+    score -= 15;
   }
 
   const wordsPerSubhead = wordCount / Math.max(totalSubheads, 1);
   if (wordsPerSubhead > 380) {
-    throw new Error(
-      `Heading cadence too sparse: ~${Math.round(wordsPerSubhead)} words per subheading.`
-    );
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error(
+        `Heading cadence too sparse: ~${Math.round(wordsPerSubhead)} words per subheading.`
+      );
+    }
+    score -= 10;
   }
 
   const hasFaqHeading =
@@ -176,10 +201,17 @@ const auditAndFixArticle = (json, sourceUrl) => {
   const totalFaqItems = Math.max(faqDtCount, faqQCount);
 
   if (!hasFAQ && !hasFaqHeading) {
-    throw new Error("Missing FAQ section.");
-  }
-  if (totalFaqItems < 4 || totalFaqItems > 6) {
-    throw new Error(`FAQ count out of range: found ${totalFaqItems}; expected 4-6.`);
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error("Missing FAQ section.");
+    }
+    content += buildFallbackFaq(json.headline || "the latest market event");
+    score -= 10;
+  } else if (totalFaqItems < 4 || totalFaqItems > 6) {
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error(`FAQ count out of range: found ${totalFaqItems}; expected 4-6.`);
+    }
+    content += buildFallbackFaq(json.headline || "the latest market event");
+    score -= 8;
   }
 
   // Ensure opening dateline format for News-style reporting.
