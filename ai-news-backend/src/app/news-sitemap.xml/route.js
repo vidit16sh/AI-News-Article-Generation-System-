@@ -10,6 +10,7 @@ export async function GET() {
       status: 'PUBLISHED',
       publishAt: { gte: twoDaysAgo },
       confidenceScore: { gte: 0.8 },
+      originalityScore: { gte: 0.65 },
     },
     orderBy: { publishAt: 'desc' },
     take: 1000,
@@ -29,7 +30,26 @@ export async function GET() {
     });
   };
 
-  const newsUrls = articles
+  const normalizeHeadline = (headline = "") =>
+    String(headline)
+      .toLowerCase()
+      .replace(/:\s*a skeptical investigation.*$/i, "")
+      .replace(/\s+amid\s+extreme\s+fear(?:\s+market)?/gi, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const seen = new Set();
+  const deduped = [];
+  for (const article of articles) {
+    const key = normalizeHeadline(article.headline);
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(article);
+  }
+
+  const newsUrls = deduped
   .filter((article) => !!article.slug && !!article.headline)
   .map(article => {
     const publishDate = new Date(article.publishAt || article.createdAt).toISOString();

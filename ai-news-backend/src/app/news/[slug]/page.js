@@ -16,12 +16,37 @@ const cleanHeadline = (title) => {
     .trim();
 };
 
+const toTitleCase = (value = "") =>
+  String(value)
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+
+const uniqueKeywords = (items = []) => {
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    const v = String(item || "").trim();
+    if (!v) continue;
+    const key = v.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+};
+
 // 1. Fetch Data Function
 async function getArticle(slug) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const publicBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const internalBaseUrl = process.env.INTERNAL_API_BASE_URL || publicBaseUrl;
 
   try {
-    const res = await fetch(`${baseUrl}/api/articles/${slug}`, {
+    const res = await fetch(`${internalBaseUrl}/api/articles/${slug}`, {
       next: { revalidate: 60, tags: ['articles', slug], },
     });
 
@@ -54,7 +79,7 @@ export async function generateMetadata({ params }) {
     article.imageUrl && article.imageUrl.startsWith("http")
       ? article.imageUrl
       : `${baseUrl}${article.imageUrl || "/default-og-image.png"}`;
-  const category = article.category || "Crypto News"; 
+  const category = toTitleCase(article.category || article.primaryCategory || article.tags?.[0] || "Crypto News");
   const confidenceScore = Number(article.confidenceScore || 0);
   const publishedDate = new Date(article.publishAt || article.createdAt);
   const ageDays = Number.isNaN(publishedDate.getTime())
@@ -65,10 +90,19 @@ export async function generateMetadata({ params }) {
     confidenceScore < 0.75 ||
     (ageDays > 14 && confidenceScore < 0.85);
 
+  const keywords = uniqueKeywords([
+    category,
+    article.focus_keywords,
+    ...(article.tags || []),
+    "CoinMarketBuzz Intelligence",
+    "Blockchain News",
+  ]);
+  const newsKeywords = uniqueKeywords([category, article.focus_keywords, "Crypto News", "Breaking News"]).join(", ");
+
   return {
     title: seoTitle,
     description: seoDescription,
-    keywords: [category, article.focus_keywords, ...(article.tags || []), "CoinMarketBuzz Intelligence", "Blockchain News"].filter(Boolean),
+    keywords,
     alternates: { canonical: url }, 
     robots: {
       index: !shouldNoindex,
@@ -82,8 +116,8 @@ export async function generateMetadata({ params }) {
       },
     },
     other: {
-    "news_keywords": `${category}, ${article.focus_keywords || ""}, Crypto News, Breaking News`,
-  },
+      "news_keywords": newsKeywords,
+    },
     openGraph: {
       title: seoTitle,
       description: seoDescription,
@@ -117,7 +151,7 @@ export default async function ArticlePage({ params }) {
   const displayTitle = cleanHeadline(article.headline);
   const articleUrl = `${baseUrl}/news/${article.slug}`;
   const isAnalysis = (article.headline || "").toLowerCase().includes("analysis"); 
-  const category = article.category || article.primaryCategory || article.tags?.[0] || "News";
+  const category = toTitleCase(article.category || article.primaryCategory || article.tags?.[0] || "News");
   const author = article.author || {
     name: "Editorial Desk",
     role: "AI News Desk",

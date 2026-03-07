@@ -4,7 +4,7 @@ import { EDITORIAL_TEAM } from '../src/config/authors.js';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding Authors (Mohit & Neelima)...');
+  console.log('🌱 Seeding authors...');
 
   for (const author of EDITORIAL_TEAM) {
     await prisma.author.upsert({
@@ -22,7 +22,10 @@ async function main() {
         slug: author.slug,
         role: author.role,
         bio: author.bio,
+        expertise: author.expertise || [],
         imageUrl: author.imageUrl,
+        email: author.email || null,
+        twitter: author.twitter || null,
         linkedin: author.linkedin || null,
       },
     });

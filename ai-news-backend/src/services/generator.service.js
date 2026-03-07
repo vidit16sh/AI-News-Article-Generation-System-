@@ -53,6 +53,27 @@ const slugify = (value = "") =>
     .trim()
     .replace(/\s+/g, "-");
 
+const compactWhitespace = (value = "") => String(value).replace(/\s+/g, " ").trim();
+
+const sanitizeHeadline = (headline = "") => {
+  let h = compactWhitespace(String(headline || ""));
+
+  // Remove repetitive templated suffixes that hurt Google News quality signals.
+  h = h.replace(
+    /:\s*a skeptical investigation(?:\s+into[^:]+?)?(?:\s+amid(?:\s+extreme)?\s+fear(?:\s+market)?)?$/i,
+    ""
+  );
+  h = h.replace(/\s+amid\s+extreme\s+fear(?:\s+market)?$/i, "");
+  h = h.replace(/\s{2,}/g, " ").replace(/\s+:/g, ":").trim();
+
+  // Keep title length practical for News surfaces.
+  if (h.length > 110) {
+    h = `${h.slice(0, 107).trim()}...`;
+  }
+
+  return h || "CoinMarketBuzz Investigative Report";
+};
+
 const toPlainText = (value = "") =>
   String(value)
     .replace(/<[^>]*>/g, " ")
@@ -132,6 +153,50 @@ const auditAndFixArticle = (json, sourceUrl) => {
     throw new Error(`Article too short: ${wordCount} words. Institutional pieces require depth.`);
   }
 
+  // Enforce heading cadence and FAQ completeness from the system prompt.
+  const h2Count = (content.match(/<h2\b/gi) || []).length;
+  const h3Count = (content.match(/<h3\b/gi) || []).length;
+  const totalSubheads = h2Count + h3Count;
+  if (totalSubheads < 6) {
+    throw new Error(`Insufficient structure: found ${totalSubheads} H2/H3 headings; expected at least 6.`);
+  }
+
+  const wordsPerSubhead = wordCount / Math.max(totalSubheads, 1);
+  if (wordsPerSubhead > 380) {
+    throw new Error(
+      `Heading cadence too sparse: ~${Math.round(wordsPerSubhead)} words per subheading.`
+    );
+  }
+
+  const hasFaqHeading =
+    /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/i.test(content) ||
+    /<h2[^>]*>\s*FAQs?\s*<\/h2>/i.test(content);
+  const faqDtCount = (content.match(/<dt\b/gi) || []).length;
+  const faqQCount = (content.match(/<strong>\s*Q\d+\s*:/gi) || []).length;
+  const totalFaqItems = Math.max(faqDtCount, faqQCount);
+
+  if (!hasFAQ && !hasFaqHeading) {
+    throw new Error("Missing FAQ section.");
+  }
+  if (totalFaqItems < 4 || totalFaqItems > 6) {
+    throw new Error(`FAQ count out of range: found ${totalFaqItems}; expected 4-6.`);
+  }
+
+  // Ensure opening dateline format for News-style reporting.
+  const datelineRegex = /^<p>\s*<strong>[A-Za-z\s]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}<\/strong>\s*[—-]/i;
+  const hasDateline = datelineRegex.test(content);
+  if (!hasDateline) {
+    const city = process.env.NEWSROOM_CITY || "VADODARA";
+    const dateStr = new Date().toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+    const intro = `<p><strong>${city}, ${dateStr}</strong> — This report analyzes the latest market development with verified source context and data-backed framing.</p>`;
+    content = `${intro}\n${content}`;
+    score -= 5;
+  }
+
   if (!hasSources) {
     const sourceNote = `
       <div class="verified-sources" style="margin-top: 30px; padding: 20px; border: 1px dashed #cbd5e1; background: #fdfdfd; font-size: 0.85rem;">
@@ -147,7 +212,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
     json.headline = json.headline.replace(/\[.*?\]/g, "").trim();
   }
 
-  const normalizedHeadline = (json.headline || "CoinMarketBuzz Investigative Report").trim();
+  const normalizedHeadline = sanitizeHeadline(json.headline || "CoinMarketBuzz Investigative Report");
   const plain = toPlainText(content);
   const excerpt = (json.excerpt || plain.slice(0, 160)).trim().slice(0, 160);
   const seoTitle = (json.seoTitle || normalizedHeadline).trim();
@@ -166,7 +231,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
   json.tags = Array.isArray(json.tags) ? json.tags : [];
   json.keywords = Array.isArray(json.keywords) ? json.keywords : [];
   json.focus_keywords = json.focus_keywords || "Crypto News";
-  json.confidence = score / 100;
+  json.confidence = Math.max(0, Math.min(1, score / 100));
   return json;
 };
 // 🚑 SMART MANUAL FALLBACK
@@ -224,80 +289,77 @@ export const generateArticle = async (cleanedNewsData, marketData = null, recent
     : ""; 
   
   // 🛡️ ENHANCED SYSTEM PROMPT
-      const systemPrompt = `
+            const systemPrompt = `
 ### ROLE: LEAD CRYPTO INVESTIGATIVE JOURNALIST & SEO ARCHITECT
-You are the lead editor at CoinMarketBuzz. Produce a definitive investigative crypto report that is factual, skeptical, and publication-ready.
+You are the lead editor at CoinMarketBuzz. Produce a definitive investigative crypto report that is factual, neutral, skeptical, and publication-ready.
 
-### OBJECTIVE
-Transform fragmented multi-source inputs into a **substantive 2,000-word report** that improves search performance and investor decision quality.
+### CORE OBJECTIVE
+Transform fragmented multi-source inputs into a 100% unique, deeply useful investigative report that can satisfy Google News quality expectations and reader trust.
 
 ### INPUT DATA PACKAGE
 You will receive:
 1. **THE LEAD**: Breaking brief from CoinNess.
-2. **THE EVIDENCE**: 2-3 scraped secondary full texts (CoinTelegraph, etc.).
+2. **THE EVIDENCE**: 2-3 scraped secondary full texts.
 3. **THE PROOF**: CryptoPanic metadata (including \`sentiment\`, \`importance\`, and related fields).
 4. **THE CONTEXT**: CoinGecko market stats.
 
 ### NON-NEGOTIABLE FACT RULES
 - Use only facts present in the input package.
-- If a detail is missing, write: \`Not provided in source data\`.
-- Do not invent quotes, numbers, timestamps, or named sources.
-- If sources conflict, explicitly label conflict and present both claims with attribution.
+- If a specific detail is missing, write: \`Not provided in source data\`.
+- Do not invent quotes, numbers, timestamps, people, or sources.
+- Separate facts from inference using explicit phrasing.
+- If sources conflict, present both claims with attribution and explain the reliability gap.
 
-### LENGTH ENFORCEMENT (STRICT)
-- Target: **1,900-2,150 words** of body content.
-- Minimum per section must be respected.
-- No short summaries replacing full sections.
-- Every section must include concrete facts, attribution, and analysis.
+### WRITING QUALITY CONSTRAINTS (STRICT)
+- Target body length: **1,900-2,150 words**.
+- Maintain neutral, journalistic tone with active voice.
+- Use transition words in a meaningful share of paragraphs.
+- Keep paragraphs concise and avoid filler.
+- Add a clear H2/H3 subheading every 250-300 words.
+- Keep reading flow simple and direct (high clarity over ornamental language).
 
 ### CONTENT BLUEPRINT (MANDATORY)
-1. **H2: The Hook** (150-220 words)
-Immediate breaking-event reporting: who/what/when/where.
+1. **H2: Breaking Developments** (150-220 words)
+   - Immediate reporting: who, what, when, where.
+   - Include location/date context in the opening paragraph when relevant.
 2. **H2: Technical Deep-Dive** (550-700 words)
-Explain mechanism, protocol architecture, or regulatory mechanics.
+   - Explain mechanism, protocol architecture, or regulatory mechanics.
 3. **H2: Data Analysis & Proof** (350-500 words)
-Integrate CoinGecko + CryptoPanic metadata with explicit references.
+   - Integrate CoinGecko + CryptoPanic metadata with explicit references.
 4. **H2: Counter-Narrative & Source Conflicts** (350-500 words)
-Compare source claims, identify contradictions, explain reliability gaps.
+   - Compare source claims, identify contradictions, and unresolved gaps.
 5. **H2: 7-Day Outlook & Scenarios** (400-520 words)
-Provide **3 scenarios** (bull/base/bear), each data-backed and conditional.
-6. **H3: Methodology & Source Reliability Notes** (120-180 words)
-Briefly explain how conflicting evidence was weighted.
+   - Provide 3 conditional scenarios: bullish, base, bearish.
+6. **H3: Methodology & Evidence Notes** (120-180 words)
+   - Briefly explain how evidence quality was weighted.
+7. **H2: Frequently Asked Questions**
+   - Add 4-6 FAQ entries with data-grounded answers.
 
-### SOURCE SYNTHESIS METHOD (MANDATORY)
-- Build an internal comparison across sources:
-  - Agreement points
-  - Contradictions
-  - Missing evidence
-  - Which claim is better supported and why
-- Use attribution phrases: \`Source A reports...\`, \`Source B disputes...\`
-- If unresolved, state \`Conflict remains unresolved with available evidence.\`
-
-### E-E-A-T OPTIMIZATION
+### E-E-A-T EXECUTION
 Write like an experienced financial investigations editor:
-- Use precise market structure and risk language.
-- Distinguish observed facts vs inference.
-- Include "what would invalidate this view" in scenario analysis.
-- Avoid hype, certainty language, and promotional tone.
+- Use precise market-structure and risk language.
+- Distinguish direct evidence vs interpretation.
+- Explain what would invalidate each scenario.
+- Add timelines, impacts, and stakeholder-level consequences.
 
-### METADATA INTEGRATION (STRICT)
-- Use \`sentiment\` and \`importance\` directly in narrative.
-- Include at least 3 explicit metadata-driven statements, e.g.:
-  - \`CryptoPanic sentiment is X, but price structure indicates Y.\`
-  - \`Importance score suggests event priority is X relative to market breadth.\`
-- If metadata is absent, state that explicitly and proceed conservatively.
+### METADATA INTEGRATION
+- Use \`sentiment\` and \`importance\` in the narrative.
+- Include at least 3 explicit metadata-driven statements.
+- If metadata is missing, explicitly say so and proceed conservatively.
 
 ### SEO & STRUCTURE RULES
-- Use only **H2/H3** headings.
-- Include slug-derived keywords naturally in headings and body.
-- Maintain readable investigative flow; avoid keyword stuffing.
-- Keep paragraphs concise and information-dense.
+- Use only **H2/H3** headings in the article body.
+- Place slug-derived keywords naturally in headings and key paragraphs.
+- Do not keyword-stuff.
+- Do not add generic hype language.
+
+### HTML RENDER RULES
+- Content must be valid HTML using only: \`h2\`, \`h3\`, \`p\`, \`ul\`, \`li\`, \`blockquote\`, \`table\`, \`section\`, \`div\`.
+- Do not include markdown fences.
+- Do not add external links.
 
 ### OUTPUT FORMAT (STRICT JSON ONLY)
-Return **only** a valid JSON object.
-No markdown fences. No commentary before/after JSON. No trailing commas. No extra keys. Content must be valid HTML using only h2, h3, p, ul, li, blockquote, table, section, and div.
-
-Schema:
+Return only a valid JSON object with exactly these keys:
 {
   "headline": "String",
   "content": "HTML String",
@@ -307,11 +369,10 @@ Schema:
 }
 
 ### JSON SAFETY RULES FOR NEXT.JS 16
-- Must parse with \`JSON.parse\` without cleanup.
+- Must parse directly with \`JSON.parse\`.
 - Escape internal quotes correctly.
 - Use \`\\n\` for line breaks inside strings.
 - Ensure all required keys are present and non-empty.
-- If constrained by missing data, still return valid schema with explicit uncertainty language in \`content\`.
 `;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -373,3 +434,4 @@ Schema:
 
   return generateFallbackArticle(cleanedNewsData);
 };
+
