@@ -18,10 +18,12 @@ const limiter = new Bottleneck({
 });
 
 const QUALITY_GATES = {
-  minConfidence: 0.75,
-  minWordCount: 1200,
-  minOriginalityForPublish: 0.6,
+  minConfidence: Number(process.env.GEN_MIN_CONFIDENCE || 0.65),
+  minWordCount: Number(process.env.GEN_MIN_WORD_COUNT || 1000),
+  minOriginalityForPublish: Number(process.env.GEN_MIN_ORIGINALITY_FOR_PUBLISH || 0.55),
 };
+
+const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
 
 // ✅ Normalize base URL once (no trailing slash issues)
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
@@ -204,7 +206,7 @@ const processGenerationJob = async (msg, channel) => {
     // 🛑 FILTER 2: Determine Status based on Priority Score
     let finalStatus = "QUEUED";
     if (priorityScore > 80) finalStatus = "PUBLISHED";
-    else if (priorityScore >= 45) finalStatus = "QUEUED";
+    else if (priorityScore >= GEN_MIN_PRIORITY_SCORE) finalStatus = "QUEUED";
     else {
       console.warn(`   🗑️ Discarding LOW SCORE: ${priorityScore}`);
       channel.ack(msg);

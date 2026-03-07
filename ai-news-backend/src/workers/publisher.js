@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import prisma from '../lib/prisma.js';
+import { logEvent } from '../utils/logger.js';
 
 const CONFIG = {
   DRIP_INTERVAL_MINS: 15,
-  MIN_SCORE: 45,
+  MIN_SCORE: Number(process.env.PUBLISHER_MIN_SCORE || 35),
 };
 
 const triggerRevalidation = async () => {
@@ -21,15 +22,20 @@ const triggerRevalidation = async () => {
         paths: ['/', '/archive', '/sitemap.xml', '/main-sitemap.xml', '/news-sitemap.xml', '/rss.xml'],
       }),
     });
-    console.log('Frontend cache revalidated.');
+    logEvent('publisher', 'revalidate_success', {});
   } catch (error) {
-    console.error('Revalidate failed:', error.message);
+    logEvent('publisher', 'revalidate_failed', { error: error.message }, 'ERROR');
   }
 };
 
 const publishArticle = async (article, reason) => {
-  console.log(`Publishing: "${article.headline}"`);
-  console.log(`Reason: ${reason} (score: ${article.priorityScore})`);
+  logEvent('publisher', 'publish_start', {
+    articleId: article.id,
+    slug: article.slug,
+    headline: article.headline,
+    reason,
+    score: article.priorityScore,
+  });
 
   await prisma.generatedArticle.update({
     where: { id: article.id },
@@ -42,7 +48,7 @@ const publishArticle = async (article, reason) => {
   await triggerRevalidation();
 };
 
-console.log('15-minute drip publisher started...');
+logEvent('publisher', 'scheduler_started', { schedule: '* * * * *', dripIntervalMins: CONFIG.DRIP_INTERVAL_MINS });
 let isPublisherRunning = false;
 
 cron.schedule('* * * * *', async () => {
@@ -61,7 +67,7 @@ cron.schedule('* * * * *', async () => {
 
     if (minsSinceLast < CONFIG.DRIP_INTERVAL_MINS) {
       const remaining = CONFIG.DRIP_INTERVAL_MINS - minsSinceLast;
-      process.stdout.write(`\rDrip cycle active. Next possible post in: ${remaining} mins.`);
+      logEvent('publisher', 'drip_wait', { minsRemaining: remaining });
       return;
     }
 
@@ -76,10 +82,10 @@ cron.schedule('* * * * *', async () => {
     if (nextInQueue) {
       await publishArticle(nextInQueue, 'staggered drip release');
     } else {
-      process.stdout.write('\rQueue empty. Waiting for new scraper data...');
+      logEvent('publisher', 'queue_empty', { minScore: CONFIG.MIN_SCORE });
     }
   } catch (error) {
-    console.error('Publisher error:', error.message);
+    logEvent('publisher', 'tick_error', { error: error.message }, 'ERROR');
   } finally {
     isPublisherRunning = false;
   }
