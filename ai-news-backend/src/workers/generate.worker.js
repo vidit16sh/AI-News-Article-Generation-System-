@@ -24,6 +24,7 @@ const QUALITY_GATES = {
 };
 
 const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
+const ALLOW_WEAK_FALLBACK = (process.env.ALLOW_WEAK_FALLBACK || "true") === "true";
 const INTERNAL_APP_URL = (
   process.env.INTERNAL_APP_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -190,17 +191,23 @@ const processGenerationJob = async (msg, channel) => {
       generateArticle(cleanNews, marketData, recentArticles, selectedPersona)
     );
 
-    // 🛑 FILTER 1: Discard WEAK generations
-    if (aiOutput.status === "WEAK") {
+    const isWeakFallback = aiOutput.status === "WEAK";
+    if (isWeakFallback && !ALLOW_WEAK_FALLBACK) {
       console.warn(`   🗑️ Discarding WEAK article: "${aiOutput.headline}"`);
       channel.ack(msg);
       return;
+    }
+    if (isWeakFallback && ALLOW_WEAK_FALLBACK) {
+      console.warn(`   ⚠️ Accepting WEAK fallback article: "${aiOutput.headline}"`);
     }
 
     const confidence = Number(aiOutput.confidence || 0);
     const generatedWordCount = countWordsFromHtml(aiOutput.article_html || aiOutput.content || "");
 
-    if (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount) {
+    if (
+      !isWeakFallback &&
+      (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount)
+    ) {
       console.warn(
         `   🗑️ Discarding low-quality article (confidence=${confidence.toFixed(2)}, words=${generatedWordCount}).`
       );
@@ -210,8 +217,8 @@ const processGenerationJob = async (msg, channel) => {
 
     // 🛑 FILTER 2: Determine Status based on Priority Score
     let finalStatus = "QUEUED";
-    if (priorityScore > 80) finalStatus = "PUBLISHED";
-    else if (priorityScore >= GEN_MIN_PRIORITY_SCORE) finalStatus = "QUEUED";
+    if (priorityScore > 80 && !isWeakFallback) finalStatus = "PUBLISHED";
+    else if (priorityScore >= GEN_MIN_PRIORITY_SCORE || isWeakFallback) finalStatus = "QUEUED";
     else {
       console.warn(`   🗑️ Discarding LOW SCORE: ${priorityScore}`);
       channel.ack(msg);

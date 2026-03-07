@@ -40,6 +40,18 @@ const uniqueKeywords = (items = []) => {
   return out;
 };
 
+const normalizeArticleHtmlForRender = (html = "") =>
+  String(html)
+    // Remove fallback FAQ block if a richer FAQ already exists.
+    .replace(
+      /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>\s*<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>[\s\S]*?<\/dl>/gi,
+      ""
+    )
+    .replace(/\s+,/g, ",")
+    .replace(/\s+\./g, ".")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
 // 1. Fetch Data Function
 async function getArticle(slug) {
   const publicBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
@@ -85,10 +97,15 @@ export async function generateMetadata({ params }) {
   const ageDays = Number.isNaN(publishedDate.getTime())
     ? 999
     : Math.floor((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60 * 24));
+  const articleStatus = String(
+    article.status || (article.publishAt ? "PUBLISHED" : "DRAFT")
+  ).toUpperCase();
+  const noindexNonPublished = (process.env.NOINDEX_NON_PUBLISHED || "true") === "true";
+  const strictNoindexByScore = (process.env.STRICT_NOINDEX_BY_SCORE || "false") === "true";
   const shouldNoindex =
-    article.status !== "PUBLISHED" ||
-    confidenceScore < 0.75 ||
-    (ageDays > 14 && confidenceScore < 0.85);
+    (noindexNonPublished && articleStatus !== "PUBLISHED") ||
+    (strictNoindexByScore &&
+      (confidenceScore < 0.75 || (ageDays > 14 && confidenceScore < 0.85)));
 
   const keywords = uniqueKeywords([
     category,
@@ -239,6 +256,7 @@ export default async function ArticlePage({ params }) {
   const relatedForMain = sidebarArticles.slice(0, 6);
 
   const shareText = displayTitle || "Check this out";
+  const articleHtml = normalizeArticleHtmlForRender(article.articleHtml);
 
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`,
@@ -369,7 +387,7 @@ export default async function ArticlePage({ params }) {
             {/* Article body */}
             <section
               className="article-prose prose prose-lg max-w-none prose-h1:hidden prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold prose-p:text-slate-800 prose-p:leading-[1.85] prose-ul:my-4 prose-ol:my-4 prose-li:my-1 prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4 prose-blockquote:not-italic prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline"
-              dangerouslySetInnerHTML={{ __html: article.articleHtml }}
+              dangerouslySetInnerHTML={{ __html: articleHtml }}
             />
           </div>
 

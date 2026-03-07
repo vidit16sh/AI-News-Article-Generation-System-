@@ -61,11 +61,15 @@ const sanitizeHeadline = (headline = "") => {
   let h = compactWhitespace(String(headline || ""));
 
   // Remove repetitive templated suffixes that hurt Google News quality signals.
+  h = h.replace(/\b(?:a\s+)?skeptical\s+investigation(?:\s+into)?\b/gi, "");
+  h = h.replace(/\bamid(?:\s+extreme)?\s+fear(?:\s+market)?\b/gi, "");
   h = h.replace(
     /:\s*a skeptical investigation(?:\s+into[^:]+?)?(?:\s+amid(?:\s+extreme)?\s+fear(?:\s+market)?)?$/i,
     ""
   );
   h = h.replace(/\s+amid\s+extreme\s+fear(?:\s+market)?$/i, "");
+  h = h.replace(/\s*[-:]\s*$/g, "");
+  h = h.replace(/\s+,/g, ",");
   h = h.replace(/\s{2,}/g, " ").replace(/\s+:/g, ":").trim();
 
   // Keep title length practical for News surfaces.
@@ -142,8 +146,28 @@ const buildFallbackFaq = (topic = "this crypto development") => `
 </dl>
 `;
 
+const FAQ_HEADING_RE = /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi;
+const FAQ_DL_RE = /<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>[\s\S]*?<\/dl>/gi;
+
+const removeFaqBlocks = (html = "") =>
+  String(html)
+    .replace(
+      /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>[\s\S]*?(?=<h2\b|<h3\b|<div class="verified-sources"|$)/gi,
+      ""
+    )
+    .replace(FAQ_DL_RE, "");
+
+const normalizeArticleHtml = (html = "") =>
+  String(html)
+    .replace(/\s+,/g, ",")
+    .replace(/\s+\./g, ".")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\bDeFi\s+,/g, "DeFi,")
+    .trim();
+
 const auditAndFixArticle = (json, sourceUrl) => {
   let content = ensureHtmlContent(json.content || json.article_html || "");
+  content = normalizeArticleHtml(content);
   let score = 100;
 
   const hasSummary = content.includes('class="executive-summary"');
@@ -196,11 +220,15 @@ const auditAndFixArticle = (json, sourceUrl) => {
   const hasFaqHeading =
     /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/i.test(content) ||
     /<h2[^>]*>\s*FAQs?\s*<\/h2>/i.test(content);
+  const faqHeadingCount = (content.match(FAQ_HEADING_RE) || []).length;
   const faqDtCount = (content.match(/<dt\b/gi) || []).length;
   const faqQCount = (content.match(/<strong>\s*Q\d+\s*:/gi) || []).length;
   const totalFaqItems = Math.max(faqDtCount, faqQCount);
 
-  if (!hasFAQ && !hasFaqHeading) {
+  if (faqHeadingCount > 1) {
+    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event")}`;
+    score -= 8;
+  } else if (!hasFAQ && !hasFaqHeading) {
     if (STRICT_ARTICLE_AUDIT) {
       throw new Error("Missing FAQ section.");
     }
@@ -210,7 +238,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
     if (STRICT_ARTICLE_AUDIT) {
       throw new Error(`FAQ count out of range: found ${totalFaqItems}; expected 4-6.`);
     }
-    content += buildFallbackFaq(json.headline || "the latest market event");
+    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event")}`;
     score -= 8;
   }
 
@@ -245,6 +273,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
   }
 
   const normalizedHeadline = sanitizeHeadline(json.headline || "CoinMarketBuzz Investigative Report");
+  content = normalizeArticleHtml(content);
   const plain = toPlainText(content);
   const excerpt = (json.excerpt || plain.slice(0, 160)).trim().slice(0, 160);
   const seoTitle = (json.seoTitle || normalizedHeadline).trim();
