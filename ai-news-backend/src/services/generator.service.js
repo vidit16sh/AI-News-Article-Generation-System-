@@ -56,9 +56,16 @@ const slugify = (value = "") =>
     .replace(/\s+/g, "-");
 
 const compactWhitespace = (value = "") => String(value).replace(/\s+/g, " ").trim();
+const removeLongDashPunctuation = (value = "") =>
+  String(value)
+    .replace(/\s*(?:—|–|â€”|â€“)\s*/g, ", ")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
 const sanitizeHeadline = (headline = "") => {
-  let h = compactWhitespace(String(headline || ""));
+  let h = compactWhitespace(removeLongDashPunctuation(String(headline || "")));
 
   // Remove repetitive templated suffixes that hurt Google News quality signals.
   h = h.replace(/\b(?:a\s+)?skeptical\s+investigation(?:\s+into)?\b/gi, "");
@@ -159,6 +166,7 @@ const removeFaqBlocks = (html = "") =>
 
 const normalizeArticleHtml = (html = "") =>
   String(html)
+    .replace(/\s*(?:—|–|â€”|â€“)\s*/g, ", ")
     .replace(/\s+,/g, ",")
     .replace(/\s+\./g, ".")
     .replace(/\s{2,}/g, " ")
@@ -243,7 +251,8 @@ const auditAndFixArticle = (json, sourceUrl) => {
   }
 
   // Ensure opening dateline format for News-style reporting.
-  const datelineRegex = /^<p>\s*<strong>[A-Za-z\s]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}<\/strong>\s*[—-]/i;
+  const datelineRegex =
+    /^<p>\s*<strong>[A-Za-z\s]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}<\/strong>\s*(?:[.:-]\s*)?/i;
   const hasDateline = datelineRegex.test(content);
   if (!hasDateline) {
     const city = process.env.NEWSROOM_CITY || "VADODARA";
@@ -252,7 +261,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
       day: "numeric",
       year: "numeric",
     });
-    const intro = `<p><strong>${city}, ${dateStr}</strong> — This report analyzes the latest market development with verified source context and data-backed framing.</p>`;
+    const intro = `<p><strong>${city}, ${dateStr}</strong>. This report analyzes the latest market development with verified source context and data-backed framing.</p>`;
     content = `${intro}\n${content}`;
     score -= 5;
   }
@@ -288,7 +297,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
   // Backward-compatible fields consumed by worker/storage pipeline.
   json.article_html = content;
   json.meta_description = seoDescription;
-  json.slug = json.slug || slugify(normalizedHeadline);
+  json.slug = slugify(normalizedHeadline);
   json.tags = Array.isArray(json.tags) ? json.tags : [];
   json.keywords = Array.isArray(json.keywords) ? json.keywords : [];
   json.focus_keywords = json.focus_keywords || "Crypto News";
@@ -303,7 +312,7 @@ const generateFallbackArticle = (data) => {
   const summaryText = data.summary || `Latest updates on ${data.title}.`;
   const fallbackContent = `
         <h1>${data.title}</h1>
-        <p><strong>VADODARA, ${safeDate}</strong> — ${summaryText}</p>
+        <p><strong>VADODARA, ${safeDate}</strong>. ${summaryText}</p>
         <blockquote><ul><li>Developing Story: Details are still emerging.</li><li>Category: ${categoryName} Market Update.</li></ul></blockquote>
         <h2>Market Update</h2>
         <p>We are tracking a developing story regarding <strong>${data.title}</strong>. Data indicates significant activity in the ${categoryName} sector.</p>
@@ -383,6 +392,11 @@ You will receive:
 1. **H2: Breaking Developments** (150-220 words)
    - Immediate reporting: who, what, when, where.
    - Include location/date context in the opening paragraph when relevant.
+   - In the first 250 words, add a short "Credibility Snapshot" block with exactly 4 bullets:
+     1) What's Confirmed
+     2) What's Weak
+     3) Missing Context
+     4) Credibility Take
 2. **H2: Technical Deep-Dive** (550-700 words)
    - Explain mechanism, protocol architecture, or regulatory mechanics.
 3. **H2: Data Analysis & Proof** (350-500 words)
@@ -402,6 +416,7 @@ Write like an experienced financial investigations editor:
 - Distinguish direct evidence vs interpretation.
 - Explain what would invalidate each scenario.
 - Add timelines, impacts, and stakeholder-level consequences.
+- Keep claims calibrated: do not overstate market impact unless source data proves causality.
 
 ### METADATA INTEGRATION
 - Use \`sentiment\` and \`importance\` in the narrative.

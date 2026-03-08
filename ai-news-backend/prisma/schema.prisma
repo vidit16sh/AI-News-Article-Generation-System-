@@ -24,6 +24,10 @@ model RawNews {
   publishedAt DateTime @default(now())
   fetchedAt DateTime @default(now())
   processed Boolean  @default(false)
+
+  @@index([processed, publishedAt])
+  @@index([publishedAt])
+  @@index([fetchedAt])
 }
 
 model CleanedNews {
@@ -38,6 +42,9 @@ model CleanedNews {
   createdAt    DateTime @default(now()) 
   
   generatedArticle GeneratedArticle?
+
+  @@index([createdAt])
+  @@index([publishedAt])
 }
 
 model ProcessingLog {
@@ -98,5 +105,37 @@ model GeneratedArticle {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt 
   @@index([status, publishAt]) // Fast lookups for "Recent Published Articles"
+  @@index([status, createdAt])
   @@index([slug])
+}
+
+model SourceReliability {
+  id                Int      @id @default(autoincrement())
+  sourceKey         String   @unique
+  fetchRuns         Int      @default(0)
+  fetchSuccessRuns  Int      @default(0)
+  scrapeAttempts    Int      @default(0)
+  scrapeSuccesses   Int      @default(0)
+  savedItems        Int      @default(0)
+  blockedItems      Int      @default(0)
+  avgContentLength  Float    @default(0.0)
+  publishConversion Float    @default(0.0)
+  reliabilityScore  Float    @default(50.0)
+  lastRunAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model IngestDiagnostic {
+  id          Int      @id @default(autoincrement())
+  service     String
+  reasonCode  String
+  sourceKey   String?
+  sourceUrl   String?
+  rawNewsId   String?
+  cleanedNewsId String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([reasonCode, createdAt])
+  @@index([sourceKey, createdAt])
 }

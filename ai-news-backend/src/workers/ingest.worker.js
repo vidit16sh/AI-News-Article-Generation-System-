@@ -6,8 +6,19 @@ import prisma from '../lib/prisma.js';
 import { cleanText } from '../services/cleaner.service.js';
 import { classifyNews, getOrCreateCategory } from '../services/classifier.service.js';
 import { logEvent } from '../utils/logger.js';
+import { getSourceKey, recordIngestDiagnostic } from '../services/ingestion-observability.service.js';
 
 const INGEST_MIN_PRIORITY_SCORE = Number(process.env.INGEST_MIN_PRIORITY_SCORE || 35);
+const INGEST_TRUSTED_SOURCE_MIN_PRIORITY = Number(process.env.INGEST_TRUSTED_SOURCE_MIN_PRIORITY || 22);
+const MAX_INGEST_RETRIES = Number(process.env.MAX_INGEST_RETRIES || 2);
+const TRUSTED_SOURCE_HOSTS = [
+  'coindesk.com',
+  'cointelegraph.com',
+  'theblock.co',
+  'reuters.com',
+  'cnbc.com',
+  'sec.gov',
+];
 
 const limiter = new Bottleneck({
   minTime: 4000,
@@ -52,9 +63,18 @@ const getFinalCanonicalUrl = async (url) => {
   }
 };
 
+const isTrustedSourceUrl = (url) => {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return TRUSTED_SOURCE_HOSTS.some((domain) => host === domain || host.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+};
+
 const processJob = async (msg, channel) => {
   const content = JSON.parse(msg.content.toString());
-  const { rawNewsId } = content;
+  const { rawNewsId, retryCount = 0 } = content;
 
   try {
     const rawNews = await prisma.rawNews.findUnique({ where: { id: rawNewsId } });
@@ -65,6 +85,7 @@ const processJob = async (msg, channel) => {
     }
 
     const cleanUrl = await getFinalCanonicalUrl(rawNews.sourceUrl);
+    const sourceKey = getSourceKey(cleanUrl);
     const cleanedBody = cleanText(rawNews.rawBody);
 
     const classification = await limiter.schedule(() => classifyNews(cleanedBody, rawNews.title));
@@ -93,12 +114,16 @@ const processJob = async (msg, channel) => {
       data: { processed: true },
     });
 
-    if (priorityScore >= INGEST_MIN_PRIORITY_SCORE) {
+    const trustedSource = isTrustedSourceUrl(cleanUrl);
+    const minScore = trustedSource ? INGEST_TRUSTED_SOURCE_MIN_PRIORITY : INGEST_MIN_PRIORITY_SCORE;
+
+    if (priorityScore >= minScore) {
       logEvent('ingest', 'article_approved_for_generation', {
         rawNewsId,
         score: priorityScore,
         category: categorySlug,
-        minScore: INGEST_MIN_PRIORITY_SCORE,
+        minScore,
+        trustedSource,
         title: rawNews.title.substring(0, 80),
       });
 
@@ -109,6 +134,15 @@ const processJob = async (msg, channel) => {
       };
       channel.sendToQueue('generation_queue', Buffer.from(JSON.stringify(payload)));
     } else {
+      await recordIngestDiagnostic({
+        service: 'ingest',
+        reasonCode: 'low_priority',
+        sourceKey,
+        sourceUrl: cleanUrl,
+        rawNewsId: rawNews.id,
+        cleanedNewsId: finalNews.id,
+        details: { score: priorityScore, minScore, categorySlug, trustedSource },
+      });
       logEvent(
         'ingest',
         'article_rejected_low_priority',
@@ -116,7 +150,8 @@ const processJob = async (msg, channel) => {
           rawNewsId,
           score: priorityScore,
           category: categorySlug,
-          minScore: INGEST_MIN_PRIORITY_SCORE,
+          minScore,
+          trustedSource,
           title: rawNews.title.substring(0, 80),
         },
         'WARN'
@@ -125,7 +160,25 @@ const processJob = async (msg, channel) => {
 
     channel.ack(msg);
   } catch (err) {
-    logEvent('ingest', 'job_error', { rawNewsId, error: err.message }, 'ERROR');
+    if (retryCount < MAX_INGEST_RETRIES) {
+      const nextPayload = { ...content, retryCount: retryCount + 1, lastError: err.message };
+      channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify(nextPayload)));
+      logEvent(
+        'ingest',
+        'job_retry_scheduled',
+        { rawNewsId, retryCount: retryCount + 1, maxRetries: MAX_INGEST_RETRIES, error: err.message },
+        'WARN'
+      );
+    } else {
+      const dlqPayload = { ...content, failedAt: new Date().toISOString(), lastError: err.message };
+      channel.sendToQueue('ingest_dlq', Buffer.from(JSON.stringify(dlqPayload)));
+      logEvent(
+        'ingest',
+        'job_sent_to_dlq',
+        { rawNewsId, retries: retryCount, error: err.message, dlq: 'ingest_dlq' },
+        'ERROR'
+      );
+    }
     channel.ack(msg);
   }
 };
@@ -134,6 +187,7 @@ const startWorker = async () => {
   try {
     const channel = await connectRabbit();
     await channel.assertQueue('generation_queue', { durable: true });
+    await channel.assertQueue('ingest_dlq', { durable: true });
     channel.prefetch(1);
 
     logEvent('ingest', 'worker_started', { minPriorityScore: INGEST_MIN_PRIORITY_SCORE });

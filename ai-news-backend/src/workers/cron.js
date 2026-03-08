@@ -1,21 +1,24 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import cron from 'node-cron';
 import { fetchRSS, fetchCoinNess } from '../services/fetcher.service.js';
 import { logEvent } from '../utils/logger.js';
+import { getSourceScoreMap, getSourceKey } from '../services/ingestion-observability.service.js';
 
 const SOURCES = [
-  'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069',
   'https://news.google.com/rss/search?q=site:coindesk.com+when:1d&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=site:cointelegraph.com+when:1d&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=site:theblock.co+when:1d&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=site:reuters.com+cryptocurrency+when:1d&hl=en-US&gl=US&ceid=US:en',
-  'https://www.sec.gov/news/pressreleases.rss',
 ];
+const DIRECT_SOURCES = [
+  'https://www.coindesk.com/arc/outboundfeeds/rss/',
+  'https://cointelegraph.com/rss',
+];
+const ENABLE_DIRECT_RSS = (process.env.ENABLE_DIRECT_RSS || 'true') === 'true';
 
-const SOURCE_COOLDOWN_AFTER_WEAK_RUNS = Number(process.env.SOURCE_COOLDOWN_AFTER_WEAK_RUNS || 4);
+const SOURCE_COOLDOWN_AFTER_WEAK_RUNS = Number(process.env.SOURCE_COOLDOWN_AFTER_WEAK_RUNS || 6);
 const SOURCE_COOLDOWN_MINUTES = Number(process.env.SOURCE_COOLDOWN_MINUTES || 45);
-const SOURCE_RETIRE_AFTER_RUNS = Number(process.env.SOURCE_RETIRE_AFTER_RUNS || 12);
+const SOURCE_RETIRE_AFTER_RUNS = Number(process.env.SOURCE_RETIRE_AFTER_RUNS || 0);
 const SOURCE_RETIRE_MAX_SAVED = Number(process.env.SOURCE_RETIRE_MAX_SAVED || 1);
+const SOURCE_MIN_RELIABILITY_SCORE = Number(process.env.SOURCE_MIN_RELIABILITY_SCORE || 25);
+const COINNESS_ONLY_MODE = (process.env.COINNESS_ONLY_MODE || 'false') === 'true';
 
 const sourceHealth = new Map();
 
@@ -27,6 +30,7 @@ const getState = (sourceUrl) => {
       totalRuns: 0,
       totalSaved: 0,
       retired: false,
+      reliabilityScore: 50,
       lastSaved: 0,
       lastBlocked: 0,
       lastError: false,
@@ -61,13 +65,34 @@ cron.schedule('*/2 * * * *', async () => {
   try {
     await fetchCoinNess();
 
-    const shuffledSources = [...SOURCES].sort(() => Math.random() - 0.5);
-    for (const url of shuffledSources) {
+    if (COINNESS_ONLY_MODE) {
+      logEvent('cron', 'coinness_only_mode_active', {});
+      return;
+    }
+
+    const activeSources = ENABLE_DIRECT_RSS ? [...SOURCES, ...DIRECT_SOURCES] : [...SOURCES];
+    const scoreMap = await getSourceScoreMap(activeSources);
+    const rankedSources = activeSources.sort(
+      (a, b) => (scoreMap[b] || 50) - (scoreMap[a] || 50) + (Math.random() * 4 - 2)
+    );
+
+    for (const url of rankedSources) {
       const state = getState(url);
       const now = Date.now();
+      state.reliabilityScore = Number(scoreMap[url] || 50);
 
       if (state.retired) {
         logEvent('cron', 'source_retired_skip', { url });
+        continue;
+      }
+
+      if (state.reliabilityScore < SOURCE_MIN_RELIABILITY_SCORE) {
+        logEvent('cron', 'source_downrank_skip', {
+          url,
+          sourceKey: getSourceKey(url),
+          reliabilityScore: state.reliabilityScore,
+          minScore: SOURCE_MIN_RELIABILITY_SCORE,
+        });
         continue;
       }
 
@@ -104,6 +129,7 @@ cron.schedule('*/2 * * * *', async () => {
         }
 
         if (
+          SOURCE_RETIRE_AFTER_RUNS > 0 &&
           state.totalRuns >= SOURCE_RETIRE_AFTER_RUNS &&
           state.totalSaved <= SOURCE_RETIRE_MAX_SAVED &&
           state.lastSaved === 0 &&
@@ -118,6 +144,7 @@ cron.schedule('*/2 * * * *', async () => {
               url,
               totalRuns: state.totalRuns,
               totalSaved: state.totalSaved,
+              reliabilityScore: state.reliabilityScore,
             },
             'WARN'
           );

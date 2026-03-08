@@ -2,15 +2,17 @@ import prisma from '@/lib/prisma';
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
-  
-  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const lookbackHours = Number(process.env.NEWS_SITEMAP_LOOKBACK_HOURS || 72);
+  const minConfidence = Number(process.env.NEWS_SITEMAP_MIN_CONFIDENCE || 0.7);
+  const minOriginality = Number(process.env.NEWS_SITEMAP_MIN_ORIGINALITY || 0.6);
+  const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
   const articles = await prisma.generatedArticle.findMany({
     where: { 
       status: 'PUBLISHED',
-      publishAt: { gte: twoDaysAgo },
-      confidenceScore: { gte: 0.8 },
-      originalityScore: { gte: 0.65 },
+      publishAt: { gte: since },
+      confidenceScore: { gte: minConfidence },
+      originalityScore: { gte: minOriginality },
     },
     orderBy: { publishAt: 'desc' },
     take: 1000,

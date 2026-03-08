@@ -6,6 +6,11 @@ import prisma from '../lib/prisma.js';
 import { connectRabbit } from '../config/rabbit.js';
 import { scrapeArticle } from './scraper.service.js';
 import { logEvent } from '../utils/logger.js';
+import {
+  getSourceKey,
+  recordIngestDiagnostic,
+  updateSourceReliability,
+} from './ingestion-observability.service.js';
 
 const parser = new Parser({
   customFields: {
@@ -51,6 +56,135 @@ const parsePublishedAt = (...candidates) => {
   return new Date();
 };
 
+const normalizeTitle = (title = '') =>
+  String(title || '')
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const tokenizeForHash = (text = '') =>
+  String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 2)
+    .slice(0, 400);
+
+const fnv1a64 = (input = '') => {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= BigInt(input.charCodeAt(i));
+    hash = (hash * prime) & 0xffffffffffffffffn;
+  }
+  return hash;
+};
+
+const simhash64 = (text = '') => {
+  const tokens = tokenizeForHash(text);
+  if (!tokens.length) return 0n;
+  const bits = new Array(64).fill(0);
+  for (const token of tokens) {
+    const h = fnv1a64(token);
+    for (let i = 0; i < 64; i += 1) {
+      const bit = (h >> BigInt(i)) & 1n;
+      bits[i] += bit === 1n ? 1 : -1;
+    }
+  }
+  let out = 0n;
+  for (let i = 0; i < 64; i += 1) {
+    if (bits[i] > 0) out |= 1n << BigInt(i);
+  }
+  return out;
+};
+
+const hamming64 = (a, b) => {
+  let x = a ^ b;
+  let dist = 0;
+  while (x) {
+    dist += Number(x & 1n);
+    x >>= 1n;
+  }
+  return dist;
+};
+
+const buildNearDuplicateChecker = async (publishedAt = new Date()) => {
+  const since = new Date((publishedAt || new Date()).getTime() - 48 * 60 * 60 * 1000);
+  const normalizedTitles = new Set();
+  const fingerprints = [];
+
+  try {
+    const recent = await prisma.rawNews.findMany({
+      where: { publishedAt: { gte: since } },
+      select: { title: true, rawBody: true },
+      orderBy: { publishedAt: 'desc' },
+      take: 220,
+    });
+
+    for (const row of recent) {
+      const rowNorm = normalizeTitle(row.title);
+      if (rowNorm) normalizedTitles.add(rowNorm);
+      fingerprints.push(simhash64(`${row.title || ''} ${row.rawBody || ''}`));
+    }
+  } catch {}
+
+  const check = ({ title, content }) => {
+    const normalized = normalizeTitle(title);
+    const fingerprint = simhash64(`${title || ''} ${content || ''}`);
+
+    if (normalized && normalizedTitles.has(normalized)) {
+      return { duplicate: true, reason: 'normalized_title' };
+    }
+
+    for (const rowHash of fingerprints) {
+      if (hamming64(fingerprint, rowHash) <= 5) {
+        return { duplicate: true, reason: 'simhash_near_duplicate' };
+      }
+    }
+
+    return { duplicate: false, reason: null };
+  };
+
+  const add = ({ title, content }) => {
+    const normalized = normalizeTitle(title);
+    if (normalized) normalizedTitles.add(normalized);
+    fingerprints.push(simhash64(`${title || ''} ${content || ''}`));
+  };
+
+  return { check, add };
+};
+
+const stripHtml = (value = '') =>
+  String(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractRssFallbackBody = (item = {}) => {
+  const candidates = [
+    item.fullContent,
+    item.normalContent,
+    item.content,
+    item.contentSnippet,
+    item.summary,
+    item.description,
+  ];
+
+  for (const candidate of candidates) {
+    const clean = stripHtml(candidate);
+    if (clean.length >= 220) return clean;
+  }
+  return '';
+};
+
 const safeRedisSet = async (key, val, mode, ttl) => {
   try {
     await redis.set(key, val, mode, ttl);
@@ -68,6 +202,14 @@ const safeRedisGet = async (key) => {
   }
 };
 
+const getChannelOptional = async () => {
+  try {
+    return await connectRabbit();
+  } catch {
+    return null;
+  }
+};
+
 export const fetchCoinNess = async () => {
   const apiUrl =
     process.env.COINNESS_API_URL ||
@@ -76,7 +218,7 @@ export const fetchCoinNess = async () => {
   logEvent('fetcher', 'coinness_start', { apiUrl });
 
   try {
-    const channel = await connectRabbit();
+    const channel = await getChannelOptional();
     const config = process.env.COINNESS_API_KEY
       ? { headers: { Authorization: `Bearer ${process.env.COINNESS_API_KEY}` } }
       : {};
@@ -84,6 +226,7 @@ export const fetchCoinNess = async () => {
     const items = response.data.list || response.data || [];
 
     let newCount = 0;
+    const dedupe = await buildNearDuplicateChecker(new Date());
     for (const item of items) {
       const rawUrl = item.shareUrl || `https://coinness.com/news/${item.id}`;
       const cleanUrl = normalizeUrl(rawUrl);
@@ -98,6 +241,21 @@ export const fetchCoinNess = async () => {
       }
 
       try {
+        const duplicate = dedupe.check({
+          title: item.title,
+          content: item.content || item.title,
+        });
+        if (duplicate.duplicate) {
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: 'duplicate',
+            sourceKey: 'coinness.com',
+            sourceUrl: rawUrl,
+            details: { method: duplicate.reason },
+          });
+          continue;
+        }
+
         const raw = await prisma.rawNews.create({
           data: {
             sourceUrl: cleanUrl,
@@ -113,7 +271,21 @@ export const fetchCoinNess = async () => {
           },
         });
 
-        channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+        if (channel) {
+          channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+        } else {
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: 'queue_unavailable',
+            sourceKey: 'coinness.com',
+            sourceUrl: cleanUrl,
+            rawNewsId: raw.id,
+          });
+        }
+        dedupe.add({
+          title: item.title || (item.content ? item.content.substring(0, 100) : 'Untitled'),
+          content: item.content || item.title,
+        });
         await safeRedisSet(cacheKey, '1', 'EX', 86400);
         newCount++;
       } catch (e) {
@@ -131,6 +303,7 @@ export const fetchCoinNess = async () => {
 
 export const fetchRSS = async (url) => {
   const source = getSourceLabel(url);
+  const sourceKey = getSourceKey(url);
   const stats = {
     source,
     url,
@@ -139,18 +312,24 @@ export const fetchRSS = async (url) => {
     existingHits: 0,
     scrapeAttempts: 0,
     scrapeBlocked: 0,
+    scrapeSuccess: 0,
+    rssFallbackUsed: 0,
     junkSkipped: 0,
     dbDuplicates: 0,
     saved: 0,
+    totalContentLength: 0,
+    avgContentLength: 0,
+    queueUnavailable: 0,
     fetchError: false,
   };
 
   logEvent('fetcher', 'rss_start', { source, url });
 
   try {
-    const channel = await connectRabbit();
+    const channel = await getChannelOptional();
     const feed = await parser.parseURL(url);
     stats.feedItems = Array.isArray(feed.items) ? feed.items.length : 0;
+    const dedupe = await buildNearDuplicateChecker(new Date());
 
     for (const item of feed.items || []) {
       const initialUrl = normalizeUrl(item.link);
@@ -176,14 +355,32 @@ export const fetchRSS = async (url) => {
 
       stats.scrapeAttempts++;
       const scrapedData = await scrapeArticle(item.link);
-      if (!scrapedData || !scrapedData.content || scrapedData.content.length < 400) {
+      let body = '';
+      let finalUrl = initialUrl;
+      if (scrapedData?.content && scrapedData.content.length >= 260) {
+        body = scrapedData.content;
+        finalUrl = normalizeUrl(scrapedData.url);
+        stats.scrapeSuccess++;
+      } else {
         stats.scrapeBlocked++;
-        logEvent('fetcher', 'rss_item_skipped_blocked', { source });
-        await safeRedisSet(cacheKey, '1', 'EX', 3600);
-        continue;
+        const rssFallback = extractRssFallbackBody(item);
+        if (!rssFallback) {
+          logEvent('fetcher', 'rss_item_skipped_blocked', { source });
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: scrapedData?.content ? 'short_content' : 'blocked',
+            sourceKey,
+            sourceUrl: item.link,
+            details: { title: item.title || null, length: scrapedData?.content?.length || 0 },
+          });
+          await safeRedisSet(cacheKey, '1', 'EX', 3600);
+          continue;
+        }
+        body = rssFallback;
+        stats.rssFallbackUsed++;
+        logEvent('fetcher', 'rss_item_fallback_used', { source });
       }
 
-      const finalUrl = normalizeUrl(scrapedData.url);
       const junkPatterns = ['/price-converter/', '/tag/', '/author/', '/category/', '/login', '/signup'];
       if (junkPatterns.some((pattern) => finalUrl.includes(pattern))) {
         stats.junkSkipped++;
@@ -194,26 +391,71 @@ export const fetchRSS = async (url) => {
       const finalExists = await prisma.rawNews.findUnique({ where: { sourceUrl: finalUrl } });
       if (finalExists) {
         stats.existingHits++;
+        await recordIngestDiagnostic({
+          service: 'fetcher',
+          reasonCode: 'duplicate',
+          sourceKey,
+          sourceUrl: finalUrl,
+          rawNewsId: finalExists.id,
+          details: { method: 'url_unique' },
+        });
         await safeRedisSet(cacheKey, '1', 'EX', 86400);
         continue;
       }
 
       try {
+        const duplicate = dedupe.check({
+          title: item.title,
+          content: body,
+        });
+        if (duplicate.duplicate) {
+          stats.dbDuplicates++;
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: 'duplicate',
+            sourceKey,
+            sourceUrl: finalUrl,
+            details: { method: duplicate.reason },
+          });
+          await safeRedisSet(cacheKey, '1', 'EX', 86400);
+          continue;
+        }
+
         const raw = await prisma.rawNews.create({
           data: {
             sourceUrl: finalUrl,
             title: item.title,
-            rawBody: scrapedData.content,
+            rawBody: body,
             publishedAt: parsePublishedAt(item.isoDate, item.pubDate),
             processed: false,
           },
         });
 
-        channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+        stats.totalContentLength += body.length;
+        if (channel) {
+          channel.sendToQueue('ingest_queue', Buffer.from(JSON.stringify({ rawNewsId: raw.id })));
+        } else {
+          stats.queueUnavailable += 1;
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: 'queue_unavailable',
+            sourceKey,
+            sourceUrl: finalUrl,
+            rawNewsId: raw.id,
+          });
+        }
         stats.saved++;
+        dedupe.add({ title: item.title, content: body });
       } catch (dbError) {
         if (dbError.code === 'P2002') {
           stats.dbDuplicates++;
+          await recordIngestDiagnostic({
+            service: 'fetcher',
+            reasonCode: 'duplicate',
+            sourceKey,
+            sourceUrl: finalUrl,
+            details: { method: 'db_unique' },
+          });
           await safeRedisSet(cacheKey, '1', 'EX', 86400);
         }
       }
@@ -221,10 +463,20 @@ export const fetchRSS = async (url) => {
       await safeRedisSet(cacheKey, '1', 'EX', 86400);
     }
 
+    stats.avgContentLength = stats.saved > 0 ? Math.round(stats.totalContentLength / stats.saved) : 0;
     logEvent('fetcher', 'rss_summary', stats);
+    await updateSourceReliability({ sourceUrl: url, stats });
     return stats;
   } catch (err) {
     stats.fetchError = true;
+    await recordIngestDiagnostic({
+      service: 'fetcher',
+      reasonCode: 'fetch_error',
+      sourceKey,
+      sourceUrl: url,
+      details: { error: err.message },
+    });
+    await updateSourceReliability({ sourceUrl: url, stats });
     logEvent('fetcher', 'rss_error', { source, url, error: err.message }, 'ERROR');
     return stats;
   }

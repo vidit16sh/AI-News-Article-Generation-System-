@@ -11,6 +11,28 @@ let activeScrapes = 0;
 const BROWSER_RECYCLE_LIMIT = 50;
 const BLOCKED_RESOURCES = new Set(['image', 'media', 'font', 'stylesheet']);
 const JUNK_PATTERNS = ['/price-converter/', '/tag/', '/author/', '/category/', '/login', '/signup'];
+const DOMAIN_SELECTORS = {
+  'coindesk.com': [
+    '[data-testid="article-body"]',
+    '.at-content-wrapper',
+    '.article-content',
+  ],
+  'cointelegraph.com': [
+    '.post__content-wrapper',
+    '.post-content',
+    '.post__content',
+  ],
+};
+
+const selectorsForHost = (host = '') => {
+  const domainEntries = Object.entries(DOMAIN_SELECTORS);
+  for (const [domain, selectors] of domainEntries) {
+    if (host === domain || host.endsWith(`.${domain}`)) {
+      return selectors;
+    }
+  }
+  return [];
+};
 
 const closeBrowser = async (reason = 'cleanup') => {
   if (!sharedBrowser) return;
@@ -105,6 +127,13 @@ export const scrapeArticle = async (url) => {
     }
 
     const finalUrl = page.url();
+    const host = (() => {
+      try {
+        return new URL(finalUrl).hostname.replace(/^www\./, '').toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
     if (JUNK_PATTERNS.some((pattern) => finalUrl.toLowerCase().includes(pattern))) {
       await page.close();
       return null;
@@ -114,7 +143,7 @@ export const scrapeArticle = async (url) => {
       await page.waitForSelector('p', { timeout: 8000 });
     } catch {}
 
-    const content = await page.evaluate(() => {
+    const content = await page.evaluate(({ domainSelectors }) => {
       const junkSelectors = [
         'nav',
         'footer',
@@ -134,6 +163,7 @@ export const scrapeArticle = async (url) => {
       junkSelectors.forEach((sel) => document.querySelectorAll(sel).forEach((el) => el.remove()));
 
       const contentSelectors = [
+        ...(Array.isArray(domainSelectors) ? domainSelectors : []),
         '.post-content',
         '[class*="Post_content"]',
         '.article-body',
@@ -153,7 +183,7 @@ export const scrapeArticle = async (url) => {
         .filter((text) => text.length > 60);
 
       return paragraphs.join('\n\n');
-    });
+    }, { domainSelectors: selectorsForHost(host) });
 
     await page.close();
     scrapeCounter++;

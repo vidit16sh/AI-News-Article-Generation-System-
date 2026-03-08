@@ -19,6 +19,8 @@ export async function POST(request) {
       return NextResponse.json({ message: "Provide 'tag' or 'path' or 'paths'[]" }, { status: 400 });
     }
 
+    const pathSet = new Set();
+
     if (tag) {
       revalidateTag(tag, 'max');
       console.log(`Tag revalidated: ${tag}`);
@@ -26,30 +28,33 @@ export async function POST(request) {
       if (tag === 'articles') {
         const articlePaths = ['/', '/archive', '/sitemap.xml', '/main-sitemap.xml', '/news-sitemap.xml', '/rss.xml'];
         for (const articlePath of articlePaths) {
-          revalidatePath(articlePath);
-          console.log(`Path revalidated: ${articlePath}`);
+          pathSet.add(articlePath);
         }
       }
     }
 
     if (path) {
-      revalidatePath(path);
-      console.log(`Path revalidated: ${path}`);
+      pathSet.add(path);
     }
 
     if (Array.isArray(paths)) {
       for (const p of paths) {
         if (typeof p === 'string' && p.trim()) {
-          revalidatePath(p);
-          console.log(`Path revalidated: ${p}`);
+          pathSet.add(p.trim());
         }
       }
+    }
+
+    for (const p of pathSet) {
+      revalidatePath(p);
+      console.log(`Path revalidated: ${p}`);
     }
 
     return NextResponse.json({
       revalidated: true,
       now: Date.now(),
       target: tag || path || paths,
+      pathCount: pathSet.size,
     });
   } catch (error) {
     console.error('Revalidate error:', error);

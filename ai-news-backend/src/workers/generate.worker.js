@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import Bottleneck from "bottleneck";
 import stringSimilarity from "string-similarity";
 import { connectRabbit } from "../config/rabbit.js";
@@ -7,10 +7,7 @@ import { generateArticle } from "../services/generator.service.js";
 import { generateImage } from "../services/image.service.js";
 import { downloadAndSaveImage } from "../services/storage.service.js";
 import { getAuthorForCategory } from "../config/authors.js";
-import {
-  getEnrichedMarketData,
-  generateChartUrl,
-} from "../services/marketData.service.js";
+import { getEnrichedMarketData, generateChartUrl } from "../services/marketData.service.js";
 
 const limiter = new Bottleneck({
   minTime: 2000,
@@ -25,26 +22,20 @@ const QUALITY_GATES = {
 
 const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
 const ALLOW_WEAK_FALLBACK = (process.env.ALLOW_WEAK_FALLBACK || "true") === "true";
+const MAX_GENERATION_RETRIES = Number(process.env.MAX_GENERATION_RETRIES || 2);
+
 const INTERNAL_APP_URL = (
-  process.env.INTERNAL_APP_URL ||
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  "http://127.0.0.1:3000"
+  process.env.INTERNAL_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3000"
 ).replace(/\/$/, "");
 
-// ✅ Normalize base URL once (no trailing slash issues)
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || INTERNAL_APP_URL).replace(
-  /\/$/,
-  ""
-);
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || INTERNAL_APP_URL).replace(/\/$/, "");
 
-// Helper: Check Originality
 const calculateOriginality = (aiText, sourceText) => {
   if (!sourceText || sourceText.length < 50) return 1.0;
   const similarity = stringSimilarity.compareTwoStrings(aiText, sourceText);
   return Math.round((1.0 - similarity) * 100) / 100;
 };
 
-// Helper: Revalidate Cache
 const triggerRevalidation = async (tag) => {
   try {
     fetch(`${INTERNAL_APP_URL}/api/revalidate`, {
@@ -58,7 +49,7 @@ const triggerRevalidation = async (tag) => {
         paths: ["/", "/archive", "/sitemap.xml", "/main-sitemap.xml", "/news-sitemap.xml", "/rss.xml"],
       }),
     }).catch(() => {});
-  } catch (error) {}
+  } catch {}
 };
 
 const countWordsFromHtml = (html = "") =>
@@ -69,24 +60,34 @@ const countWordsFromHtml = (html = "") =>
     .split(" ")
     .filter(Boolean).length;
 
-// ✅ Helper: ensure absolute URL (for JSON-LD compliance)
+const ensureUniqueSlug = async (candidate = "") => {
+  const base =
+    String(candidate || "coinmarketbuzz-report")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "coinmarketbuzz-report";
+
+  let slug = base;
+  for (let idx = 2; idx < 100; idx += 1) {
+    const existing = await prisma.generatedArticle.findUnique({ where: { slug } });
+    if (!existing) return slug;
+    slug = `${base}-${idx}`;
+  }
+  return `${base}-${Date.now()}`;
+};
+
 const toAbsoluteUrl = (pathOrUrl) => {
-  if (!pathOrUrl) return `${SITE_URL}/default-news.jpg`;
-  if (typeof pathOrUrl !== "string") return `${SITE_URL}/default-news.jpg`;
-  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://"))
-    return pathOrUrl;
+  if (!pathOrUrl || typeof pathOrUrl !== "string") return `${SITE_URL}/default-news.jpg`;
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl;
   if (pathOrUrl.startsWith("/")) return `${SITE_URL}${pathOrUrl}`;
   return `${SITE_URL}/${pathOrUrl}`;
 };
 
-// JSON-LD Builder (strict image + strict author URL + correct publisher logo)
 const createJsonLd = (article, url, authorObj) => {
   const validImage = toAbsoluteUrl(article.imageUrl);
-
   const authorName = authorObj?.name || "Editorial Team";
-  const authorUrl = authorObj?.slug
-    ? `${SITE_URL}/authors/${authorObj.slug}`
-    : `${SITE_URL}/about`;
+  const authorUrl = authorObj?.slug ? `${SITE_URL}/authors/${authorObj.slug}` : `${SITE_URL}/about`;
 
   return {
     "@context": "https://schema.org",
@@ -97,47 +98,34 @@ const createJsonLd = (article, url, authorObj) => {
     image: [validImage],
     datePublished: new Date().toISOString(),
     dateModified: new Date().toISOString(),
-    author: {
-      "@type": "Person",
-      name: authorName,
-      url: authorUrl,
-    },
+    author: { "@type": "Person", name: authorName, url: authorUrl },
     publisher: {
       "@type": "Organization",
       name: "CoinMarketBuzz",
-      logo: {
-        "@type": "ImageObject",
-        // ✅ Updated to match your current logo path in public/
-        url: `${SITE_URL}/brand/logo.png`,
-      },
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/logo.png` },
     },
   };
 };
 
-// Helper: Get recent articles to create internal links
 const getRecentArticlesForLinking = async (currentNewsId) => {
   try {
-    const articles = await prisma.generatedArticle.findMany({
-      where: {
-        status: "PUBLISHED",
-        originalNewsId: { not: currentNewsId },
-      },
+    return await prisma.generatedArticle.findMany({
+      where: { status: "PUBLISHED", originalNewsId: { not: currentNewsId } },
       take: 4,
       orderBy: { publishAt: "desc" },
       select: { headline: true, slug: true },
     });
-    return articles;
   } catch (e) {
-    console.error("   ⚠️ Error fetching recent articles:", e.message);
+    console.error(`Error fetching recent articles: ${e.message}`);
     return [];
   }
 };
 
 const processGenerationJob = async (msg, channel) => {
   const content = JSON.parse(msg.content.toString());
-  const { newsId, priorityScore = 50, categoryTag } = content;
+  const { newsId, priorityScore = 50, categoryTag, retryCount = 0 } = content;
 
-  console.log(`\n📝 [Gen-Worker] Processing Job: ${newsId}`);
+  console.log(`[Gen-Worker] Processing Job: ${newsId}`);
 
   try {
     const cleanNews = await prisma.cleanedNews.findUnique({
@@ -150,87 +138,47 @@ const processGenerationJob = async (msg, channel) => {
       return;
     }
 
-    // Idempotency
-    const existing = await prisma.generatedArticle.findUnique({
-      where: { originalNewsId: newsId },
-    });
+    const existing = await prisma.generatedArticle.findUnique({ where: { originalNewsId: newsId } });
     if (existing) {
       channel.ack(msg);
       return;
     }
 
-    // 1. Assign Author & Persona
-    const assignedAuthorProfile = getAuthorForCategory(
-      cleanNews.title,
-      cleanNews.tags || []
-    );
+    const assignedAuthorProfile = getAuthorForCategory(cleanNews.title, cleanNews.tags || []);
+    const assignedAuthor = await prisma.author.findFirst({ where: { slug: assignedAuthorProfile.slug } });
 
-    const assignedAuthor = await prisma.author.findFirst({
-      where: { slug: assignedAuthorProfile.slug },
-    });
-
-    const authorName = assignedAuthor ? assignedAuthor.name : "Editorial Team";
-    const selectedPersona = assignedAuthorProfile.personaKey;
-
-    console.log(`   👤 Author: ${authorName} | 🎭 Persona: ${selectedPersona}`);
-
-    // 2. Data Injection (Market Data + Sentiment)
-    console.log(`   📊 Checking for Market Data...`);
-    const marketData = await getEnrichedMarketData(
-      cleanNews.title + " " + cleanNews.summary
-    );
-
-    if (marketData) console.log(`   ✅ Live Data Found (Injecting...)`);
-
-    // 3. Internal Linking Strategy
+    const marketData = await getEnrichedMarketData(`${cleanNews.title} ${cleanNews.summary}`);
     const recentArticles = await getRecentArticlesForLinking(newsId);
 
-    // 4. Generate Text (Pass Persona + Data + Links)
-    console.log(`   🧠 Writing: "${cleanNews.title.substring(0, 30)}..."`);
     const aiOutput = await limiter.schedule(() =>
-      generateArticle(cleanNews, marketData, recentArticles, selectedPersona)
+      generateArticle(cleanNews, marketData, recentArticles, assignedAuthorProfile.personaKey)
     );
 
     const isWeakFallback = aiOutput.status === "WEAK";
     if (isWeakFallback && !ALLOW_WEAK_FALLBACK) {
-      console.warn(`   🗑️ Discarding WEAK article: "${aiOutput.headline}"`);
       channel.ack(msg);
       return;
-    }
-    if (isWeakFallback && ALLOW_WEAK_FALLBACK) {
-      console.warn(`   ⚠️ Accepting WEAK fallback article: "${aiOutput.headline}"`);
     }
 
     const confidence = Number(aiOutput.confidence || 0);
     const generatedWordCount = countWordsFromHtml(aiOutput.article_html || aiOutput.content || "");
 
-    if (
-      !isWeakFallback &&
-      (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount)
-    ) {
-      console.warn(
-        `   🗑️ Discarding low-quality article (confidence=${confidence.toFixed(2)}, words=${generatedWordCount}).`
-      );
+    if (!isWeakFallback && (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount)) {
       channel.ack(msg);
       return;
     }
 
-    // 🛑 FILTER 2: Determine Status based on Priority Score
     let finalStatus = "QUEUED";
     if (priorityScore > 80 && !isWeakFallback) finalStatus = "PUBLISHED";
     else if (priorityScore >= GEN_MIN_PRIORITY_SCORE || isWeakFallback) finalStatus = "QUEUED";
     else {
-      console.warn(`   🗑️ Discarding LOW SCORE: ${priorityScore}`);
       channel.ack(msg);
       return;
     }
 
-    // 5. VISUAL STRATEGY: Chart vs. AI Image
     let finalImageUrl = null;
-
     const headlineLower = (aiOutput.headline || "").toLowerCase();
     const tagsString = (aiOutput.tags || []).join(" ").toLowerCase();
-
     const isMarketStory =
       headlineLower.includes("price") ||
       headlineLower.includes("prediction") ||
@@ -239,43 +187,23 @@ const processGenerationJob = async (msg, channel) => {
       headlineLower.includes("market") ||
       tagsString.includes("market");
 
-    // A. Always Generate the Featured Image (AI Art)
     const categorySlug = cleanNews.category ? cleanNews.category.slug : "altcoins";
     const aiImage = await generateImage(aiOutput.headline, categorySlug);
+    finalImageUrl = aiImage ? await downloadAndSaveImage(aiImage, aiOutput.slug) : "/default-news.jpg";
 
-    if (aiImage) {
-      finalImageUrl = await downloadAndSaveImage(aiImage, aiOutput.slug);
-    } else {
-      finalImageUrl = "/default-news.jpg";
-    }
-
-    // B. If Market Story, Generate Chart & INJECT into Body
     if (isMarketStory) {
-      console.log(`   📊 Market Story Detected: Generating Chart...`);
-      const textForDetection = `${aiOutput.headline} ${cleanNews.title}`;
-      const rawChartUrl = await generateChartUrl(textForDetection);
-
+      const rawChartUrl = await generateChartUrl(`${aiOutput.headline} ${cleanNews.title}`);
       if (rawChartUrl) {
-        const localChart = await downloadAndSaveImage(
-          rawChartUrl,
-          aiOutput.slug + "-chart"
-        );
-
+        const localChart = await downloadAndSaveImage(rawChartUrl, `${aiOutput.slug}-chart`);
         if (localChart) {
-          console.log(`      ✅ Chart Injected into Article Body.`);
-
           const chartHtml = `
             <figure class="my-8">
               <img src="${localChart}" alt="${aiOutput.headline} Price Chart" class="w-full rounded-lg shadow-lg border border-gray-800" />
               <figcaption class="text-center text-sm text-gray-400 mt-2">7-Day Price Action via CoinGecko</figcaption>
             </figure>
           `;
-
           if (aiOutput.article_html?.includes("</p>")) {
-            aiOutput.article_html = aiOutput.article_html.replace(
-              "</p>",
-              `</p>${chartHtml}`
-            );
+            aiOutput.article_html = aiOutput.article_html.replace("</p>", `</p>${chartHtml}`);
           } else {
             aiOutput.article_html = chartHtml + (aiOutput.article_html || "");
           }
@@ -283,30 +211,20 @@ const processGenerationJob = async (msg, channel) => {
       }
     }
 
-    // 6. Prepare Metadata & Save
-    const fullUrl = `${SITE_URL}/news/${aiOutput.slug}`;
-    const newsJsonLd = createJsonLd(
-      { ...aiOutput, imageUrl: finalImageUrl },
-      fullUrl,
-      assignedAuthor
-    );
+    const finalSlug = await ensureUniqueSlug(aiOutput.slug);
+    aiOutput.slug = finalSlug;
+    const fullUrl = `${SITE_URL}/news/${finalSlug}`;
+    const newsJsonLd = createJsonLd({ ...aiOutput, imageUrl: finalImageUrl }, fullUrl, assignedAuthor);
 
-    const realOriginalityScore = calculateOriginality(
-      aiOutput.article_html,
-      cleanNews.content
-    );
-
+    const realOriginalityScore = calculateOriginality(aiOutput.article_html, cleanNews.content);
     if (finalStatus === "PUBLISHED" && realOriginalityScore < QUALITY_GATES.minOriginalityForPublish) {
       finalStatus = "QUEUED";
-      console.warn(
-        `   ⚠️ Downgrading to QUEUED due to low originality (${realOriginalityScore}).`
-      );
     }
 
     await prisma.generatedArticle.create({
       data: {
         headline: aiOutput.headline,
-        slug: aiOutput.slug,
+        slug: finalSlug,
         metaDescription: aiOutput.meta_description,
         articleHtml: aiOutput.article_html,
         tags: categoryTag ? [categoryTag] : (aiOutput.tags || []),
@@ -315,7 +233,7 @@ const processGenerationJob = async (msg, channel) => {
         newsJsonLd,
         originalityScore: realOriginalityScore,
         confidenceScore: aiOutput.confidence || 0,
-        priorityScore: priorityScore,
+        priorityScore,
         status: finalStatus,
         publishAt: new Date(),
         originalNewsId: cleanNews.id,
@@ -323,12 +241,22 @@ const processGenerationJob = async (msg, channel) => {
       },
     });
 
-    console.log(`   ✨ Finished: ${aiOutput.slug} [${finalStatus}]`);
-
+    console.log(`Finished: ${finalSlug} [${finalStatus}]`);
     if (finalStatus === "PUBLISHED") await triggerRevalidation("articles");
     channel.ack(msg);
   } catch (err) {
-    console.error(`   ❌ Worker Error: ${err.message}`);
+    if (retryCount < MAX_GENERATION_RETRIES) {
+      const nextPayload = { ...content, retryCount: retryCount + 1, lastError: err.message };
+      channel.sendToQueue("generation_queue", Buffer.from(JSON.stringify(nextPayload)));
+      console.warn(
+        `Generation retry scheduled (${retryCount + 1}/${MAX_GENERATION_RETRIES}) for ${newsId}: ${err.message}`
+      );
+    } else {
+      const dlqPayload = { ...content, failedAt: new Date().toISOString(), lastError: err.message };
+      channel.sendToQueue("generation_dlq", Buffer.from(JSON.stringify(dlqPayload)));
+      console.error(`Sent to generation_dlq after retries for ${newsId}: ${err.message}`);
+    }
+    console.error(`Worker error: ${err.message}`);
     channel.ack(msg);
   }
 };
@@ -336,8 +264,9 @@ const processGenerationJob = async (msg, channel) => {
 const startGenWorker = async () => {
   const channel = await connectRabbit();
   await channel.assertQueue("generation_queue", { durable: true });
+  await channel.assertQueue("generation_dlq", { durable: true });
   channel.prefetch(1);
-  console.log("🚀 Gen Worker Started...");
+  console.log("Gen Worker Started...");
   channel.consume("generation_queue", (msg) => {
     if (msg) processGenerationJob(msg, channel);
   });

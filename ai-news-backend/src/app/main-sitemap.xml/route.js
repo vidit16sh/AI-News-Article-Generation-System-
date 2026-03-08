@@ -20,6 +20,7 @@ const escapeXml = (unsafe = '') =>
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
+  const minConfidence = Number(process.env.MAIN_SITEMAP_MIN_CONFIDENCE || 0.7);
 
   const staticRoutes = ['', '/about', '/contact', '/authors', '/archive', '/category/crypto', '/category/bitcoin', '/category/ethereum', '/category/finance']
     .map(
@@ -36,7 +37,7 @@ export async function GET() {
   const articles = await prisma.generatedArticle.findMany({
     where: {
       status: 'PUBLISHED',
-      confidenceScore: { gte: 0.75 },
+      confidenceScore: { gte: minConfidence },
     },
     orderBy: { publishAt: 'desc' },
     take: 49000,

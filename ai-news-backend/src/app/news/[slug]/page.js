@@ -40,17 +40,25 @@ const uniqueKeywords = (items = []) => {
   return out;
 };
 
-const normalizeArticleHtmlForRender = (html = "") =>
-  String(html)
-    // Remove fallback FAQ block if a richer FAQ already exists.
-    .replace(
+const normalizeArticleHtmlForRender = (html = "") => {
+  let out = String(html);
+  const faqHeadingCount =
+    (out.match(/<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi) || []).length;
+
+  // Remove fallback FAQ block only when duplicate FAQ headings exist.
+  if (faqHeadingCount > 1) {
+    out = out.replace(
       /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>\s*<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>[\s\S]*?<\/dl>/gi,
       ""
-    )
+    );
+  }
+
+  return out
     .replace(/\s+,/g, ",")
     .replace(/\s+\./g, ".")
     .replace(/\s{2,}/g, " ")
     .trim();
+};
 
 // 1. Fetch Data Function
 async function getArticle(slug) {

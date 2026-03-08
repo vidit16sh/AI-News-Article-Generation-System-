@@ -27,6 +27,8 @@ export const connectRabbit = async () => {
 
     await channel.assertQueue('ingest_queue', { durable: true });
     await channel.assertQueue('generation_queue', { durable: true });
+    await channel.assertQueue('ingest_dlq', { durable: true });
+    await channel.assertQueue('generation_dlq', { durable: true });
 
     console.log('RabbitMQ connected');
     return channel;
