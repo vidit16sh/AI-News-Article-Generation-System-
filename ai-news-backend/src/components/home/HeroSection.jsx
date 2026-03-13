@@ -9,7 +9,7 @@ export default function HeroSection({ featured }) {
       "Small Businesses Flourish as US Government Expands Loan Access and Support",
     excerpt:
       "In a year filled with economic challenges, small businesses across the United States are finding new opportunities for growth and expansion, thanks to the U.S....",
-    author: "AI Writer",
+    author: "CoinMarketBuzz Writer",
     date: "",
     imageUrl: "",
   };

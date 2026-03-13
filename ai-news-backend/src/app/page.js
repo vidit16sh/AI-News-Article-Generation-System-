@@ -30,7 +30,7 @@ export default async function HomePage() {
   const articles = articlesRaw.map((art) => ({
     ...art,
     category: art.originalNews?.category?.name || "General",
-    authorName: art.author?.name || "AI Writer",
+    authorName: art.author?.name || "CoinMarketBuzz Writer",
   }));
 
   // Separate the "Featured" (first one) from the rest

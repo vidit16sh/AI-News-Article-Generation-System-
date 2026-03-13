@@ -55,7 +55,7 @@ function ArticleCard({ article }) {
     article.primaryCategory ||
     article.tags?.[0] ||
     "News";
-  const author = article.authorName || article.sourceName || "AI Writer";
+  const author = article.authorName || article.sourceName || "CoinMarketBuzz Writer";
   const timeAgo = timeAgoFromDate(article.createdAt);
   const thumbnail =
     article.imageUrl || article.heroImageUrl || article.thumbnail || "";

@@ -179,7 +179,7 @@ export default async function ArticlePage({ params }) {
   const category = toTitleCase(article.category || article.primaryCategory || article.tags?.[0] || "News");
   const author = article.author || {
     name: "Editorial Desk",
-    role: "AI News Desk",
+    role: " News Desk",
     slug: null,
     imageUrl: null,
   }; 
