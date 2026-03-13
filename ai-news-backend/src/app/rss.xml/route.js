@@ -38,7 +38,7 @@ export async function GET() {
   <channel>
     <title>CoinMarketBuzz</title>
     <link>${baseUrl}</link>
-    <description>Latest AI-generated Crypto and Finance News</description>
+    <description>Latest cryptocurrency, blockchain, and financial market news from CoinMarketBuzz.</description>
     <language>en</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${baseUrl}/rss.xml" rel="self" type="application/rss+xml" />
