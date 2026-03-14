@@ -29,6 +29,8 @@ const FORBIDDEN_WORDS = [
 ];
 const STRICT_ARTICLE_AUDIT = process.env.STRICT_ARTICLE_AUDIT === "true";
 const MIN_AUDIT_WORD_COUNT = Number(process.env.MIN_AUDIT_WORD_COUNT || 900);
+const EDITORIAL_HARD_GATES = (process.env.EDITORIAL_HARD_GATES || "true") === "true";
+const REQUIRE_VERIFIED_QUOTE = (process.env.REQUIRE_VERIFIED_QUOTE || "false") === "true";
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
@@ -93,6 +95,90 @@ const toPlainText = (value = "") =>
     .replace(/[#*_`>\-\[\]\(\)]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const normalizeForMatch = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const firstParagraphText = (html = "") => {
+  const m = String(html).match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  return toPlainText(m?.[1] || "");
+};
+
+const hasLeadWhen = (text = "") =>
+  /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}|\b(?:today|yesterday|earlier|overnight)\b/i.test(
+    text
+  );
+
+const hasLeadWhy = (text = "") =>
+  /\b(?:because|as|after|amid|following|due to|driven by|triggered by)\b/i.test(text);
+
+const hasLeadImpact = (text = "") =>
+  /\b(?:market|crypto|industry|token|bitcoin|ethereum|volume|liquidity|price|cap|etf)\b/i.test(text);
+
+const findConcreteMetrics = (text = "") => {
+  const matches = String(text).match(
+    /(?:\$ ?\d[\d.,]*\s?(?:billion|million|trillion|bn|mn|tn)?)|(?:\d[\d.,]*\s?%)|(?:\d[\d.,]*\s?(?:btc|eth|usd|usdt|usdc))|(?:market cap|trading volume|open interest)\s?(?:of|at|near)?\s?\$?\d[\d.,]*/gi
+  );
+  return matches || [];
+};
+
+const hasSourceTag = (text = "") =>
+  /\bsource\s*:\s*(?:coingecko|exchange|regulatory filing|filing|public statement|blockchain analytics|on-chain data)\b/i.test(
+    text
+  );
+
+const hasBackgroundSection = (html = "") =>
+  /<h2[^>]*>\s*background\s*<\/h2>|<h3[^>]*>\s*background\s*<\/h3>/i.test(String(html));
+
+const hasRelatedDevelopments = (html = "") =>
+  /<h2[^>]*>\s*related developments\s*<\/h2>|<h3[^>]*>\s*related developments\s*<\/h3>/i.test(
+    String(html)
+  );
+
+const hasNarrativeSignal = (text = "") =>
+  /\b(?:unusual|unexpected|historically|historical|compared with|in contrast|despite|regulatory link|geopolitical)\b/i.test(
+    text
+  );
+
+const hasWatchNextEnding = (html = "") => {
+  const paragraphs = String(html).match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+  const tail = toPlainText(paragraphs.slice(-2).join(" "));
+  return /\b(?:watch|monitor|next|focus|key level|next data point)\b/i.test(tail);
+};
+
+const extractQuotedSegments = (text = "") => {
+  const matches = String(text).match(/["“”]([^"“”]{20,220})["“”]/g) || [];
+  return matches.map((q) => q.replace(/^["“”]|["“”]$/g, "").trim());
+};
+
+const enforceQuotePolicy = (content = "", sourceText = "") => {
+  const sourceNorm = normalizeForMatch(sourceText);
+  const quotes = extractQuotedSegments(content);
+  let out = String(content);
+  let validQuotes = 0;
+
+  for (const q of quotes) {
+    const qNorm = normalizeForMatch(q);
+    if (qNorm && sourceNorm.includes(qNorm)) {
+      validQuotes += 1;
+      continue;
+    }
+
+    // Remove surrounding quote marks for non-verifiable quotes to avoid fabricated direct quotations.
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`["“”]${escaped}["“”]`, "g"), q);
+  }
+
+  if (validQuotes === 0) {
+    out += `\n<p>No direct public quote was available at publication time.</p>`;
+  }
+
+  return { content: out, validQuotes };
+};
 const ensureHtmlContent = (rawContent = "") => {
   const source = String(rawContent || "").trim();
   if (!source) return "";
@@ -173,10 +259,20 @@ const normalizeArticleHtml = (html = "") =>
     .replace(/\bDeFi\s+,/g, "DeFi,")
     .trim();
 
-const auditAndFixArticle = (json, sourceUrl) => {
+const auditAndFixArticle = (json, sourceUrl, sourceText = "") => {
   let content = ensureHtmlContent(json.content || json.article_html || "");
   content = normalizeArticleHtml(content);
   let score = 100;
+  let editorialScore = 100;
+  const scorecard = {
+    leadCompleteness: 0,
+    dataAttribution: 0,
+    contextDepth: 0,
+    quoteValidity: 0,
+    neutralTone: 0,
+    uniquenessSignals: 0,
+    watchNextLine: 0,
+  };
 
   const hasSummary = content.includes('class="executive-summary"');
   const hasFAQ = content.includes('class="faq-section"');
@@ -195,6 +291,7 @@ const auditAndFixArticle = (json, sourceUrl) => {
       score -= 5;
     }
   });
+  scorecard.neutralTone = 1;
 
   const wordCount = toPlainText(content).split(/\s+/).filter(Boolean).length;
   if (wordCount < MIN_AUDIT_WORD_COUNT) {
@@ -202,6 +299,18 @@ const auditAndFixArticle = (json, sourceUrl) => {
       throw new Error(`Article too short: ${wordCount} words. Institutional pieces require depth.`);
     }
     score -= 20;
+  }
+
+  // Quote policy (safe mode): keep only verifiable quotes from source text; add a no-quote note otherwise.
+  const quotePolicy = enforceQuotePolicy(content, sourceText || "");
+  content = quotePolicy.content;
+  if (quotePolicy.validQuotes > 0 || !REQUIRE_VERIFIED_QUOTE) {
+    scorecard.quoteValidity = 1;
+  } else {
+    editorialScore -= 18;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error("Missing verified quote while REQUIRE_VERIFIED_QUOTE is enabled.");
+    }
   }
 
   // Enforce heading cadence and FAQ completeness from the system prompt.
@@ -249,6 +358,67 @@ const auditAndFixArticle = (json, sourceUrl) => {
     content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event")}`;
     score -= 8;
   }
+
+  // Editorial lead contract in first paragraph: what/when/why/impact.
+  const lead = firstParagraphText(content);
+  const leadHasWhen = hasLeadWhen(lead);
+  const leadHasWhy = hasLeadWhy(lead);
+  const leadHasImpact = hasLeadImpact(lead);
+  const leadHasWhat = lead.length >= 90;
+  const leadPass = leadHasWhat && leadHasWhen && leadHasWhy && leadHasImpact;
+  if (leadPass) {
+    scorecard.leadCompleteness = 1;
+  } else {
+    editorialScore -= 20;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error("Lead paragraph contract failed (what/when/why/impact).");
+    }
+  }
+
+  // Data + attribution: at least 2 concrete metrics when source data appears to include enough metrics.
+  const sourceMetrics = findConcreteMetrics(sourceText);
+  const outputMetrics = findConcreteMetrics(toPlainText(content));
+  const metricsRequired = sourceMetrics.length >= 2;
+  const hasNotProvided = /not provided in source data/i.test(content);
+  const dataAttributionPass =
+    (metricsRequired && outputMetrics.length >= 2 && hasSourceTag(content)) ||
+    (!metricsRequired && (hasSourceTag(content) || hasNotProvided));
+
+  if (dataAttributionPass) {
+    scorecard.dataAttribution = 1;
+  } else {
+    editorialScore -= 18;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error("Data attribution gate failed (metrics/source tags).");
+    }
+  }
+
+  // Context depth: mandatory short background + related developments section.
+  const contextDepthPass = hasBackgroundSection(content) && hasRelatedDevelopments(content);
+  if (contextDepthPass) {
+    scorecard.contextDepth = 1;
+  } else {
+    editorialScore -= 14;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error("Context gate failed (Background and Related Developments required).");
+    }
+  }
+
+  // Subtle narrative signal (non-hype) improves readability without speculation.
+  if (hasNarrativeSignal(toPlainText(content))) {
+    scorecard.uniquenessSignals = 1;
+  } else {
+    editorialScore -= 8;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error("Narrative signal missing (historical/unusual/regulatory-geopolitical connection).");
+    }
+  }
+
+  // Ending must include a concise 'what to watch next' line.
+  if (!hasWatchNextEnding(content)) {
+    content += `\n<p>What traders and analysts are watching next: confirmed filings, exchange-level flow data, and official follow-up statements tied to this development.</p>`;
+  }
+  scorecard.watchNextLine = hasWatchNextEnding(content) ? 1 : 0;
 
   // Ensure opening dateline format for News-style reporting.
   const datelineRegex =
@@ -301,7 +471,25 @@ const auditAndFixArticle = (json, sourceUrl) => {
   json.tags = Array.isArray(json.tags) ? json.tags : [];
   json.keywords = Array.isArray(json.keywords) ? json.keywords : [];
   json.focus_keywords = json.focus_keywords || "Crypto News";
-  json.confidence = Math.max(0, Math.min(1, score / 100));
+
+  // Weighted editorial scorecard hard-gate + confidence blend.
+  const weightedEditorial =
+    scorecard.leadCompleteness * 0.22 +
+    scorecard.dataAttribution * 0.2 +
+    scorecard.contextDepth * 0.16 +
+    scorecard.quoteValidity * 0.14 +
+    scorecard.neutralTone * 0.1 +
+    scorecard.uniquenessSignals * 0.1 +
+    scorecard.watchNextLine * 0.08;
+
+  const finalEditorialScore = Math.max(0, Math.min(100, Math.round((editorialScore * 0.5) + (weightedEditorial * 100 * 0.5))));
+  if (EDITORIAL_HARD_GATES && finalEditorialScore < 75) {
+    throw new Error(`Editorial score below threshold: ${finalEditorialScore}/100`);
+  }
+
+  json.editorial_score = finalEditorialScore;
+  json.quality_scorecard = scorecard;
+  json.confidence = Math.max(0, Math.min(1, ((score * 0.55) + (finalEditorialScore * 0.45)) / 100));
   return json;
 };
 // 🚑 SMART MANUAL FALLBACK
@@ -333,6 +521,16 @@ const generateFallbackArticle = (data) => {
     focus_keywords: categoryName,
     status: "WEAK",
     confidence: 0.1,
+    editorial_score: 35,
+    quality_scorecard: {
+      leadCompleteness: 0,
+      dataAttribution: 0,
+      contextDepth: 0,
+      quoteValidity: 0,
+      neutralTone: 1,
+      uniquenessSignals: 0,
+      watchNextLine: 0,
+    },
   };
 };
 
@@ -379,6 +577,8 @@ You will receive:
 - Do not invent quotes, numbers, timestamps, people, or sources.
 - Separate facts from inference using explicit phrasing.
 - If sources conflict, present both claims with attribution and explain the reliability gap.
+- Only include direct quotes that appear in provided source text; otherwise add:
+  \`No direct public quote was available at publication time.\`
 
 ### WRITING QUALITY CONSTRAINTS (STRICT)
 - Target body length: **1,900-2,150 words**.
@@ -392,6 +592,7 @@ You will receive:
 1. **H2: Breaking Developments** (150-220 words)
    - Immediate reporting: who, what, when, where.
    - Include location/date context in the opening paragraph when relevant.
+   - First paragraph must explicitly include: what happened, when it happened, why it matters, and current market/industry impact.
    - In the first 250 words, add a short "Credibility Snapshot" block with exactly 4 bullets:
      1) What's Confirmed
      2) What's Weak
@@ -401,6 +602,9 @@ You will receive:
    - Explain mechanism, protocol architecture, or regulatory mechanics.
 3. **H2: Data Analysis & Proof** (350-500 words)
    - Integrate CoinGecko + CryptoPanic metadata with explicit references.
+   - Include at least 2 concrete metrics when available (price, %, volume, market cap, timeline).
+   - Add source tags for metrics where possible: \`Source: CoinGecko\`, \`Source: exchange data\`, \`Source: regulatory filing\`, \`Source: public statement\`.
+   - If a required metric is unavailable, state exactly: \`Not provided in source data\`.
 4. **H2: Counter-Narrative & Source Conflicts** (350-500 words)
    - Compare source claims, identify contradictions, and unresolved gaps.
 5. **H2: 7-Day Outlook & Scenarios** (400-520 words)
@@ -409,6 +613,12 @@ You will receive:
    - Briefly explain how evidence quality was weighted.
 7. **H2: Frequently Asked Questions**
    - Add 4-6 FAQ entries with data-grounded answers.
+8. **H2: Background**
+   - Add a short paragraph giving broader context and significance.
+9. **H2: Related Developments**
+   - Include relevant ETH/altcoin/ETF/institutional/regulatory/macro reactions when relevant.
+10. **Final line**
+   - End with one evidence-based sentence on what traders/investors/analysts are watching next.
 
 ### E-E-A-T EXECUTION
 Write like an experienced financial investigations editor:
@@ -497,7 +707,7 @@ Return only a valid JSON object with exactly these keys:
         throw new Error("Parsed JSON is null or invalid.");
       }
 
-      json = auditAndFixArticle(json, cleanedNewsData.sourceUrl); 
+      json = auditAndFixArticle(json, cleanedNewsData.sourceUrl, cleanedNewsData.content || ""); 
 
       return { ...json, status: "STRONG", author_id: authorProfile?.id || "editorial-desk" };
     } catch (error) {

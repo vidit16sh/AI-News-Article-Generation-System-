@@ -18,6 +18,7 @@ const QUALITY_GATES = {
   minConfidence: Number(process.env.GEN_MIN_CONFIDENCE || 0.65),
   minWordCount: Number(process.env.GEN_MIN_WORD_COUNT || 1000),
   minOriginalityForPublish: Number(process.env.GEN_MIN_ORIGINALITY_FOR_PUBLISH || 0.55),
+  minEditorialScore: Number(process.env.GEN_MIN_EDITORIAL_SCORE || 75),
 };
 
 const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
@@ -154,6 +155,11 @@ const processGenerationJob = async (msg, channel) => {
       generateArticle(cleanNews, marketData, recentArticles, assignedAuthorProfile.personaKey)
     );
 
+    const editorialScore = Number(aiOutput.editorial_score || 0);
+    if (editorialScore > 0 && editorialScore < QUALITY_GATES.minEditorialScore) {
+      aiOutput.status = "WEAK";
+    }
+
     const isWeakFallback = aiOutput.status === "WEAK";
     if (isWeakFallback && !ALLOW_WEAK_FALLBACK) {
       channel.ack(msg);
@@ -163,7 +169,10 @@ const processGenerationJob = async (msg, channel) => {
     const confidence = Number(aiOutput.confidence || 0);
     const generatedWordCount = countWordsFromHtml(aiOutput.article_html || aiOutput.content || "");
 
-    if (!isWeakFallback && (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount)) {
+    if (
+      !isWeakFallback &&
+      (confidence < QUALITY_GATES.minConfidence || generatedWordCount < QUALITY_GATES.minWordCount)
+    ) {
       channel.ack(msg);
       return;
     }
