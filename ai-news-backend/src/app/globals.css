@@ -223,6 +223,38 @@ a {
     font-size: 0.85rem;
     color: #64748b; /* slate-500 */
   }
+
+  .article-prose.prose .faq-section {
+    margin: 1.5rem 0 2rem !important;
+    padding: 1rem 1.25rem !important;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+  }
+
+  .article-prose.prose .faq-section dt {
+    margin: 0.9rem 0 0.25rem !important;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .article-prose.prose .faq-section dt:first-of-type {
+    margin-top: 0 !important;
+  }
+
+  .article-prose.prose .faq-section dd {
+    margin: 0 0 0.6rem !important;
+    color: #334155;
+    line-height: 1.8;
+  }
+
+  .article-prose.prose section {
+    margin: 1.25rem 0 !important;
+  }
+
+  .article-prose.prose .verified-sources {
+    border-radius: 0.75rem;
+  }
 }
 
 @keyframes ticker {
