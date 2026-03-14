@@ -21,18 +21,11 @@ const escapeXml = (unsafe = '') =>
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
   const minConfidence = Number(process.env.MAIN_SITEMAP_MIN_CONFIDENCE || 0.7);
-
-  const staticRoutes = ['', '/about', '/contact', '/authors', '/archive', '/category/crypto', '/category/bitcoin', '/category/ethereum', '/category/finance']
-    .map(
-      (route) => `
-  <url>
-    <loc>${escapeXml(`${baseUrl}${route}`)}</loc>
-    <lastmod>${new Date().toISOString()}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>`
-    )
-    .join('');
+  const fallbackStaticLastmod =
+    process.env.SITEMAP_STATIC_LASTMOD ||
+    process.env.BUILD_TIMESTAMP ||
+    '2026-01-01T00:00:00.000Z';
+  const staticLastmodIso = new Date(fallbackStaticLastmod).toISOString();
 
   const articles = await prisma.generatedArticle.findMany({
     where: {
@@ -44,7 +37,39 @@ export async function GET() {
     select: { slug: true, updatedAt: true },
   });
 
-  const articleUrls = articles
+  const validArticles = articles.filter(
+    (article) => !!article.slug && /^[a-z0-9-]+$/.test(article.slug)
+  );
+
+  const latestArticleLastmodIso =
+    validArticles.length > 0
+      ? validArticles[0].updatedAt.toISOString()
+      : staticLastmodIso;
+
+  const staticRouteDefs = [
+    { route: '', priority: '1.0', changefreq: 'hourly', lastmod: latestArticleLastmodIso },
+    { route: '/about', priority: '0.5', changefreq: 'monthly', lastmod: staticLastmodIso },
+    { route: '/contact', priority: '0.5', changefreq: 'monthly', lastmod: staticLastmodIso },
+    { route: '/authors', priority: '0.6', changefreq: 'weekly', lastmod: staticLastmodIso },
+    { route: '/archive', priority: '0.8', changefreq: 'daily', lastmod: latestArticleLastmodIso },
+    { route: '/category/crypto', priority: '0.8', changefreq: 'daily', lastmod: latestArticleLastmodIso },
+    { route: '/category/bitcoin', priority: '0.8', changefreq: 'daily', lastmod: latestArticleLastmodIso },
+    { route: '/category/ethereum', priority: '0.8', changefreq: 'daily', lastmod: latestArticleLastmodIso },
+    { route: '/category/finance', priority: '0.8', changefreq: 'daily', lastmod: latestArticleLastmodIso },
+  ];
+
+  const staticRoutes = staticRouteDefs
+    .map(
+      ({ route, priority, changefreq, lastmod }) => `
+  <url>
+    <loc>${escapeXml(`${baseUrl}${route}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`
+    )
+    .join('');
+  const articleUrls = validArticles
     .map(
       (article) => `
   <url>

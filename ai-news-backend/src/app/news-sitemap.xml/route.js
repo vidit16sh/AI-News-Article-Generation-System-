@@ -52,9 +52,10 @@ export async function GET() {
   }
 
   const newsUrls = deduped
-  .filter((article) => !!article.slug && !!article.headline)
+  .filter((article) => !!article.slug && !!article.headline && /^[a-z0-9-]+$/.test(article.slug))
   .map(article => {
     const publishDate = new Date(article.publishAt || article.createdAt).toISOString();
+    const lastmodDate = new Date(article.updatedAt || article.publishAt || article.createdAt).toISOString();
     const absoluteImage = article.imageUrl?.startsWith('http') 
       ? article.imageUrl 
       : `${baseUrl}${article.imageUrl || '/default-news.jpg'}`;
@@ -62,6 +63,7 @@ export async function GET() {
     return `
   <url>
     <loc>${escapeXml(`${baseUrl}/news/${article.slug}`)}</loc>
+    <lastmod>${lastmodDate}</lastmod>
     <news:news>
       <news:publication>
         <news:name>CoinMarketBuzz</news:name>
