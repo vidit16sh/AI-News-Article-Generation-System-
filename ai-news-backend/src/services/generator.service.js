@@ -31,6 +31,8 @@ const STRICT_ARTICLE_AUDIT = process.env.STRICT_ARTICLE_AUDIT === "true";
 const MIN_AUDIT_WORD_COUNT = Number(process.env.MIN_AUDIT_WORD_COUNT || 900);
 const EDITORIAL_HARD_GATES = (process.env.EDITORIAL_HARD_GATES || "true") === "true";
 const REQUIRE_VERIFIED_QUOTE = (process.env.REQUIRE_VERIFIED_QUOTE || "false") === "true";
+const EDITORIAL_REQUIRE_IDEAL_STRUCTURE =
+  (process.env.EDITORIAL_REQUIRE_IDEAL_STRUCTURE || "false") === "true";
 
 // 🧹 ROBUST JSON CLEANER
 const cleanJsonOutput = (text) => {
@@ -130,6 +132,22 @@ const hasSourceTag = (text = "") =>
   /\bsource\s*:\s*(?:coingecko|exchange|regulatory filing|filing|public statement|blockchain analytics|on-chain data)\b/i.test(
     text
   );
+
+const hasSectionHeading = (html = "", title = "") =>
+  new RegExp(`<h2[^>]*>\\s*${title}\\s*<\\/h2>|<h3[^>]*>\\s*${title}\\s*<\\/h3>`, "i").test(
+    String(html)
+  );
+
+const hasIdealNewsStructure = (html = "") => {
+  const required = [
+    "Hook paragraph",
+    "Data summary",
+    "Why it matters",
+    "Industry comparison",
+    "Future implications",
+  ];
+  return required.every((section) => hasSectionHeading(html, section));
+};
 
 const hasBackgroundSection = (html = "") =>
   /<h2[^>]*>\s*background\s*<\/h2>|<h3[^>]*>\s*background\s*<\/h3>/i.test(String(html));
@@ -393,14 +411,26 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "") => {
     }
   }
 
-  // Context depth: mandatory short background + related developments section.
+  // Context depth:
+  // - Background + Related Developments remain mandatory.
+  // - Ideal News Structure can be toggled to hard-gate via EDITORIAL_REQUIRE_IDEAL_STRUCTURE.
+  const hasIdealStructure = hasIdealNewsStructure(content);
   const contextDepthPass = hasBackgroundSection(content) && hasRelatedDevelopments(content);
   if (contextDepthPass) {
     scorecard.contextDepth = 1;
   } else {
     editorialScore -= 14;
     if (EDITORIAL_HARD_GATES) {
-      throw new Error("Context gate failed (Background and Related Developments required).");
+      throw new Error("Context gate failed (Background + Related Developments required).");
+    }
+  }
+
+  if (!hasIdealStructure) {
+    editorialScore -= 6;
+    if (EDITORIAL_HARD_GATES && EDITORIAL_REQUIRE_IDEAL_STRUCTURE) {
+      throw new Error(
+        "Ideal News Structure missing (Hook paragraph, Data summary, Why it matters, Industry comparison, Future implications)."
+      );
     }
   }
 
@@ -619,6 +649,12 @@ You will receive:
    - Include relevant ETH/altcoin/ETF/institutional/regulatory/macro reactions when relevant.
 10. **Final line**
    - End with one evidence-based sentence on what traders/investors/analysts are watching next.
+11. **Ideal News Structure (exact section headings, in order)**
+   - H2: Hook paragraph
+   - H2: Data summary
+   - H2: Why it matters
+   - H2: Industry comparison
+   - H2: Future implications
 
 ### E-E-A-T EXECUTION
 Write like an experienced financial investigations editor:
