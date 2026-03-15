@@ -350,7 +350,6 @@ export default async function ArticlePage({ params }) {
   const articleHtml = addHeadingAnchors(normalizedArticleHtml);
   const readingTimeMinutes = estimateReadingTime(articleHtml);
   const tocItems = extractTocItems(articleHtml);
-  const editorialScore = Number(article.editorialScore || 0);
   const dataPackUsed = article.dataPackUsed || null;
   const faqItems = extractFaqItems(articleHtml);
   const sourceUrl = dataPackUsed?.sourceUrl || article.originalNews?.sourceUrl || "";
@@ -505,36 +504,30 @@ export default async function ArticlePage({ params }) {
           </div>
 
           {tocItems.length >= 3 && (
-            <section className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <h2 className="text-lg font-semibold text-slate-900">Table of Contents</h2>
-              <ul className="mt-3 space-y-1 text-sm">
-                {tocItems.map((item) => (
+            <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-semibold tracking-tight text-slate-900">Table of contents</h2>
+                <span className="text-xs text-slate-500">{tocItems.length} sections</span>
+              </div>
+              <ol className="space-y-1.5 text-sm">
+                {tocItems.map((item, idx) => (
                   <li key={item.id}>
-                    <a href={`#${item.id}`} className="text-blue-700 hover:underline">
-                      {item.label}
+                    <a
+                      href={`#${item.id}`}
+                      className="group flex items-start gap-2 rounded-md px-2 py-1.5 text-slate-700 hover:bg-slate-50"
+                    >
+                      <span className="mt-[1px] w-6 shrink-0 text-xs font-medium text-slate-400 group-hover:text-slate-600">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <span className="leading-5 group-hover:text-slate-900">{item.label}</span>
                     </a>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </section>
           )}
 
           <AuthorBioBox author={author} />
-          {(editorialScore > 0 || dataPackUsed) && (
-            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
-              <p className="font-semibold text-slate-900">Report Quality</p>
-              <p className="mt-1">
-                Editorial score: <strong>{editorialScore || "N/A"}</strong>
-              </p>
-              {dataPackUsed && (
-                <p className="mt-1 text-slate-600">
-                  Data Pack: {dataPackUsed.metricsAvailable || 0} metrics,{" "}
-                  {dataPackUsed.timelinePoints || 0} timeline points,{" "}
-                  {dataPackUsed.unknowns || 0} missing-data flags.
-                </p>
-              )}
-            </div>
-          )}
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">Evidence &amp; Sources</p>
             <div className="mt-2 space-y-1">

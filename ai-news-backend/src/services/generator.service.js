@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+﻿import OpenAI from "openai";
 
 // 🔌 Connect to DeepSeek via OpenAI SDK
 const openai = new OpenAI({
@@ -156,6 +156,23 @@ const hasSourceTag = (text = "") =>
 
 const DATA_PACK_MAX_METRICS = Number(process.env.DATA_PACK_MAX_METRICS || 10);
 const DATA_PACK_MIN_METRIC_HITS = Number(process.env.DATA_PACK_MIN_METRIC_HITS || 2);
+const MIN_TIMELINE_POINTS = Number(process.env.MIN_TIMELINE_POINTS || 1);
+const EVIDENCE_DENSITY_HARD_GATES = (process.env.EVIDENCE_DENSITY_HARD_GATES || "true") === "true";
+const CERTAINTY_OVERREACH_HARD_GATES = (process.env.CERTAINTY_OVERREACH_HARD_GATES || "true") === "true";
+const MAX_TEMPLATE_PHRASE_HITS = Number(process.env.MAX_TEMPLATE_PHRASE_HITS || 3);
+
+const TEMPLATE_PHRASES = [
+  "what traders and analysts are watching next",
+  "not provided in source data",
+  "in summary",
+  "this report analyzes the latest market development",
+  "coinmarketbuzz intelligence desk",
+];
+
+const CERTAINTY_CLAIMS_RE =
+  /\b(?:will definitely|will certainly|guaranteed|inevitable|cannot fail|undeniable|proves that|no doubt)\b/gi;
+const FLUENCY_ARTIFACT_RE =
+  /\b(?:this context why|the regulatory for years to come|this development[^.]{0,120},\s*the\s+[a-z]|is also tied to broader political cycles[, ]+with)\b/gi;
 
 const ATTRIBUTION_RULES = [
   { tag: "Source: CoinGecko", re: /\bcoingecko\b/i },
@@ -422,15 +439,78 @@ const extractQuotedSegments = (text = "") => {
   return matches.map((q) => q.replace(/^["“”]|["“”]$/g, "").trim());
 };
 
+const tokenSet = (value = "") =>
+  new Set(
+    normalizeForMatch(value)
+      .split(" ")
+      .filter((t) => t && t.length > 3)
+  );
+
+const quoteTokenOverlap = (quote = "", sourceText = "") => {
+  const a = tokenSet(quote);
+  const b = tokenSet(sourceText);
+  if (!a.size || !b.size) return 0;
+  let hits = 0;
+  for (const t of a) if (b.has(t)) hits += 1;
+  return hits / Math.max(a.size, 1);
+};
+
+const isLikelyQuoteInSource = (quote = "", sourceText = "") => {
+  const qNorm = normalizeForMatch(quote);
+  const sNorm = normalizeForMatch(sourceText);
+  if (!qNorm || !sNorm) return false;
+  if (sNorm.includes(qNorm)) return true;
+
+  const words = qNorm.split(" ").filter(Boolean);
+  const anchor = words.slice(0, Math.min(7, words.length)).join(" ");
+  if (anchor && sNorm.includes(anchor) && quoteTokenOverlap(quote, sourceText) >= 0.6) return true;
+
+  return quoteTokenOverlap(quote, sourceText) >= 0.72;
+};
+
+const hasDirectQuoteMarkup = (text = "") => /["“”][^"“”]{15,220}["“”]/.test(String(text || ""));
+
+const ensureCleanMetaDescription = (candidate = "", fallback = "") => {
+  let out = compactWhitespace(String(candidate || fallback || ""));
+  if (!out) return "";
+
+  out = out.replace(/\u2026/g, "...").replace(/\.\.\.$/, "").trim();
+  out = out.replace(/\b(?:and|or|but|with|for|to|of|in|on|at)\s*$/i, "").trim();
+  out = out.replace(/\b(?:u\.s|u\.k|eu)\.?$/i, "").trim();
+
+  if (!/[.!?]$/.test(out)) out = `${out}.`;
+  if (out.length > 160) {
+    out = out.slice(0, 157).replace(/\s+\S*$/, "").trim();
+    if (!/[.!?]$/.test(out)) out = `${out}.`;
+  }
+
+  return out;
+};
+
+const countTemplatePhraseHits = (text = "") => {
+  const plain = normalizeForMatch(text);
+  return TEMPLATE_PHRASES.reduce((acc, phrase) => {
+    const p = normalizeForMatch(phrase);
+    if (!p) return acc;
+    return acc + (plain.includes(p) ? 1 : 0);
+  }, 0);
+};
+
+const countTimelineMentionsInOutput = (text = "") => {
+  const matches =
+    String(text).match(
+      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b|\b(?:today|yesterday|earlier|overnight)\b/gi
+    ) || [];
+  return matches.length;
+};
+
 const enforceQuotePolicy = (content = "", sourceText = "") => {
-  const sourceNorm = normalizeForMatch(sourceText);
   const quotes = extractQuotedSegments(content);
   let out = String(content);
   let validQuotes = 0;
 
   for (const q of quotes) {
-    const qNorm = normalizeForMatch(q);
-    if (qNorm && sourceNorm.includes(qNorm)) {
+    if (isLikelyQuoteInSource(q, sourceText || "")) {
       validQuotes += 1;
       continue;
     }
@@ -440,7 +520,8 @@ const enforceQuotePolicy = (content = "", sourceText = "") => {
     out = out.replace(new RegExp(`["“”]${escaped}["“”]`, "g"), q);
   }
 
-  if (validQuotes === 0) {
+  const hasAnyDirectQuote = hasDirectQuoteMarkup(out);
+  if (validQuotes === 0 && !hasAnyDirectQuote) {
     out += `\n<p>No direct public quote was available at publication time.</p>`;
   }
 
@@ -573,6 +654,14 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
       score -= 5;
     }
   });
+
+  const fluencyArtifacts = (toPlainText(content).match(FLUENCY_ARTIFACT_RE) || []).length;
+  if (fluencyArtifacts > 0) {
+    editorialScore -= 10;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error(`Editorial fluency failed: found ${fluencyArtifacts} broken-syntax artifact(s).`);
+    }
+  }
   scorecard.neutralTone = 1;
 
   const wordCount = countWords(content);
@@ -600,6 +689,21 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
     editorialScore -= 18;
     if (EDITORIAL_HARD_GATES) {
       throw new Error("Missing verified quote while REQUIRE_VERIFIED_QUOTE is enabled.");
+    }
+  }
+
+  if (hasDirectQuoteMarkup(content)) {
+    content = content.replace(
+      /<p>\s*No direct public quote was available at publication time\.\s*<\/p>/gi,
+      ""
+    );
+  }
+
+  const templateHits = countTemplatePhraseHits(toPlainText(content));
+  if (templateHits > MAX_TEMPLATE_PHRASE_HITS) {
+    editorialScore -= 12;
+    if (EDITORIAL_HARD_GATES) {
+      throw new Error(`Template footprint too strong: ${templateHits} repeated boilerplate signals.`);
     }
   }
 
@@ -691,6 +795,23 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
     if (EDITORIAL_HARD_GATES) {
       throw new Error(
         `Data pack metric usage too low: ${dataPackMetricHits}/${DATA_PACK_MIN_METRIC_HITS} required references.`
+      );
+    }
+  }
+
+  const timelineMentions = countTimelineMentionsInOutput(toPlainText(content));
+  if (timelineMentions < MIN_TIMELINE_POINTS) {
+    editorialScore -= 8;
+    if (EVIDENCE_DENSITY_HARD_GATES) {
+      throw new Error(`Timeline evidence too thin: ${timelineMentions} mention(s), minimum ${MIN_TIMELINE_POINTS}.`);
+    }
+  }
+
+  if (wordCount > 900 && (outputMetrics.length < 3 || timelineMentions < 2)) {
+    editorialScore -= 14;
+    if (EVIDENCE_DENSITY_HARD_GATES) {
+      throw new Error(
+        `Evidence density insufficient for long-form length (${wordCount} words): need >=3 metrics and >=2 timeline mentions.`
       );
     }
   }
@@ -802,6 +923,14 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   }
   scorecard.watchNextLine = hasWatchNextEnding(content) ? 1 : 0;
 
+  const certaintyHits = (toPlainText(content).match(CERTAINTY_CLAIMS_RE) || []).length;
+  if (certaintyHits > 0 && (outputMetrics.length < 2 || !hasSourceTag(content))) {
+    editorialScore -= 12;
+    if (CERTAINTY_OVERREACH_HARD_GATES) {
+      throw new Error("Potential factual overreach detected: certainty claims exceed evidence attribution.");
+    }
+  }
+
   // Ensure opening dateline format for News-style reporting.
   const datelineRegex =
     /^<p>\s*<strong>[A-Za-z\s]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}<\/strong>\s*(?:[.:-]\s*)?/i;
@@ -838,7 +967,10 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   const plain = toPlainText(content);
   const excerpt = (json.excerpt || plain.slice(0, 160)).trim().slice(0, 160);
   const seoTitle = (json.seoTitle || normalizedHeadline).trim();
-  const seoDescription = (json.seoDescription || excerpt || normalizedHeadline).trim().slice(0, 160);
+  const seoDescription = ensureCleanMetaDescription(
+    (json.seoDescription || excerpt || normalizedHeadline).trim(),
+    excerpt || normalizedHeadline
+  );
 
   json.headline = normalizedHeadline;
   json.content = content;
@@ -1115,4 +1247,5 @@ Return only a valid JSON object with exactly these keys:
 
   return generateFallbackArticle(cleanedNewsData);
 };
+
 
