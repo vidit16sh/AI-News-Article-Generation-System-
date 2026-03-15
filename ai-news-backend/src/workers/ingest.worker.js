@@ -14,6 +14,7 @@ const MAX_INGEST_RETRIES = Number(process.env.MAX_INGEST_RETRIES || 2);
 const TRUSTED_SOURCE_HOSTS = [
   'coindesk.com',
   'cointelegraph.com',
+  'coinpedia.org',
   'theblock.co',
   'reuters.com',
   'cnbc.com',

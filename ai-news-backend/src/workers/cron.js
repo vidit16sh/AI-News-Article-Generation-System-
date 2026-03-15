@@ -6,10 +6,12 @@ import { getSourceScoreMap, getSourceKey } from '../services/ingestion-observabi
 
 const SOURCES = [
   'https://news.google.com/rss/search?q=site:coindesk.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=site:coinpedia.org+when:1d&hl=en-US&gl=US&ceid=US:en',
 ];
 const DIRECT_SOURCES = [
   'https://www.coindesk.com/arc/outboundfeeds/rss/',
   'https://cointelegraph.com/rss',
+  'https://coinpedia.org/feed/',
 ];
 const ENABLE_DIRECT_RSS = (process.env.ENABLE_DIRECT_RSS || 'true') === 'true';
 

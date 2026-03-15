@@ -16,7 +16,7 @@ const limiter = new Bottleneck({
 
 const QUALITY_GATES = {
   minConfidence: Number(process.env.GEN_MIN_CONFIDENCE || 0.65),
-  minWordCount: Number(process.env.GEN_MIN_WORD_COUNT || 1000),
+  minWordCount: Number(process.env.GEN_MIN_WORD_COUNT || 450),
   minOriginalityForPublish: Number(process.env.GEN_MIN_ORIGINALITY_FOR_PUBLISH || 0.55),
   minEditorialScore: Number(process.env.GEN_MIN_EDITORIAL_SCORE || 75),
 };

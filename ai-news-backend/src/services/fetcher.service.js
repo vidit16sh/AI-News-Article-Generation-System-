@@ -327,7 +327,20 @@ export const fetchRSS = async (url) => {
 
   try {
     const channel = await getChannelOptional();
-    const feed = await parser.parseURL(url);
+    let feed;
+    try {
+      feed = await parser.parseURL(url);
+    } catch {
+      const rssRes = await axios.get(url, {
+        timeout: 20000,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+        },
+      });
+      feed = await parser.parseString(String(rssRes.data || ''));
+    }
     stats.feedItems = Array.isArray(feed.items) ? feed.items.length : 0;
     const dedupe = await buildNearDuplicateChecker(new Date());
 

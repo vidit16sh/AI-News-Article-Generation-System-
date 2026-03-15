@@ -22,6 +22,11 @@ const DOMAIN_SELECTORS = {
     '.post-content',
     '.post__content',
   ],
+  'coinpedia.org': [
+    '.post-content',
+    '.entry-content',
+    'article .td-post-content',
+  ],
 };
 
 const selectorsForHost = (host = '') => {

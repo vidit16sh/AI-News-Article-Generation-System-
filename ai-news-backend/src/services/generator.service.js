@@ -28,7 +28,9 @@ const FORBIDDEN_WORDS = [
   "beacon", "dive deep", "poised to", "seamlessly", "complex world of"
 ];
 const STRICT_ARTICLE_AUDIT = process.env.STRICT_ARTICLE_AUDIT === "true";
-const MIN_AUDIT_WORD_COUNT = Number(process.env.MIN_AUDIT_WORD_COUNT || 900);
+const MIN_NEWS_WORD_COUNT = Number(process.env.MIN_NEWS_WORD_COUNT || 400);
+const MAX_NEWS_WORD_COUNT = Number(process.env.MAX_NEWS_WORD_COUNT || 2200);
+const MIN_AUDIT_WORD_COUNT = Number(process.env.MIN_AUDIT_WORD_COUNT || MIN_NEWS_WORD_COUNT);
 const EDITORIAL_HARD_GATES = (process.env.EDITORIAL_HARD_GATES || "true") === "true";
 const REQUIRE_VERIFIED_QUOTE = (process.env.REQUIRE_VERIFIED_QUOTE || "false") === "true";
 const EDITORIAL_REQUIRE_IDEAL_STRUCTURE =
@@ -99,6 +101,23 @@ const toPlainText = (value = "") =>
     .replace(/[#*_`>\-\[\]\(\)]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const countWords = (value = "") =>
+  toPlainText(value)
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const computeWordTargets = (summary = "", content = "") => {
+  const sourceWords = countWords(`${summary} ${content}`);
+  const minFromDepth = Math.round(sourceWords * 0.6);
+  const maxFromDepth = Math.round(sourceWords * 1.35);
+
+  const minWords = clampNumber(Math.max(MIN_NEWS_WORD_COUNT, minFromDepth), MIN_NEWS_WORD_COUNT, 1200);
+  const maxWords = clampNumber(Math.max(minWords + 250, maxFromDepth), 700, MAX_NEWS_WORD_COUNT);
+  return { sourceWords, minWords, maxWords };
+};
 
 const normalizeForMatch = (value = "") =>
   String(value)
@@ -521,7 +540,7 @@ const ensureExecutiveSummarySection = (html = "") => {
   return source.replace(firstParagraphRe, wrapped);
 };
 
-const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null) => {
+const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, wordTargets = null) => {
   let content = ensureHtmlContent(json.content || json.article_html || "");
   content = normalizeArticleHtml(content);
   content = ensureExecutiveSummarySection(content);
@@ -556,12 +575,20 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null) =
   });
   scorecard.neutralTone = 1;
 
-  const wordCount = toPlainText(content).split(/\s+/).filter(Boolean).length;
-  if (wordCount < MIN_AUDIT_WORD_COUNT) {
+  const wordCount = countWords(content);
+  const minRequiredWords = Math.max(Number(wordTargets?.minWords || 0), MIN_AUDIT_WORD_COUNT);
+  const maxRecommendedWords = Number(wordTargets?.maxWords || MAX_NEWS_WORD_COUNT);
+  if (wordCount < minRequiredWords) {
     if (STRICT_ARTICLE_AUDIT) {
-      throw new Error(`Article too short: ${wordCount} words. Institutional pieces require depth.`);
+      throw new Error(`Article too short: ${wordCount} words. Required minimum is ${minRequiredWords}.`);
     }
     score -= 20;
+  }
+  if (wordCount > maxRecommendedWords + 120) {
+    if (STRICT_ARTICLE_AUDIT) {
+      throw new Error(`Article too long: ${wordCount} words. Recommended maximum is ${maxRecommendedWords}.`);
+    }
+    score -= 8;
   }
 
   // Quote policy (safe mode): keep only verifiable quotes from source text; add a no-quote note otherwise.
@@ -893,6 +920,7 @@ const generateFallbackArticle = (data) => {
 export const generateArticle = async (cleanedNewsData, marketData = null, recentArticles = [], authorProfile = null) => {
   const MAX_RETRIES = 2;
   const dataPack = buildDataPack(cleanedNewsData, marketData);
+  const wordTargets = computeWordTargets(cleanedNewsData.summary || "", cleanedNewsData.content || "");
 
   // 1. Prepare Persona
   const selectedPersonaKey = authorProfile?.personaKey || "THE_ANALYST";  
@@ -940,7 +968,8 @@ You will receive:
   \`Not provided in source data.\`
 
 ### WRITING QUALITY CONSTRAINTS (STRICT)
-- Target body length: **1,900-2,150 words**.
+- Target body length should follow source depth. Keep it concise when source context is thin.
+- Hard floor: do not go below the supplied minimum word target.
 - Maintain neutral, journalistic tone with active voice.
 - Use transition words in a meaningful share of paragraphs.
 - Keep paragraphs concise and avoid filler.
@@ -1037,7 +1066,7 @@ Return only a valid JSON object with exactly these keys:
             **STYLE MODE:** ${selectedStyle} 
 
             ### FINAL CHECKS:
-            1. **Word Count:** Ensure content is 1,900-2,150 words.
+            1. **Word Count:** Follow this dynamic target window: min=${wordTargets.minWords}, max=${wordTargets.maxWords} (source words=${wordTargets.sourceWords}).
             2. **Schema:** Return ONLY this JSON: headline, content, excerpt, seoTitle, seoDescription.
             3. **No Extra Keys:** Do not include fields outside the required schema.
             4. **JSON Validity:** Output must parse directly with JSON.parse().
@@ -1066,7 +1095,8 @@ Return only a valid JSON object with exactly these keys:
         json,
         cleanedNewsData.sourceUrl,
         cleanedNewsData.content || "",
-        dataPack
+        dataPack,
+        wordTargets
       );
       json.data_pack_used = {
         metricsAvailable: dataPack.metrics.length,
