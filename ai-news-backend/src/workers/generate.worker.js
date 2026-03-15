@@ -230,6 +230,13 @@ const processGenerationJob = async (msg, channel) => {
       finalStatus = "QUEUED";
     }
 
+    const dataPackUsed = {
+      ...(aiOutput.data_pack_used || {}),
+      sourcePublishedAt: cleanNews.publishedAt ? new Date(cleanNews.publishedAt).toISOString() : null,
+      generatedAt: new Date().toISOString(),
+      sourceUrl: cleanNews.sourceUrl || null,
+    };
+
     await prisma.generatedArticle.create({
       data: {
         headline: aiOutput.headline,
@@ -242,6 +249,9 @@ const processGenerationJob = async (msg, channel) => {
         newsJsonLd,
         originalityScore: realOriginalityScore,
         confidenceScore: aiOutput.confidence || 0,
+        editorialScore: Number(aiOutput.editorial_score || 0),
+        qualityScorecard: aiOutput.quality_scorecard || null,
+        dataPackUsed,
         priorityScore,
         status: finalStatus,
         publishAt: new Date(),

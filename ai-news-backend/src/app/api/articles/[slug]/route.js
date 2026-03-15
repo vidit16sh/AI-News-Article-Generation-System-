@@ -25,7 +25,12 @@ export async function GET(request, { params }) {
             }
         },
         originalNews: {
-            select: { categoryId: true }
+            select: {
+              categoryId: true,
+              sourceUrl: true,
+              publishedAt: true,
+              title: true
+            }
         }
       }
     });

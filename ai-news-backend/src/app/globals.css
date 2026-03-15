@@ -126,6 +126,14 @@ a {
     line-height: 1.9 !important;
   }
 
+  .article-prose.prose .executive-summary {
+    margin: 0 0 1.5rem !important;
+    padding: 0.9rem 1rem !important;
+    border-left: 4px solid #0f172a;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+  }
+
   .article-prose.prose h2 {
     margin-top: 3rem !important;
     margin-bottom: 0.75rem !important;

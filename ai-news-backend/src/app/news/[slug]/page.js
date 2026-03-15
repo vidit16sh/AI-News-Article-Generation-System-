@@ -16,6 +16,8 @@ const cleanHeadline = (title) => {
     .trim();
 };
 
+const trimTrailingSlash = (value = "") => String(value).replace(/\/+$/, "");
+
 const toTitleCase = (value = "") =>
   String(value)
     .replace(/[-_]+/g, " ")
@@ -42,6 +44,12 @@ const uniqueKeywords = (items = []) => {
 
 const normalizeArticleHtmlForRender = (html = "") => {
   let out = String(html);
+
+  // Defensive sanitize to prevent duplicate JSON-LD/meta script injection from article body.
+  out = out
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "");
+
   const faqHeadingCount =
     (out.match(/<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi) || []).length;
 
@@ -60,9 +68,48 @@ const normalizeArticleHtmlForRender = (html = "") => {
     .trim();
 };
 
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const extractFaqItems = (html = "") => {
+  const source = String(html || "");
+  const items = [];
+
+  const dtRe = /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi;
+  let m;
+  while ((m = dtRe.exec(source)) !== null) {
+    const q = String(m[1] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const a = String(m[2] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (q && a) items.push({ question: q, answer: a });
+    if (items.length >= 8) break;
+  }
+
+  if (items.length) return items;
+
+  const qRe = /<p[^>]*>\s*<strong>\s*Q\d+\s*:\s*<\/strong>\s*([\s\S]*?)<br\s*\/?>\s*([\s\S]*?)<\/p>/gi;
+  while ((m = qRe.exec(source)) !== null) {
+    const q = String(m[1] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const a = String(m[2] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (q && a) items.push({ question: q, answer: a });
+    if (items.length >= 8) break;
+  }
+  return items;
+};
+
 // 1. Fetch Data Function
 async function getArticle(slug) {
-  const publicBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const publicBaseUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com");
   const internalBaseUrl = process.env.INTERNAL_API_BASE_URL || publicBaseUrl;
 
   try {
@@ -88,7 +135,7 @@ export async function generateMetadata({ params }) {
   }
 
   const { article } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com"; 
+  const baseUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com");
 
   const seoTitle = cleanHeadline(article.headline);
   const seoDescription = article.metaDescription || article.excerpt || article.headline;
@@ -171,7 +218,7 @@ export default async function ArticlePage({ params }) {
   if (!data || !data.article) notFound();
 
   const { article, relatedArticles } = data;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const baseUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com");
   
   const displayTitle = cleanHeadline(article.headline);
   const articleUrl = `${baseUrl}/news/${article.slug}`;
@@ -209,7 +256,7 @@ export default async function ArticlePage({ params }) {
   // ✅ PERFECTED JSON-LD (Removed Warnings)
   const newsJsonLd = {
     "@context": "https://schema.org",
-    "@type": isAnalysis ? "AnalysisNewsArticle" : "NewsArticle",
+    "@type": "NewsArticle",
     "headline": displayTitle,
     "description": article.metaDescription || article.excerpt || article.headline,
     "image": [absoluteImage], 
@@ -265,6 +312,15 @@ export default async function ArticlePage({ params }) {
 
   const shareText = displayTitle || "Check this out";
   const articleHtml = normalizeArticleHtmlForRender(article.articleHtml);
+  const editorialScore = Number(article.editorialScore || 0);
+  const dataPackUsed = article.dataPackUsed || null;
+  const faqItems = extractFaqItems(articleHtml);
+  const sourceUrl = dataPackUsed?.sourceUrl || article.originalNews?.sourceUrl || "";
+  const updatedAtLabel = formatDateTime(article.updatedAt || article.publishAt || article.createdAt);
+  const windowStart = formatDateTime(dataPackUsed?.sourcePublishedAt || article.originalNews?.publishedAt);
+  const windowEnd = formatDateTime(dataPackUsed?.generatedAt || article.updatedAt || article.publishAt);
+  const dataWindowLabel =
+    windowStart && windowEnd ? `${windowStart} → ${windowEnd}` : (windowStart || windowEnd || "N/A");
 
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`,
@@ -318,6 +374,14 @@ export default async function ArticlePage({ params }) {
                   </time> 
                 </>
               )}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700">
+                Updated: {updatedAtLabel || "N/A"}
+              </span>
+              <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700">
+                Data window: {dataWindowLabel}
+              </span>
             </div>
 
             {/* DESKTOP AUTHOR ROW */}
@@ -400,6 +464,48 @@ export default async function ArticlePage({ params }) {
           </div>
 
           <AuthorBioBox author={author} />
+          {(editorialScore > 0 || dataPackUsed) && (
+            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+              <p className="font-semibold text-slate-900">Report Quality</p>
+              <p className="mt-1">
+                Editorial score: <strong>{editorialScore || "N/A"}</strong>
+              </p>
+              {dataPackUsed && (
+                <p className="mt-1 text-slate-600">
+                  Data Pack: {dataPackUsed.metricsAvailable || 0} metrics,{" "}
+                  {dataPackUsed.timelinePoints || 0} timeline points,{" "}
+                  {dataPackUsed.unknowns || 0} missing-data flags.
+                </p>
+              )}
+            </div>
+          )}
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">Evidence &amp; Sources</p>
+            <div className="mt-2 space-y-1">
+              <p>Primary source: {sourceUrl ? <a href={sourceUrl} className="underline" target="_blank" rel="noreferrer noopener">{sourceUrl}</a> : "Not available"}</p>
+              <p>Updated at: {updatedAtLabel || "N/A"}</p>
+              <p>Data window: {dataWindowLabel}</p>
+              {dataPackUsed && (
+                <p>
+                  Evidence stats: {dataPackUsed.metricsAvailable || 0} metrics, {dataPackUsed.timelinePoints || 0} timeline points.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {faqItems.length > 0 && (
+            <section className="mt-8 rounded-lg border border-slate-200 bg-white p-4">
+              <h2 className="text-lg font-semibold text-slate-900">FAQ (Quick View)</h2>
+              <div className="mt-3 space-y-2">
+                {faqItems.map((item, idx) => (
+                  <details key={`${idx}-${item.question}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <summary className="cursor-pointer font-medium text-slate-900">{item.question}</summary>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-700">{item.answer}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
