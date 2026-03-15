@@ -107,6 +107,10 @@ const extractFaqItems = (html = "") => {
   return items;
 };
 
+const hasInlineFaqSection = (html = "") =>
+  /<h2[^>]*>\s*(?:Frequently Asked Questions|FAQs?)\s*<\/h2>/i.test(String(html || "")) ||
+  /<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>/i.test(String(html || ""));
+
 const estimateReadingTime = (html = "") => {
   const plain = String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   const words = plain ? plain.split(" ").length : 0;
@@ -352,6 +356,7 @@ export default async function ArticlePage({ params }) {
   const tocItems = extractTocItems(articleHtml);
   const dataPackUsed = article.dataPackUsed || null;
   const faqItems = extractFaqItems(articleHtml);
+  const shouldRenderFaqQuickView = faqItems.length > 0 && !hasInlineFaqSection(articleHtml);
   const sourceUrl = dataPackUsed?.sourceUrl || article.originalNews?.sourceUrl || "";
   const updatedAtLabel = formatDateTime(article.updatedAt || article.publishAt || article.createdAt);
   const windowStart = formatDateTime(dataPackUsed?.sourcePublishedAt || article.originalNews?.publishedAt);
@@ -542,7 +547,7 @@ export default async function ArticlePage({ params }) {
             </div>
           </div>
 
-          {faqItems.length > 0 && (
+          {shouldRenderFaqQuickView && (
             <section className="mt-8 rounded-lg border border-slate-200 bg-white p-4">
               <h2 className="text-lg font-semibold text-slate-900">FAQ (Quick View)</h2>
               <div className="mt-3 space-y-2">
