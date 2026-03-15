@@ -372,8 +372,8 @@ export default async function ArticlePage({ params }) {
   };
 
   return (
-    <div className="mx-auto max-w-[1440px] lg:px-0">
-      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,3fr)_1px_minmax(0,1fr)] lg:items-start lg:gap-8">
+    <div className="mx-auto max-w-[1440px] overflow-x-clip lg:px-0">
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_1px_320px] lg:items-start lg:gap-8">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
         <script
           type="application/ld+json"
@@ -381,7 +381,7 @@ export default async function ArticlePage({ params }) {
         />
 
         {/* MAIN ARTICLE COLUMN (itemScope/itemType removed to fix warnings) */}
-        <main className="lg:pr-0">
+        <main className="min-w-0 lg:pr-0">
           <header className="mb-8 pb-4">
             <div className="mb-4">
               <span className="inline-flex items-center gap-2 rounded-md border border-[#f7d9d9] bg-[#fcf2f2] px-3 py-1 text-[0.8rem] text-[#cc0000]">
@@ -490,7 +490,7 @@ export default async function ArticlePage({ params }) {
             </figure>
           )}
 
-          <div className="relative flex gap-8">
+          <div className="relative min-w-0 max-w-full flex gap-8 overflow-x-hidden">
             {/* Share column */}
             <div className="hidden lg:block lg:w-12 lg:flex-none">
               <div className="sticky top-32 flex flex-col gap-3">
@@ -503,7 +503,7 @@ export default async function ArticlePage({ params }) {
 
             {/* Article body */}
             <section
-              className="article-prose prose prose-lg max-w-none prose-h1:hidden prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold prose-p:text-slate-800 prose-p:leading-[1.85] prose-ul:my-4 prose-ol:my-4 prose-li:my-1 prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4 prose-blockquote:not-italic prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline"
+              className="article-prose prose prose-lg min-w-0 max-w-none break-words prose-h1:hidden prose-h2:mt-12 prose-h2:mb-3 prose-h2:text-[1.6rem] prose-h2:font-semibold prose-h2:tracking-tight prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-[1.25rem] prose-h3:font-semibold prose-p:text-slate-800 prose-p:leading-[1.85] prose-ul:my-4 prose-ol:my-4 prose-li:my-1 prose-blockquote:my-8 prose-blockquote:border-l-4 prose-blockquote:border-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:px-6 prose-blockquote:py-4 prose-blockquote:not-italic prose-a:text-blue-700 prose-a:font-medium hover:prose-a:underline [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:whitespace-nowrap [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_a]:break-all [&_img]:max-w-full [&_figure]:max-w-full"
               dangerouslySetInnerHTML={{ __html: articleHtml }}
             />
           </div>
@@ -536,7 +536,7 @@ export default async function ArticlePage({ params }) {
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">Evidence &amp; Sources</p>
             <div className="mt-2 space-y-1">
-              <p>Primary source: {sourceUrl ? <a href={sourceUrl} className="underline" target="_blank" rel="noreferrer noopener">{sourceUrl}</a> : "Not available"}</p>
+              <p>Primary source: {sourceUrl ? <a href={sourceUrl} className="underline break-all" target="_blank" rel="noreferrer noopener">{sourceUrl}</a> : "Not available"}</p>
               <p>Updated at: {updatedAtLabel || "N/A"}</p>
               <p>Data window: {dataWindowLabel}</p>
               {dataPackUsed && (
@@ -564,7 +564,7 @@ export default async function ArticlePage({ params }) {
           <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm leading-relaxed text-slate-600">
             <p>
               <strong>Disclaimer:</strong> The information provided is not trading advice, <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> holds no liability for any investments made based on the information provided on this page. We strongly recommend independent research and/or consultation with a qualified professional before making any investment decisions. <br></br>
-              <a href="https://coinmarketbuzz.com" className="underline">coinmarketbuzz.com</a> leverages advanced AI technology to analyze market data. All content is fact-checked and reviewed by our editorial team to ensure accuracy and neutrality.
+              All published reports are reviewed by our editorial team for factual consistency, neutrality, and reader clarity.
             </p>
           </div>
 
@@ -573,7 +573,7 @@ export default async function ArticlePage({ params }) {
 
         <div className="hidden h-full w-px bg-slate-200 lg:block" />
 
-        <aside className="mt-8 w-full lg:sticky lg:top-24 lg:mt-0">
+        <aside className="mt-8 min-w-0 w-full lg:sticky lg:top-24 lg:mt-0 lg:w-[320px]">
           <RightSidebar />
         </aside>
       </div>

@@ -124,6 +124,7 @@ a {
   .article-prose.prose p {
     margin: 0.75rem 0 !important;
     line-height: 1.9 !important;
+    overflow-wrap: anywhere;
   }
 
   .article-prose.prose .executive-summary {
@@ -197,7 +198,22 @@ a {
     font-size: 0.95rem;
     display: block; /* enables horizontal scrolling */
     overflow-x: auto;
+    max-width: 100%;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .article-prose.prose a {
+    word-break: break-word;
+  }
+
+  .article-prose.prose img,
+  .article-prose.prose figure,
+  .article-prose.prose pre {
+    max-width: 100%;
+  }
+
+  .article-prose.prose pre {
+    overflow-x: auto;
   }
 
   .article-prose.prose thead {

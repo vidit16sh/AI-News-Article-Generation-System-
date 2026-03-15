@@ -520,11 +520,6 @@ const enforceQuotePolicy = (content = "", sourceText = "") => {
     out = out.replace(new RegExp(`["“”]${escaped}["“”]`, "g"), q);
   }
 
-  const hasAnyDirectQuote = hasDirectQuoteMarkup(out);
-  if (validQuotes === 0 && !hasAnyDirectQuote) {
-    out += `\n<p>No direct public quote was available at publication time.</p>`;
-  }
-
   return { content: out, validQuotes };
 };
 const ensureHtmlContent = (rawContent = "") => {
@@ -600,6 +595,12 @@ const buildFallbackFaq = (topic = "this crypto development", dataPack = null) =>
 `.trim();
 };
 
+const buildWatchNextLine = (dataPack = null) => {
+  const primaryTimeline = dataPack?.timeline?.[0] || "next official follow-up statements";
+  const secondaryTimeline = dataPack?.timeline?.[1] || "exchange-level volume and liquidity data";
+  return `\n<p>What to watch next: ${primaryTimeline}; ${secondaryTimeline}.</p>`;
+};
+
 const FAQ_HEADING_RE = /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi;
 const FAQ_DL_RE = /<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>[\s\S]*?<\/dl>/gi;
 
@@ -654,7 +655,7 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   const hasFAQ = content.includes('class="faq-section"');
   const hasSources = content.includes('class="verified-sources"');
 
-  if (hasSummary && hasFAQ && hasSources) {
+  if (hasSummary && hasFAQ) {
     score += 10;
   } else {
     score -= 15;
@@ -932,7 +933,7 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
 
   // Ending must include a concise 'what to watch next' line.
   if (!hasWatchNextEnding(content)) {
-    content += `\n<p>What traders and analysts are watching next: confirmed filings, exchange-level flow data, and official follow-up statements tied to this development.</p>`;
+    content += buildWatchNextLine(dataPack);
   }
   scorecard.watchNextLine = hasWatchNextEnding(content) ? 1 : 0;
 
@@ -955,20 +956,17 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
       day: "numeric",
       year: "numeric",
     });
-    const intro = `<p><strong>${city}, ${dateStr}</strong>. This report analyzes the latest market development with verified source context and data-backed framing.</p>`;
+    const intro = `<p><strong>${city}, ${dateStr}</strong>. The following report is based on currently available verified source material and market data.</p>`;
     content = `${intro}\n${content}`;
     score -= 5;
   }
 
-  if (!hasSources) {
-    const sourceNote = `
-      <div class="verified-sources" style="margin-top: 30px; padding: 20px; border: 1px dashed #cbd5e1; background: #fdfdfd; font-size: 0.85rem;">
-        <strong>Source Note:</strong> Factual reporting in this investigative piece is sourced from
-        <a href="${sourceUrl}" target="_blank" rel="nofollow" style="color: #2563eb; text-decoration: underline;">original market reports</a>.
-        Analysis and technical forecasting provided by CoinMarketBuzz Intelligence Desk.
-      </div>
-    `;
-    content += sourceNote;
+  // Frontend renders a dedicated Evidence & Sources box; keep article body clean.
+  if (hasSources) {
+    content = content.replace(
+      /<div[^>]*class=["'][^"']*verified-sources[^"']*["'][^>]*>[\s\S]*?<\/div>/gi,
+      ""
+    );
   }
 
   if (json.headline) {
@@ -1107,8 +1105,7 @@ You will receive:
 - Do not invent quotes, numbers, timestamps, people, or sources.
 - Separate facts from inference using explicit phrasing.
 - If sources conflict, present both claims with attribution and explain the reliability gap.
-- Only include direct quotes that appear in provided source text; otherwise add:
-  \`No direct public quote was available at publication time.\`
+- Only include direct quotes that appear in provided source text.
 - Use at least two metrics from DATA PACK when available; if unavailable, explicitly write:
   \`Not provided in source data.\`
 
