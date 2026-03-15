@@ -6,6 +6,46 @@ import { logEvent } from '../utils/logger.js';
 const CONFIG = {
   DRIP_INTERVAL_MINS: 15,
   MIN_SCORE: Number(process.env.PUBLISHER_MIN_SCORE || 35),
+  MIN_CONFIDENCE: Number(process.env.PUBLISHER_MIN_CONFIDENCE || process.env.GEN_MIN_CONFIDENCE || 0.65),
+  MIN_EDITORIAL: Number(process.env.PUBLISHER_MIN_EDITORIAL_SCORE || process.env.GEN_MIN_EDITORIAL_SCORE || 75),
+  MIN_WORD_COUNT: Number(process.env.PUBLISHER_MIN_WORD_COUNT || process.env.GEN_MIN_WORD_COUNT || 450),
+};
+
+const countWordsFromHtml = (html = '') =>
+  String(html)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean).length;
+
+const isFallbackLikeContent = (html = '') => {
+  const plain = String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  const markers = [
+    'developing story: details are still emerging',
+    'coinmarketbuzz analysts are reviewing the details and will update this analysis shortly',
+    'market update',
+  ];
+
+  return markers.filter((m) => plain.includes(m)).length >= 2;
+};
+
+const passesPublishQuality = (article) => {
+  const confidence = Number(article?.confidenceScore || 0);
+  const editorial = Number(article?.editorialScore || 0);
+  const words = countWordsFromHtml(article?.articleHtml || '');
+  const fallbackLike = isFallbackLikeContent(article?.articleHtml || '');
+
+  return (
+    confidence >= CONFIG.MIN_CONFIDENCE &&
+    editorial >= CONFIG.MIN_EDITORIAL &&
+    words >= CONFIG.MIN_WORD_COUNT &&
+    !fallbackLike
+  );
 };
 
 const triggerRevalidation = async () => {
@@ -74,18 +114,24 @@ cron.schedule('* * * * *', async () => {
       return;
     }
 
-    const nextInQueue = await prisma.generatedArticle.findFirst({
+    const queueBatch = await prisma.generatedArticle.findMany({
       where: {
         status: 'QUEUED',
         priorityScore: { gte: CONFIG.MIN_SCORE },
       },
-      orderBy: { priorityScore: 'desc' },
+      orderBy: [{ priorityScore: 'desc' }, { createdAt: 'asc' }],
+      take: 25,
     });
+
+    const nextInQueue = queueBatch.find(passesPublishQuality);
 
     if (nextInQueue) {
       await publishArticle(nextInQueue, 'staggered drip release');
     } else {
-      logEvent('publisher', 'queue_empty', { minScore: CONFIG.MIN_SCORE });
+      logEvent('publisher', 'queue_empty_or_failed_quality', {
+        minScore: CONFIG.MIN_SCORE,
+        candidatesChecked: queueBatch.length,
+      });
     }
   } catch (error) {
     logEvent('publisher', 'tick_error', { error: error.message }, 'ERROR');

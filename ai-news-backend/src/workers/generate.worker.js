@@ -22,7 +22,7 @@ const QUALITY_GATES = {
 };
 
 const GEN_MIN_PRIORITY_SCORE = Number(process.env.GEN_MIN_PRIORITY_SCORE || 35);
-const ALLOW_WEAK_FALLBACK = (process.env.ALLOW_WEAK_FALLBACK || "true") === "true";
+const ALLOW_WEAK_FALLBACK = (process.env.ALLOW_WEAK_FALLBACK || "false") === "true";
 const MAX_GENERATION_RETRIES = Number(process.env.MAX_GENERATION_RETRIES || 2);
 
 const INTERNAL_APP_URL = (
@@ -60,6 +60,21 @@ const countWordsFromHtml = (html = "") =>
     .trim()
     .split(" ")
     .filter(Boolean).length;
+
+const isFallbackLikeContent = (html = "") => {
+  const plain = String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+  const markers = [
+    "developing story: details are still emerging",
+    "coinmarketbuzz analysts are reviewing the details and will update this analysis shortly",
+    "market update",
+  ];
+
+  return markers.filter((m) => plain.includes(m)).length >= 2;
+};
 
 const ensureUniqueSlug = async (candidate = "") => {
   const base =
@@ -160,8 +175,10 @@ const processGenerationJob = async (msg, channel) => {
       aiOutput.status = "WEAK";
     }
 
-    const isWeakFallback = aiOutput.status === "WEAK";
+    const fallbackLike = isFallbackLikeContent(aiOutput.article_html || aiOutput.content || "");
+    const isWeakFallback = aiOutput.status === "WEAK" || fallbackLike;
     if (isWeakFallback && !ALLOW_WEAK_FALLBACK) {
+      console.warn(`[Gen-Worker] Rejected weak/fallback article for ${newsId}`);
       channel.ack(msg);
       return;
     }
@@ -179,7 +196,7 @@ const processGenerationJob = async (msg, channel) => {
 
     let finalStatus = "QUEUED";
     if (priorityScore > 80 && !isWeakFallback) finalStatus = "PUBLISHED";
-    else if (priorityScore >= GEN_MIN_PRIORITY_SCORE || isWeakFallback) finalStatus = "QUEUED";
+    else if (priorityScore >= GEN_MIN_PRIORITY_SCORE && !isWeakFallback) finalStatus = "QUEUED";
     else {
       channel.ack(msg);
       return;
