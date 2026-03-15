@@ -573,19 +573,32 @@ const ensureHtmlContent = (rawContent = "") => {
   return out.join("\n");
 };
 
-const buildFallbackFaq = (topic = "this crypto development") => `
+const buildFallbackFaq = (topic = "this crypto development", dataPack = null) => {
+  const safeTopic = String(topic || "this crypto development").trim();
+  const eventWhat = dataPack?.event?.what || safeTopic;
+  const eventWhen = dataPack?.event?.when || "Not provided in source data";
+  const sourceUrl = dataPack?.event?.sourceUrl || "Not provided in source data";
+  const metricA = dataPack?.metrics?.[0]?.value || "Not provided in source data";
+  const metricB = dataPack?.metrics?.[1]?.value || "Not provided in source data";
+  const timelineA = dataPack?.timeline?.[0] || "Not provided in source data";
+  const timelineB = dataPack?.timeline?.[1] || "Not provided in source data";
+
+  return `
 <h2>Frequently Asked Questions</h2>
 <dl class="faq-section">
-  <dt>What happened?</dt>
-  <dd>The source indicates a material update around ${topic}.</dd>
-  <dt>Why does it matter?</dt>
-  <dd>It can affect short-term sentiment, liquidity, and positioning.</dd>
-  <dt>What should readers monitor next?</dt>
-  <dd>Watch official filings, exchange data, and follow-up statements.</dd>
-  <dt>Is this confirmed final?</dt>
-  <dd>No. Some details may evolve as more verified information arrives.</dd>
+  <dt>What is the core update in this report?</dt>
+  <dd>This article tracks ${eventWhat}. The latest timestamped reference is: ${eventWhen}.</dd>
+  <dt>Which data points matter most right now?</dt>
+  <dd>Key references currently highlighted are ${metricA} and ${metricB}. If additional validated figures emerge, coverage will be updated.</dd>
+  <dt>How should readers interpret this in market context?</dt>
+  <dd>The practical impact depends on confirmation quality, liquidity reaction, and whether follow-up disclosures reinforce the initial report.</dd>
+  <dt>What timeline checkpoints should be monitored next?</dt>
+  <dd>Watch for follow-up milestones linked to: ${timelineA}${timelineB !== "Not provided in source data" ? `; ${timelineB}` : ""}.</dd>
+  <dt>Where is the primary source for this update?</dt>
+  <dd>Primary source reference: ${sourceUrl}.</dd>
 </dl>
-`;
+`.trim();
+};
 
 const FAQ_HEADING_RE = /<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi;
 const FAQ_DL_RE = /<dl[^>]*class=["'][^"']*faq-section[^"']*["'][^>]*>[\s\S]*?<\/dl>/gi;
@@ -737,19 +750,19 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   const totalFaqItems = Math.max(faqDtCount, faqQCount);
 
   if (faqHeadingCount > 1) {
-    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event")}`;
+    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event", dataPack)}`;
     score -= 8;
   } else if (!hasFAQ && !hasFaqHeading) {
     if (STRICT_ARTICLE_AUDIT) {
       throw new Error("Missing FAQ section.");
     }
-    content += buildFallbackFaq(json.headline || "the latest market event");
+    content += buildFallbackFaq(json.headline || "the latest market event", dataPack);
     score -= 10;
   } else if (totalFaqItems < 4 || totalFaqItems > 6) {
     if (STRICT_ARTICLE_AUDIT) {
       throw new Error(`FAQ count out of range: found ${totalFaqItems}; expected 4-6.`);
     }
-    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event")}`;
+    content = `${removeFaqBlocks(content)}\n${buildFallbackFaq(json.headline || "the latest market event", dataPack)}`;
     score -= 8;
   }
 
