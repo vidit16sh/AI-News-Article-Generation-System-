@@ -51,7 +51,7 @@ export async function GET() {
     deduped.push(article);
   }
 
-  const newsUrls = deduped
+  const validNewsArticles = deduped
   .filter((article) => !!article.slug && !!article.headline && /^[a-z0-9-]+$/.test(article.slug))
   .map(article => {
     const publishDate = new Date(article.publishAt || article.createdAt).toISOString();
@@ -77,7 +77,32 @@ export async function GET() {
       <image:loc>${escapeXml(absoluteImage)}</image:loc>
     </image:image>` : ''}
   </url>`;
-  }).join('');
+  });
+
+  // Google rejects empty <urlset>. Keep one valid fallback URL if filters produce zero items.
+  let newsUrls = validNewsArticles.join('');
+  if (!newsUrls) {
+    const fallbackLatest = await prisma.generatedArticle.findFirst({
+      where: { status: 'PUBLISHED' },
+      orderBy: { publishAt: 'desc' },
+      select: { slug: true, updatedAt: true },
+    });
+
+    if (fallbackLatest?.slug && /^[a-z0-9-]+$/.test(fallbackLatest.slug)) {
+      const lastmod = new Date(fallbackLatest.updatedAt || Date.now()).toISOString();
+      newsUrls = `
+  <url>
+    <loc>${escapeXml(`${baseUrl}/news/${fallbackLatest.slug}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
+  </url>`;
+    } else {
+      newsUrls = `
+  <url>
+    <loc>${escapeXml(`${baseUrl}/`)}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+  </url>`;
+    }
+  }
 
   // 🛡️ CRITICAL FIX: You MUST include the xmlns:image line below
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
