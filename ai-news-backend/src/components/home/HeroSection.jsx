@@ -54,14 +54,14 @@ export default function HeroSection({ featured }) {
               )}
             </div>
 
-            <h1 className="text-2xl leading-snug sm:text-3xl lg:text-[2rem]">
+            <h2 className="text-2xl leading-snug sm:text-3xl lg:text-[2rem]">
               <Link
                 href={`/news/${article.slug}`}
                 className="underline-offset-[3px] decoration-red-500 hover:underline"
               >
                 {article.title}
               </Link>
-            </h1>
+            </h2>
 
             <p className="max-w-xl text-[1rem] leading-relaxed text-[#020a1c]">
               {article.excerpt}

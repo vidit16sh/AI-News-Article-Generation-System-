@@ -21,10 +21,7 @@ const escapeXml = (unsafe = '') =>
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
   const minConfidence = Number(process.env.MAIN_SITEMAP_MIN_CONFIDENCE || 0.7);
-  const fallbackStaticLastmod =
-    process.env.SITEMAP_STATIC_LASTMOD ||
-    process.env.BUILD_TIMESTAMP ||
-    '2026-01-01T00:00:00.000Z';
+  const fallbackStaticLastmod = process.env.SITEMAP_STATIC_LASTMOD || process.env.BUILD_TIMESTAMP || new Date().toISOString();
   const staticLastmodIso = new Date(fallbackStaticLastmod).toISOString();
 
   const articles = await prisma.generatedArticle.findMany({

@@ -10,7 +10,7 @@ export default function ArticleGrid({ articles }) {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
-            Latest AI-generated news
+            Latest market news
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             Fresh crypto, AI, and macro headlines, expanded into readable
@@ -49,7 +49,7 @@ function ArticleCard({ article }) {
     article.metaDescription ||
     article.summary ||
     article.excerpt ||
-    "AI-generated article without a summary.";
+    "Article without a summary.";
   const category =
     article.category ||
     article.primaryCategory ||
@@ -90,8 +90,8 @@ function ArticleCard({ article }) {
           <span className="opacity-80">{iconForCategory(category)}</span>
           <span>{category}</span>
         </div>
-        <div className="absolute right-2 bottom-2 rounded-full bg-slate-900/80 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.12em] text-emerald-300">
-          AI-generated
+        <div className="absolute right-2 bottom-2 rounded-full bg-slate-900/80 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.12em] text-sky-200">
+          Editorial
         </div>
       </div>
 

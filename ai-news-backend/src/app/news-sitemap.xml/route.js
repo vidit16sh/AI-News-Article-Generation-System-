@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
-  const lookbackHours = Number(process.env.NEWS_SITEMAP_LOOKBACK_HOURS || 72);
+  const lookbackHours = Number(process.env.NEWS_SITEMAP_LOOKBACK_HOURS || 48);
   const minConfidence = Number(process.env.NEWS_SITEMAP_MIN_CONFIDENCE || 0.7);
   const minOriginality = Number(process.env.NEWS_SITEMAP_MIN_ORIGINALITY || 0.6);
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);

@@ -6,23 +6,27 @@ import RightSidebar from "../../../components/layout/RightSidebar";
 
 async function fetchCategoryArticles(slug) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const safePage = Number.isFinite(Number(slug?.page)) ? Number(slug.page) : 1;
 
   try {
     const res = await fetch(
-      `${baseUrl}/api/articles?category=${encodeURIComponent(slug)}&limit=20`,
+      `${baseUrl}/api/articles?category=${encodeURIComponent(slug.category)}&limit=20&page=${Math.max(1, safePage)}`,
       { cache: 'no-store' }
     );
 
     if (!res.ok) {
       console.error("Failed to fetch category articles:", res.status);
-      return [];
+      return { data: [], meta: { page: 1, totalPages: 1, total: 0 } };
     }
 
     const json = await res.json();
-    return Array.isArray(json.data) ? json.data : [];
+    return {
+      data: Array.isArray(json.data) ? json.data : [],
+      meta: json.meta || { page: 1, totalPages: 1, total: 0 },
+    };
   } catch (err) {
     console.error("Error fetching category articles:", err);
-    return [];
+    return { data: [], meta: { page: 1, totalPages: 1, total: 0 } };
   }
 }
 
@@ -39,7 +43,7 @@ export async function generateMetadata({ params }) {
     title: `${meta.label} News | CoinMarketBuzz`,
     description:
       meta.description ||
-      `AI-generated ${meta.label.toLowerCase()} news, summaries, and explainers.`,
+      `Breaking ${meta.label.toLowerCase()} news, price updates, and market analysis from the CoinMarketBuzz editorial team.`,
     alternates: { canonical },
     robots: { index: true, follow: true },
   };
@@ -47,14 +51,17 @@ export async function generateMetadata({ params }) {
 
 /* ---------- Page ---------- */
 
-export default async function CategoryPage({ params }) {
+export default async function CategoryPage({ params, searchParams }) {
   const { slug } = await params;
   const safeSlug = (slug ?? "news").toString().trim().toLowerCase();
+  const page = Math.max(parseInt((await searchParams)?.page || "1", 10) || 1, 1);
 
   const categoryMeta = getCategoryMeta(safeSlug);
 
-  // ✅ FIX: Fetch already-filtered data from the server
-  const filteredArticles = await fetchCategoryArticles(safeSlug);
+  const { data: filteredArticles, meta } = await fetchCategoryArticles({
+    category: safeSlug,
+    page,
+  });
 
   if (!filteredArticles.length) {
     return (
@@ -70,10 +77,29 @@ export default async function CategoryPage({ params }) {
   }
 
   const [heroArticle, ...rest] = filteredArticles;
-  const gridArticles = rest.length ? rest.slice(0, 3) : [];
+  const gridArticles = rest;
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com";
+  const itemListElements = filteredArticles.map((article, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: `${baseUrl}/news/${article.slug || article.id}`,
+    name: article.headline || article.title || "News Article",
+  }));
+  const categoryJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `${categoryMeta.label} News`,
+    url: `${baseUrl}/category/${safeSlug}${page > 1 ? `?page=${page}` : ""}`,
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: itemListElements,
+    },
+  };
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryJsonLd) }} />
       {/* Banner */}
       <CategoryBanner label={categoryMeta.label} />
 
@@ -83,6 +109,9 @@ export default async function CategoryPage({ params }) {
         <div className="flex-1 space-y-6 lg:pr-8">
           <CategoryHero article={heroArticle} />
           <CategoryGrid articles={gridArticles} />
+          {meta.totalPages > 1 && (
+            <CategoryPagination slug={safeSlug} page={page} totalPages={meta.totalPages} />
+          )}
         </div>
 
         {/* DIVIDER */}
@@ -166,7 +195,7 @@ function CategoryGrid({ articles }) {
 
   return (
     <section className="mt-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {articles.map((article) => {
           const a = normalizeArticle(article);
           return (
@@ -201,6 +230,31 @@ function CategoryGrid({ articles }) {
         })}
       </div>
     </section>
+  );
+}
+
+function CategoryPagination({ slug, page, totalPages }) {
+  const prevPage = Math.max(page - 1, 1);
+  const nextPage = Math.min(page + 1, totalPages);
+
+  return (
+    <nav className="mt-8 flex items-center justify-between border-t border-slate-200 pt-4 text-sm">
+      <Link
+        href={page > 1 ? `/category/${slug}?page=${prevPage}` : "#"}
+        className={`rounded-md border px-3 py-1.5 ${page > 1 ? "border-slate-300 text-slate-700 hover:bg-slate-50" : "cursor-not-allowed border-slate-200 text-slate-400"}`}
+      >
+        Previous
+      </Link>
+      <span className="text-slate-600">
+        Page {page} of {totalPages}
+      </span>
+      <Link
+        href={page < totalPages ? `/category/${slug}?page=${nextPage}` : "#"}
+        className={`rounded-md border px-3 py-1.5 ${page < totalPages ? "border-slate-300 text-slate-700 hover:bg-slate-50" : "cursor-not-allowed border-slate-200 text-slate-400"}`}
+      >
+        Next
+      </Link>
+    </nav>
   );
 }
 

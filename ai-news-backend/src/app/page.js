@@ -10,6 +10,28 @@ import prisma from "@/lib/prisma";
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+export const metadata = {
+  title: "Latest Cryptocurrency News | CoinMarketBuzz",
+  description:
+    "Breaking cryptocurrency news, Bitcoin and Ethereum market updates, regulation coverage, and data-backed analysis from the CoinMarketBuzz editorial desk.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "https://coinmarketbuzz.com/",
+    title: "CoinMarketBuzz | Latest Cryptocurrency News",
+    description:
+      "Breaking cryptocurrency news, Bitcoin and Ethereum market updates, and editorial analysis.",
+    images: ["/brand/logo.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CoinMarketBuzz | Latest Cryptocurrency News",
+    description:
+      "Breaking cryptocurrency news, Bitcoin and Ethereum market updates, and editorial analysis.",
+    images: ["/brand/logo.png"],
+  },
+};
+
 export default async function HomePage() {
   // ✅ 1. Direct Database Query
   const articlesRaw = await prisma.generatedArticle.findMany({
@@ -43,9 +65,34 @@ export default async function HomePage() {
 
   const politicsSource = politicsArticles.length ? politicsArticles : rest;
   const politicsForStrip = politicsSource.slice(0, 4);
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "CoinMarketBuzz",
+    url: "https://coinmarketbuzz.com",
+    logo: "https://coinmarketbuzz.com/brand/logo.png",
+    sameAs: [
+      "https://x.com/coinmarketbuzz",
+      "https://www.linkedin.com/company/coinmarketbuzz",
+    ],
+  };
+  const webSiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "CoinMarketBuzz",
+    url: "https://coinmarketbuzz.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: "https://coinmarketbuzz.com/search?q={search_term_string}",
+      "query-input": "required name=search_term_string",
+    },
+  };
 
   return (
     <div className="space-y-10">
+      <h1 className="sr-only">Latest Cryptocurrency News</h1>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }} />
       {/* ✅ Auto refresh while the page is OPEN */}
       <AutoRefresh intervalMs={60000} />
 

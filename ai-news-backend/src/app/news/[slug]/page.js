@@ -107,6 +107,41 @@ const extractFaqItems = (html = "") => {
   return items;
 };
 
+const estimateReadingTime = (html = "") => {
+  const plain = String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const words = plain ? plain.split(" ").length : 0;
+  return Math.max(1, Math.ceil(words / 220));
+};
+
+const slugifyHeading = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+const addHeadingAnchors = (html = "") =>
+  String(html || "").replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (_, attrs = "", content = "") => {
+    const plain = String(content).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (!plain) return `<h2${attrs}>${content}</h2>`;
+    const id = slugifyHeading(plain);
+    if (/id\s*=/.test(attrs)) return `<h2${attrs}>${content}</h2>`;
+    return `<h2 id="${id}"${attrs}>${content}</h2>`;
+  });
+
+const extractTocItems = (html = "") => {
+  const out = [];
+  const re = /<h2[^>]*id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/h2>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const id = String(m[1] || "").trim();
+    const label = String(m[2] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (!id || !label) continue;
+    out.push({ id, label });
+  }
+  return out.slice(0, 18);
+};
+
 // 1. Fetch Data Function
 async function getArticle(slug) {
   const publicBaseUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || "https://coinmarketbuzz.com");
@@ -311,7 +346,10 @@ export default async function ArticlePage({ params }) {
   const relatedForMain = sidebarArticles.slice(0, 6);
 
   const shareText = displayTitle || "Check this out";
-  const articleHtml = normalizeArticleHtmlForRender(article.articleHtml);
+  const normalizedArticleHtml = normalizeArticleHtmlForRender(article.articleHtml);
+  const articleHtml = addHeadingAnchors(normalizedArticleHtml);
+  const readingTimeMinutes = estimateReadingTime(articleHtml);
+  const tocItems = extractTocItems(articleHtml);
   const editorialScore = Number(article.editorialScore || 0);
   const dataPackUsed = article.dataPackUsed || null;
   const faqItems = extractFaqItems(articleHtml);
@@ -381,6 +419,9 @@ export default async function ArticlePage({ params }) {
               </span>
               <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700">
                 Data window: {dataWindowLabel}
+              </span>
+              <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700">
+                Reading time: {readingTimeMinutes} min
               </span>
             </div>
 
@@ -462,6 +503,21 @@ export default async function ArticlePage({ params }) {
               dangerouslySetInnerHTML={{ __html: articleHtml }}
             />
           </div>
+
+          {tocItems.length >= 3 && (
+            <section className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h2 className="text-lg font-semibold text-slate-900">Table of Contents</h2>
+              <ul className="mt-3 space-y-1 text-sm">
+                {tocItems.map((item) => (
+                  <li key={item.id}>
+                    <a href={`#${item.id}`} className="text-blue-700 hover:underline">
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <AuthorBioBox author={author} />
           {(editorialScore > 0 || dataPackUsed) && (
