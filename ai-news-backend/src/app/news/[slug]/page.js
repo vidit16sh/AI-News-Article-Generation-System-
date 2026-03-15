@@ -50,6 +50,19 @@ const normalizeArticleHtmlForRender = (html = "") => {
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "");
 
+  // Remove legacy inline source/AI-template blocks from old generated articles.
+  out = out
+    .replace(/<div[^>]*class=["'][^"']*verified-sources[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, "")
+    .replace(/<p>\s*No direct public quote was available at publication time\.\s*<\/p>/gi, "")
+    .replace(
+      /<p>\s*What traders and analysts are watching next:[\s\S]*?<\/p>/gi,
+      ""
+    )
+    .replace(
+      /<p>\s*What happened\?\s*<\/p>\s*<p>[\s\S]*?<\/p>\s*<p>\s*Why does it matter\?\s*<\/p>\s*<p>[\s\S]*?<\/p>\s*<p>\s*What should readers monitor next\?\s*<\/p>\s*<p>[\s\S]*?<\/p>\s*<p>\s*Is this confirmed final\?\s*<\/p>\s*<p>[\s\S]*?<\/p>/gi,
+      ""
+    );
+
   const faqHeadingCount =
     (out.match(/<h2[^>]*>\s*Frequently Asked Questions\s*<\/h2>/gi) || []).length;
 
@@ -124,23 +137,38 @@ const slugifyHeading = (value = "") =>
     .trim()
     .replace(/\s+/g, "-");
 
-const addHeadingAnchors = (html = "") =>
-  String(html || "").replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (_, attrs = "", content = "") => {
+const addHeadingAnchors = (html = "") => {
+  const used = new Map();
+  return String(html || "").replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (_, attrs = "", content = "") => {
     const plain = String(content).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     if (!plain) return `<h2${attrs}>${content}</h2>`;
-    const id = slugifyHeading(plain);
-    if (/id\s*=/.test(attrs)) return `<h2${attrs}>${content}</h2>`;
-    return `<h2 id="${id}"${attrs}>${content}</h2>`;
+
+    const explicitIdMatch = String(attrs).match(/\sid=["']([^"']+)["']/i);
+    const baseId = explicitIdMatch?.[1] || slugifyHeading(plain);
+    const seen = used.get(baseId) || 0;
+    used.set(baseId, seen + 1);
+    const finalId = seen === 0 ? baseId : `${baseId}-${seen + 1}`;
+
+    if (explicitIdMatch) {
+      const newAttrs = String(attrs).replace(/\sid=["'][^"']+["']/i, ` id="${finalId}"`);
+      return `<h2${newAttrs}>${content}</h2>`;
+    }
+    return `<h2 id="${finalId}"${attrs}>${content}</h2>`;
   });
+};
 
 const extractTocItems = (html = "") => {
   const out = [];
+  const seen = new Set();
   const re = /<h2[^>]*id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/h2>/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     const id = String(m[1] || "").trim();
     const label = String(m[2] || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     if (!id || !label) continue;
+    const key = `${id}::${label.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push({ id, label });
   }
   return out.slice(0, 18);

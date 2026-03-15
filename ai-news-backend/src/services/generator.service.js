@@ -618,8 +618,76 @@ const normalizeArticleHtml = (html = "") =>
     .replace(/\s+,/g, ",")
     .replace(/\s+\./g, ".")
     .replace(/\s{2,}/g, " ")
+    .replace(/<a\s+href=(\/[^>\s]+)([^>]*)>/gi, '<a href="$1"$2>')
     .replace(/\bDeFi\s+,/g, "DeFi,")
     .trim();
+
+const stripTags = (value = "") =>
+  String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeHeadingKey = (value = "") =>
+  stripTags(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const scoreSectionBlock = (block = "") => {
+  const text = stripTags(block);
+  let score = countWords(text);
+  if (/not provided in source data/i.test(text)) score -= 80;
+  if (/developed into a market-moving story within the reported window/i.test(text)) score -= 120;
+  if (/<table\b/i.test(block)) score += 20;
+  if (/<section[^>]*executive-summary/i.test(block)) score += 10;
+  return score;
+};
+
+const dedupeRepeatedH2Sections = (html = "") => {
+  const source = String(html || "");
+  const headingRe = /<h2[^>]*>[\s\S]*?<\/h2>/gi;
+  const matches = [...source.matchAll(headingRe)];
+  if (matches.length < 2) return source;
+
+  const prefix = source.slice(0, matches[0].index);
+  const blocks = matches.map((m, idx) => {
+    const start = m.index;
+    const end = idx + 1 < matches.length ? matches[idx + 1].index : source.length;
+    const block = source.slice(start, end);
+    const heading = m[0];
+    const headingText = heading.replace(/<\/?h2[^>]*>/gi, "");
+    const key = normalizeHeadingKey(headingText);
+    return { start, block, key };
+  });
+
+  const selected = new Map();
+  for (const item of blocks) {
+    if (!item.key) continue;
+    const prev = selected.get(item.key);
+    if (!prev || scoreSectionBlock(item.block) > scoreSectionBlock(prev.block)) {
+      selected.set(item.key, item);
+    }
+  }
+
+  const ordered = Array.from(selected.values()).sort((a, b) => a.start - b.start);
+  return `${prefix}${ordered.map((x) => x.block.trim()).join("\n")}`.trim();
+};
+
+const removeHeadlineEchoSection = (html = "", headline = "") => {
+  const key = normalizeHeadingKey(headline);
+  if (!key) return String(html || "");
+  const sections = String(html || "").split(/(?=<h2\b[^>]*>)/i);
+  return sections
+    .filter((section) => {
+      const m = section.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+      if (!m) return true;
+      return normalizeHeadingKey(m[1]) !== key;
+    })
+    .join("")
+    .trim();
+};
 
 const ensureExecutiveSummarySection = (html = "") => {
   const source = String(html || "");
@@ -974,6 +1042,8 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   }
 
   const normalizedHeadline = sanitizeHeadline(json.headline || "CoinMarketBuzz Investigative Report");
+  content = removeHeadlineEchoSection(content, normalizedHeadline);
+  content = dedupeRepeatedH2Sections(content);
   content = normalizeArticleHtml(content);
   const plain = toPlainText(content);
   const excerpt = (json.excerpt || plain.slice(0, 160)).trim().slice(0, 160);
