@@ -87,7 +87,10 @@ model GeneratedArticle {
   tags            String[] // Stores tags as a list
   keywords        String[] // Main keywords
   
-  imageUrl        String? 
+  imageUrl        String?
+  // 🔴 PHASE 2: Image accessibility and structured data
+  imageAltText    String?  // Descriptive alt text for Google Images, Vision API, accessibility
+  imageCaption    String?  // Image caption for figure/figcaption element 
   
   // Advanced Fields (Requested in your prompt)
   newsJsonLd      Json?    // Stores the Schema.org JSON-LD object

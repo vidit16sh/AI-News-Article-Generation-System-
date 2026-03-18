@@ -9,7 +9,7 @@ const openai = new OpenAI({
 // DeepSeek V3 Configuration
 const MODEL_CONFIG = {
   model: "deepseek-chat",
-  temperature: 0.1, // Low temp is CRITICAL for following strict formatting rules
+  temperature: 0.3, // Increased for more analytical depth (causal reasoning, mechanism analysis)
   max_tokens: 8192,
   top_p: 0.9,
   response_format: { type: "json_object" },
@@ -155,7 +155,7 @@ const hasSourceTag = (text = "") =>
   );
 
 const DATA_PACK_MAX_METRICS = Number(process.env.DATA_PACK_MAX_METRICS || 10);
-const DATA_PACK_MIN_METRIC_HITS = Number(process.env.DATA_PACK_MIN_METRIC_HITS || 2);
+const DATA_PACK_MIN_METRIC_HITS = Number(process.env.DATA_PACK_MIN_METRIC_HITS || 1);
 const MIN_TIMELINE_POINTS = Number(process.env.MIN_TIMELINE_POINTS || 1);
 const EVIDENCE_DENSITY_HARD_GATES = (process.env.EVIDENCE_DENSITY_HARD_GATES || "true") === "true";
 const CERTAINTY_OVERREACH_HARD_GATES = (process.env.CERTAINTY_OVERREACH_HARD_GATES || "true") === "true";
@@ -334,7 +334,9 @@ const REQUIRED_NEWS_SECTIONS = [
   "Hook paragraph",
   "Data summary",
   "Why it matters",
+  "Mechanism Breakdown",
   "Industry comparison",
+  "Risks & Counterpoints",
   "Future implications",
 ];
 
@@ -369,12 +371,20 @@ const buildMissingSectionScaffold = (headline = "") => {
   </tbody>
 </table>
 <h2>Why it matters</h2>
-<p>The event matters because positioning, liquidity, and regulatory expectations can shift quickly once new information is confirmed across major trading venues.</p>
+<p>The event matters because positioning, liquidity, and regulatory expectations can shift quickly once new information is confirmed across major trading venues. Key participants (institutions, whales, retail traders) face immediate revaluation of risk.</p>
+<h2>Mechanism Breakdown</h2>
+<p>The underlying mechanism depends on the specific market event. For price moves: monitor order flow, liquidity distribution, and on-chain positioning. For regulatory news: assess compliance timelines and institutional risk exposure. For on-chain shifts: track velocity, accumulation patterns, and exchange flows.</p>
 <h2>Industry comparison</h2>
 <ul>
   <li>Bitcoin reaction: monitor directional follow-through and liquidity depth.</li>
   <li>Ethereum and majors: compare cross-asset participation versus Bitcoin-led moves.</li>
   <li>Policy layer: track filings or regulator statements for follow-up risk.</li>
+</ul>
+<h2>Risks & Counterpoints</h2>
+<ul>
+  <li>Bullish narrative risk: what data would invalidate the primary interpretation?</li>
+  <li>Uncertainty gap: what critical information is still missing from source data?</li>
+  <li>Mechanism failure: what market condition would break the expected price/impact relationship?</li>
 </ul>
 <h2>Future implications</h2>
 <p>Near-term implications depend on confirmation quality, follow-up disclosures, and whether volume expands beyond initial reaction windows.</p>
@@ -393,7 +403,9 @@ const hasIdealNewsStructure = (html = "") => {
     "hook paragraph",
     "data summary",
     "why it matters",
+    "mechanism breakdown",
     "industry comparison",
+    "risks & counterpoints",
     "future implications",
   ];
 
@@ -1064,8 +1076,46 @@ const auditAndFixArticle = (json, sourceUrl, sourceText = "", dataPack = null, w
   json.meta_description = seoDescription;
   json.slug = slugify(normalizedHeadline);
   json.tags = Array.isArray(json.tags) ? json.tags : [];
-  json.keywords = Array.isArray(json.keywords) ? json.keywords : [];
-  json.focus_keywords = json.focus_keywords || "Crypto News";
+  
+  // 🔴 PHASE 1: Ensure keywords are ALWAYS populated (required for Google News)
+  let keywords = Array.isArray(json.keywords) ? json.keywords.filter(Boolean) : [];
+  
+  // If AI didn't provide keywords, extract smart fallback keywords from content
+  if (keywords.length === 0) {
+    // Fallback: Extract topic anchors from headline and first section
+    const contentPreview = `${normalizedHeadline} ${firstParagraphText(content)}`.toLowerCase();
+    const cryptoTerms = ["bitcoin", "ethereum", "defi", "nft", "btc", "eth", "altcoin", "staking", "mining", "etf"];
+    const eventTerms = ["approval", "ruling", "lawsuit", "halving", "upgrade", "fork", "announcement", "sec", "regulatory"];
+    const metricTerms = ["price", "volume", "cap", "rally", "surge", "crash", "flow"];
+    
+    const foundTerms = [];
+    for (const term of [...cryptoTerms, ...eventTerms, ...metricTerms]) {
+      if (contentPreview.includes(term) && !foundTerms.includes(term)) {
+        foundTerms.push(term.charAt(0).toUpperCase() + term.slice(1));
+      }
+    }
+    
+    // Use found terms + category as fallback
+    keywords = foundTerms.slice(0, 6) || [
+      cleanedNewsData.category?.name || "Crypto",
+      "News",
+      "Market Update"
+    ];
+  }
+  
+  // Ensure at least 4 keywords
+  if (keywords.length < 4) {
+    keywords = [
+      ...keywords,
+      cleanedNewsData.category?.name || "Crypto",
+      "News",
+      "Market Analysis",
+      "Blockchain"
+    ].slice(0, 6);
+  }
+  
+  json.keywords = [...new Set(keywords)].slice(0, 8); // Dedupe and limit to 8
+  json.focus_keywords = json.focus_keywords || keywords[0] || "Crypto News";
 
   // Weighted editorial scorecard hard-gate + confidence blend.
   const weightedEditorial =
@@ -1161,6 +1211,15 @@ You are the lead editor at CoinMarketBuzz. Produce a definitive investigative cr
 ### CORE OBJECTIVE
 Transform fragmented multi-source inputs into a 100% unique, deeply useful investigative report that can satisfy Google News quality expectations and reader trust.
 
+### CAUSAL REASONING LAYER (CRITICAL FOR ANALYTICAL DEPTH)
+For every major claim, structure your thinking as:
+1. **Initial Event/Trigger**: What happened?
+2. **Mechanism**: How does this mechanically work? (e.g., whale movement → liquidity drain → price impact; ETF inflows → buying pressure → upward momentum)
+3. **Immediate Effect**: What is the direct market/technical response?
+4. **Outcome/Impact**: What are the cascading consequences for traders, institutions, price discovery?
+
+This prevents shallow fact-listing and forces deep causal chains. Connect cause to mechanism to effect for every major development.
+
 ### INPUT DATA PACKAGE
 You will receive:
 1. **THE LEAD**: Breaking brief from CoinNess.
@@ -1198,22 +1257,48 @@ You will receive:
    - If a required metric is unavailable, state exactly: \`Not provided in source data\`.
    - Include at least one table in this section.
 3. **H2: Why it matters**
-   - Explain significance to traders, institutions, or market structure in neutral language.
-4. **H2: Industry comparison**
+   - Answer these 4 elements (mandatory):
+     * **Why now?**: What contextual shift makes this significant at this moment? (market cycle, regulatory window, price level, etc.)
+     * **Who benefits?**: Which market participants (retail, whales, institutions, traders, developers) stand to gain or lose?
+     * **Time horizons**: Separate short-term (days/weeks) impact from longer-term (months/years) implications.
+     * **Causal chain**: Explicitly explain the mechanism linking the event to the market outcome (e.g., "ETF flows → decreased selling pressure → price support → retail FOMO")
+4. **H2: Mechanism Breakdown**
+   - Explain HOW things work internally, not just that they happened.
+   - For market events: break down whale behavior, ETF flows, liquidity pools, on-chain metrics, regulatory hooks.
+   - Use technical and market-structure language.
+   - Minimum: 2-3 sentences explaining the underlying mechanism.
+   - Example: "Whales accumulating below resistance → thin sell-side liquidity → one large buy absorbs surface asks → momentum cascade."
+5. **H2: Industry comparison**
    - Compare with adjacent developments (ETH/altcoins/ETF/institutional/regulation/macro).
    - Include one concise bullet list.
-5. **H2: Future implications**
+6. **H2: Risks & Counterpoints**
+   - Present the bearish scenario explicitly (what would invalidate the bullish narrative?).
+   - Discuss uncertainty: what data is missing? What could be wrong about the analysis?
+   - State the failure condition: what would break the assumed mechanism?
+   - Include 2-3 bullet points covering key risks.
+7. **H2: Future implications**
    - Explain practical near-term implications without speculative hype.
-6. **H2: Background**
+8. **H2: Background**
    - Add a short context paragraph with historical or structural framing.
-7. **H2: Related Developments**
+9. **H2: Related Developments**
    - Include relevant cross-market reactions where applicable.
-8. **H2: Conclusion**
+10. **H2: Conclusion**
    - Briefly wrap up key takeaways.
-9. **H2: Frequently Asked Questions**
+11. **H2: Frequently Asked Questions**
    - Add 4-6 FAQ entries using Q-style format (e.g., Q1:, Q2:) or definition list format.
-10. **Final line**
+12. **Final line**
    - End with one evidence-based sentence on what traders/investors/analysts are watching next.
+
+### NARRATIVE FLOW RULE (STRUCTURAL REQUIREMENT)
+Ensure articles follow this logical progression for maximum analytical depth:
+1. **Hook** - What happened? Grab attention with the news event.
+2. **Data** - What are the concrete numbers/metrics? Ground it in facts.
+3. **Mechanism** - How does it work internally? Break down the mechanics.
+4. **Impact** - Who benefits/loses? Why now? Causal consequences.
+5. **Risk** - What could go wrong? Uncertainties and failure conditions.
+6. **Outlook** - What to watch next? Forward-looking implications.
+
+This flow prevents analytical gaps and ensures readers understand both the "what" and the deeper "why" and "how."
 
 ### E-E-A-T EXECUTION
 Write like an experienced financial investigations editor:
@@ -1234,6 +1319,20 @@ Write like an experienced financial investigations editor:
 - Do not keyword-stuff.
 - Do not add generic hype language.
 
+### KEYWORDS GENERATION (CRITICAL FOR GOOGLE NEWS)
+You MUST extract and define keywords for the article. These are used for:
+- Google News categorization and relevance scoring
+- News feed placement and topic matching
+- Search result optimization
+
+**Rules for keyword extraction:**
+- Extract 5-8 specific keywords from the article content (NOT generic terms)
+- Keywords should be topic anchors: names (Bitcoin, Ethereum), sectors (DeFi, NFT), events (ETF approval, SEC ruling), metrics (price, volume, market cap)
+- Example BAD keywords: "news", "crypto", "update", "latest"
+- Example GOOD keywords: "Bitcoin ETF", "SEC approval", "institutional adoption", "Ethereum staking", "DeFi yields"
+- Each keyword should appear naturally multiple times in article content
+- Sort by relevance (most important first)
+
 ### HTML RENDER RULES
 - Content must be valid HTML using only: \`h2\`, \`h3\`, \`p\`, \`ul\`, \`li\`, \`blockquote\`, \`table\`, \`section\`, \`div\`.
 - Do not include markdown fences.
@@ -1246,7 +1345,8 @@ Return only a valid JSON object with exactly these keys:
   "content": "HTML String",
   "excerpt": "String (max 160 chars)",
   "seoTitle": "String",
-  "seoDescription": "String"
+  "seoDescription": "String",
+  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"] // 🔴 REQUIRED FOR GOOGLE NEWS
 }
 
 ### JSON SAFETY RULES FOR NEXT.JS 16
@@ -1254,6 +1354,7 @@ Return only a valid JSON object with exactly these keys:
 - Escape internal quotes correctly.
 - Use \`\\n\` for line breaks inside strings.
 - Ensure all required keys are present and non-empty.
+- keywords array MUST contain 4-8 relevant, specific keywords.
 `;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -1279,9 +1380,10 @@ Return only a valid JSON object with exactly these keys:
 
             ### FINAL CHECKS:
             1. **Word Count:** Follow this dynamic target window: min=${wordTargets.minWords}, max=${wordTargets.maxWords} (source words=${wordTargets.sourceWords}).
-            2. **Schema:** Return ONLY this JSON: headline, content, excerpt, seoTitle, seoDescription.
-            3. **No Extra Keys:** Do not include fields outside the required schema.
-            4. **JSON Validity:** Output must parse directly with JSON.parse().
+            2. **Keywords:** Extract 5-8 relevant, specific keywords from the headline and content (NOT generic terms). Include ticker symbols if mentioned (e.g., "BTC", "ETH", "GBTC"). This field is CRITICAL for Google News indexing.
+            3. **Schema:** Return ONLY this JSON: headline, content, excerpt, seoTitle, seoDescription, keywords.
+            4. **No Extra Keys:** Do not include fields outside the required schema.
+            5. **JSON Validity:** Output must parse directly with JSON.parse().
             `;
 
       const completion = await openai.chat.completions.create({

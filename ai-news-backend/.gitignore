@@ -4,4 +4,5 @@ node_modules
 .next
 /generated/prisma
 public/uploads
-docker-compose.yml
+docker-compose.yml 
+*.md

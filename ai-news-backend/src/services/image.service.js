@@ -40,6 +40,27 @@ const STORY_MOOD_PROMPTS = {
 
 const getRandomStyle = (variants) => variants[Math.floor(Math.random() * variants.length)];
 
+/**
+ * Generate descriptive alt text for news article image
+ * Phase 2 Enhancement: Accessibility + SEO for Google Images
+ */
+const generateImageAltText = (headline, category = "EDITORIAL") => {
+  const cleanHeadline = headline.replace(/[:"()]/g, "").trim();
+  
+  // Extract key terms from headline for specificity
+  const words = cleanHeadline.split(/\s+/).filter(w => w.length > 3);
+  const keywords = words.slice(0, 4).join(", ");
+  
+  // Create descriptive alt text based on category
+  const altTextTemplates = {
+    MEME: `Crypto market meme illustration showing ${cleanHeadline} - ${keywords}`,
+    SERIOUS: `Editorial illustration for crypto news: ${cleanHeadline}`,
+    DEFAULT: `Cryptocurrency news visual illustration: ${cleanHeadline}`
+  };
+  
+  return altTextTemplates[category] || altTextTemplates.DEFAULT;
+};
+
 export const generateImage = async (headline, category = "EDITORIAL") => {
   if (!process.env.FAL_KEY) return null;
 
@@ -104,7 +125,15 @@ export const generateImage = async (headline, category = "EDITORIAL") => {
     });
 
     const images = result.images || (result.data && result.data.images);
-    return images && images.length > 0 ? images[0].url : null;
+    
+    // Phase 2: Return both URL and auto-generated descriptive alt text
+    if (images && images.length > 0) {
+      return {
+        url: images[0].url,
+        alt: generateImageAltText(headline, category)
+      };
+    }
+    return null;
 
   } catch (error) {
     console.error("   ❌ Image Gen Error:", error.message);

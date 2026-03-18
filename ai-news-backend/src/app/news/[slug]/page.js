@@ -259,6 +259,14 @@ export async function generateMetadata({ params }) {
     },
     other: {
       "news_keywords": newsKeywords,
+      // 🔴 PHASE 1: Google News specific meta tags for better categorization
+      "article:published_time": publishedISO,
+      "article:modified_time": modifiedISO,
+      "article:author": article.author?.name || "CoinMarketBuzz Editorial",
+      "article:section": category,
+      "article:tag": newsKeywords,
+      // 🔴 PHASE 1: Access level declaration for Google News Showcase
+      "news_access": "Free",
     },
     openGraph: {
       title: seoTitle,
@@ -270,12 +278,14 @@ export async function generateMetadata({ params }) {
       section: category,
       images: [image],
       siteName: "CoinMarketBuzz",
+      authors: article.author?.name ? [article.author.name] : ["CoinMarketBuzz Editorial"],
     },
     twitter: {
       card: "summary_large_image",
       title: seoTitle,
       description: seoDescription,
       images: [image],
+      creator: article.author?.twitter ? `@${article.author.twitter}` : "@CoinMarketBuzz",
     },
   };
 }
@@ -323,13 +333,24 @@ export default async function ArticlePage({ params }) {
     { "@type": "ListItem", "position": 3, "name": displayTitle, "item": articleUrl }
   ]
   };
-  // ✅ PERFECTED JSON-LD (Removed Warnings)
-  const newsJsonLd = {
+  
+  // 🔴 PHASE 1: Use stored JSON-LD if available, with fallback to generated version
+  const storedNewsJsonLd = article.newsJsonLd || null;
+  
+  const newsJsonLd = storedNewsJsonLd || {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     "headline": displayTitle,
     "description": article.metaDescription || article.excerpt || article.headline,
-    "image": [absoluteImage], 
+    // 🔴 PHASE 2: Enhanced image structure with description for Google Images & Vision API
+    "image": [
+      {
+        "@type": "ImageObject",
+        "url": absoluteImage,
+        "description": article.imageAltText || displayTitle,
+        "caption": article.imageCaption || undefined
+      }
+    ],
     "datePublished": publishedISO,
     "dateModified": modifiedISO, 
     "url": articleUrl,
@@ -429,16 +450,17 @@ export default async function ArticlePage({ params }) {
             {displayTitle}
             </h1>
 
-            {/* MOBILE AUTHOR ROW */}
-            <div className="sm:hidden text-sm text-slate-600">
+            {/* MOBILE AUTHOR ROW  with Schema.org Person markup */}
+            <div className="sm:hidden text-sm text-slate-600" itemScope itemType="https://schema.org/Person">
               <span className="text-slate-500">By: </span>
               {authorSlug ? (
-                <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline">
-                  {authorName}
+                <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline" itemProp="url">
+                  <span itemProp="name">{authorName}</span>
                 </Link>
               ) : (
-                <span className="font-normal text-slate-900">{authorName}</span>
+                <span className="font-normal text-slate-900" itemProp="name">{authorName}</span>
               )}
+              {author.role && <span className="text-slate-500 text-xs" itemProp="jobTitle"> ({author.role})</span>}
               {publishedDate && (
                 <>
                   <span className="mx-2 inline-block h-1 w-1 align-middle rounded-full bg-red-600" />
@@ -460,17 +482,18 @@ export default async function ArticlePage({ params }) {
               </span>
             </div>
 
-            {/* DESKTOP AUTHOR ROW */}
-            <div className="hidden sm:flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
+            {/* DESKTOP AUTHOR ROW with Schema.org Person markup */}
+            <div className="hidden sm:flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6" itemScope itemType="https://schema.org/Person">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-slate-100">
                   {author.imageUrl ? (
                     <Image
                       src={author.imageUrl}
-                      alt={authorName}
+                      alt={`${authorName} - CoinMarketBuzz Author`}
                       width={36}
                       height={36}
                       className="object-cover"
+                      itemProp="image"
                     />
                   ) : (
                     <span className="text-sm font-extralight text-slate-500">
@@ -481,12 +504,14 @@ export default async function ArticlePage({ params }) {
 
                 <div className="flex flex-wrap items-center gap-4 text-sm">
                   {authorSlug ? (
-                    <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline">
-                      {authorName}
+                    <Link href={`/authors/${authorSlug}`} className="font-normal text-slate-900 hover:underline" itemProp="url">
+                      <span itemProp="name">{authorName}</span>
                     </Link>
                   ) : (
-                    <span className="font-medium text-slate-900">{authorName}</span>
+                    <span className="font-medium text-slate-900" itemProp="name">{authorName}</span>
                   )}
+                  {author.role && <span className="text-slate-500" itemProp="jobTitle">{author.role}</span>}
+                  {author.expertise && <span className="text-slate-400 text-xs" itemProp="knowsAbout">{author.expertise}</span>}
 
                   {publishedDate && <span className="h-1 w-1 rounded-full bg-red-600" />}
 
@@ -502,21 +527,26 @@ export default async function ArticlePage({ params }) {
 
           {/* Hero image */}
           {article.imageUrl && (
-            <figure className="mb-10 overflow-hidden rounded-2xl shadow-sm">
+            <figure className="mb-10 overflow-hidden rounded-2xl shadow-sm" itemScope itemType="https://schema.org/ImageObject">
               <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] bg-slate-100">
                 <Image
                   src={article.imageUrl}
-                  alt={article.headline}
+                  // 🔴 PHASE 2: Use auto-generated alt text from image service, with fallback
+                  alt={article.imageAltText || article.headline || "CoinMarketBuzz News"}
                   fill
                   priority
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 800px"
+                  itemProp="url"
                 />
               </div>
               {article.imageCaption && (
-                <figcaption className="mt-3 text-center text-sm italic text-slate-500">
+                <figcaption className="mt-3 text-center text-sm italic text-slate-500" itemProp="caption">
                   {article.imageCaption}
                 </figcaption>
+              )}
+              {(article.imageAltText || displayTitle) && (
+                <meta itemProp="description" content={article.imageAltText || displayTitle} />
               )}
             </figure>
           )}

@@ -3,8 +3,9 @@ import prisma from '@/lib/prisma';
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://coinmarketbuzz.com';
   const lookbackHours = Number(process.env.NEWS_SITEMAP_LOOKBACK_HOURS || 48);
-  const minConfidence = Number(process.env.NEWS_SITEMAP_MIN_CONFIDENCE || 0.7);
-  const minOriginality = Number(process.env.NEWS_SITEMAP_MIN_ORIGINALITY || 0.6);
+  // 🔴 PHASE 1: Lowered thresholds to include more articles in news feed (faster discovery)
+  const minConfidence = Number(process.env.NEWS_SITEMAP_MIN_CONFIDENCE || 0.65);
+  const minOriginality = Number(process.env.NEWS_SITEMAP_MIN_ORIGINALITY || 0.55);
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
   const articles = await prisma.generatedArticle.findMany({
@@ -59,6 +60,11 @@ export async function GET() {
     const absoluteImage = article.imageUrl?.startsWith('http') 
       ? article.imageUrl 
       : `${baseUrl}${article.imageUrl || '/default-news.jpg'}`;
+    
+    // 🔴 PHASE 1: Include keywords for Google News categorization
+    const keywordsList = Array.isArray(article.keywords) && article.keywords.length > 0
+      ? article.keywords.join(", ")
+      : [article.tags?.[0], "Crypto News"].filter(Boolean).join(", ");
 
     return `
   <url>
@@ -71,6 +77,7 @@ export async function GET() {
       </news:publication>
       <news:publication_date>${publishDate}</news:publication_date>
       <news:title>${escapeXml(article.headline)}</news:title>
+      ${keywordsList ? `<news:keywords>${escapeXml(keywordsList)}</news:keywords>` : ''}
     </news:news>
     ${article.imageUrl ? `
     <image:image>

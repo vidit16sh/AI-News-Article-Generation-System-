@@ -203,6 +203,7 @@ const processGenerationJob = async (msg, channel) => {
     }
 
     let finalImageUrl = null;
+    let imageAltText = null;
     const headlineLower = (aiOutput.headline || "").toLowerCase();
     const tagsString = (aiOutput.tags || []).join(" ").toLowerCase();
     const isMarketStory =
@@ -214,8 +215,18 @@ const processGenerationJob = async (msg, channel) => {
       tagsString.includes("market");
 
     const categorySlug = cleanNews.category ? cleanNews.category.slug : "altcoins";
+    // 🔴 PHASE 2: Capture both image URL and auto-generated alt text
     const aiImage = await generateImage(aiOutput.headline, categorySlug);
-    finalImageUrl = aiImage ? await downloadAndSaveImage(aiImage, aiOutput.slug) : "/default-news.jpg";
+    
+    if (aiImage) {
+      // Handle both old format (URL string) and new format (object with URL + alt text)
+      const imageUrl = typeof aiImage === 'string' ? aiImage : aiImage.url;
+      imageAltText = typeof aiImage === 'object' ? aiImage.alt : null;
+      finalImageUrl = await downloadAndSaveImage(imageUrl, aiOutput.slug);
+    } else {
+      finalImageUrl = "/default-news.jpg";
+      imageAltText = `Cryptocurrency news about ${aiOutput.headline}`;
+    }
 
     if (isMarketStory) {
       const rawChartUrl = await generateChartUrl(`${aiOutput.headline} ${cleanNews.title}`);
@@ -263,6 +274,7 @@ const processGenerationJob = async (msg, channel) => {
         tags: categoryTag ? [categoryTag] : (aiOutput.tags || []),
         keywords: aiOutput.keywords || [],
         imageUrl: finalImageUrl,
+        imageAltText: imageAltText,
         newsJsonLd,
         originalityScore: realOriginalityScore,
         confidenceScore: aiOutput.confidence || 0,
