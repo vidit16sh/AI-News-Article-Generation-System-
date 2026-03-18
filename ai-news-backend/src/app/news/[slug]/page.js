@@ -6,7 +6,10 @@ import RightSidebar from "../../../components/layout/RightSidebar";
 import AuthorBioBox from "../../../components/article/AuthorBioBox";
 
 // ✅ Icons (lucide-react)
-import { Facebook, Twitter, Linkedin, Mail } from "lucide-react"; 
+import { Facebook, Twitter, Linkedin, Mail } from "lucide-react";
+
+// ✅ REMOVED: Article detail uses cached API calls (next: { revalidate: 60 })
+// No explicit revalidate needed here since API handles caching 
 
 const cleanHeadline = (title) => {
   if (!title) return "";

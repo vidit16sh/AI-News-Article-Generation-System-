@@ -6,7 +6,8 @@ import RightSidebar from "../components/layout/RightSidebar";
 import AutoRefresh from "../components/common/AutoRefresh";
 import prisma from "@/lib/prisma";
 
-// ✅ ISR: refresh the cached homepage at most every 60 seconds
+// ⚠️ force-dynamic: Homepage requires fresh article data from database
+// Database often unavailable at build time, so ISR not viable
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 

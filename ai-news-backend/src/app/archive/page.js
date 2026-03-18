@@ -3,6 +3,8 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import RightSidebar from "../../components/layout/RightSidebar";
 
+// ⚠️ force-dynamic: Archive page requires fresh data from database
+// Can't use ISR because page is prerendered at build time (database not available)
 export const dynamic = "force-dynamic";
 
 export const metadata = {

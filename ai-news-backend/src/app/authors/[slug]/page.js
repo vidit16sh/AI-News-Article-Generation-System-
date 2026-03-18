@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import RightSidebar from "../../../components/layout/RightSidebar";
 import prisma from "@/lib/prisma";
 
+// ⚠️ force-dynamic: Author pages require fresh author data from database
 export const dynamic = "force-dynamic";
 
 async function getAuthorWithArticles(slug) {
